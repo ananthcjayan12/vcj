@@ -1,0 +1,57 @@
+# OS / Finder clutter
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor and IDE state
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python bytecode and tooling caches
+__pycache__/
+*.py[cod]
+*.py,cover
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.eggs/
+*.egg-info/
+build/
+dist/
+site/
+.ipynb_checkpoints/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local tool state
+.playwright-cli/
+.python-version
+
+# Downloader outputs
+CAIE_IGCSE_Physics_0625_Question_Papers/
+CAIE_IGCSE_Physics_0625_Question_Papers.zip
+download_manifest.csv
+*.part
+
+# Generated analysis and browser outputs
+output/
+pilot/output/
+pilot/index_output/
+
+# Generated databases and scratch files
+*.sqlite3
+*.db
+*.log
