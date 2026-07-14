@@ -1,0 +1,116 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Speed-time graph challenge",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_TitleCard",
+      "label": "Introduction",
+      "duration": 5,
+      "narration": "The gradient gives acceleration, while the area under the graph gives distance.",
+      "params": {
+        "title": "Read the whole journey",
+        "subtitle": "Acceleration and area from one graph",
+        "badge": "IGCSE Physics 0625"
+      }
+    },
+    {
+      "scene": "Scene_GraphPlotter",
+      "label": "Journey graph",
+      "duration": 9,
+      "narration": "The bicycle reaches eight metres per second in four seconds, travels steadily, and then stops.",
+      "params": {
+        "title": "Electric bicycle journey",
+        "xAxis": {
+          "label": "time",
+          "min": 0,
+          "max": 12,
+          "unit": "s"
+        },
+        "yAxis": {
+          "label": "speed",
+          "min": 0,
+          "max": 10,
+          "unit": "m/s"
+        },
+        "curves": [
+          {
+            "label": "speed",
+            "color": "velocity",
+            "style": "solid",
+            "dataPoints": [
+              [
+                0,
+                0
+              ],
+              [
+                4,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                12,
+                0
+              ]
+            ]
+          }
+        ],
+        "annotations": [
+          {
+            "x": 4,
+            "y": 8,
+            "text": "8 m/s after 4 s"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "Scene_NumericalExample",
+      "label": "Calculate",
+      "duration": 9,
+      "narration": "Acceleration is eight divided by four. Distance is the sum of two triangles and one rectangle.",
+      "params": {
+        "title": "Gradient and area",
+        "steps": [
+          {
+            "label": "Acceleration",
+            "content": "8 / 4 = 2.0 m/s^2"
+          },
+          {
+            "label": "First triangle",
+            "content": "0.5 x 4 x 8 = 16 m"
+          },
+          {
+            "label": "Rectangle",
+            "content": "6 x 8 = 48 m"
+          },
+          {
+            "label": "Final triangle",
+            "content": "0.5 x 2 x 8 = 8 m"
+          },
+          {
+            "label": "Total",
+            "content": "16 + 48 + 8 = 72 m"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "label": "Retrieval summary",
+      "duration": 6,
+      "narration": "Pause and calculate the two answers again without looking.",
+      "params": {
+        "heading": "Pause and recall",
+        "points": [
+          "Gradient gives acceleration",
+          "Area gives distance",
+          "Split a complex area into simple shapes"
+        ]
+      }
+    }
+  ]
+}

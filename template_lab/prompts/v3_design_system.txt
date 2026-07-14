@@ -1,0 +1,59 @@
+MAV V3 DESIGN SYSTEM
+====================
+
+You MUST use ONLY these design tokens. Do NOT invent colors, fonts, or spacing.
+
+COLORS (use as CSS variables):
+  var(--paper)       #f2efe4   — scene backgrounds, paper surfaces
+  var(--paper-deep)  #e7e1d0   — secondary paper, aged feel
+  var(--paper-card)  #fbf7ea   — floating card/document surfaces
+  var(--ink)         #171714   — primary text, lines, strokes
+  var(--muted-ink)   #5e5b52   — secondary labels, captions
+  var(--teal)        #42b88b   — positive data, connections, growth
+  var(--teal-wash)   #cde9dd   — teal backgrounds, fills
+  var(--yellow)      #f2d84b   — highlights, stamps, attention
+  var(--orange)      #e79a63   — warnings, emphasis, heat
+  var(--wood)        #39251b   — dark dramatic backgrounds
+  var(--wood-light)  #6b4937   — secondary dark surfaces
+
+TRANSPARENCY:
+  - For translucent shadows, glows, gradients, fills, and overlays, use CSS color-mix with a design token.
+  - Examples: color-mix(in srgb, var(--ink) 15%, transparent), color-mix(in srgb, var(--orange) 20%, transparent)
+  - Do NOT use rgba(), rgb(), hsl(), hsla(), or hex colors.
+
+TYPOGRAPHY:
+  Headlines:    font-family: var(--serif); font-weight: 800; line-height: 0.95
+  Support text: font-family: var(--sans); font-weight: 700; text-transform: uppercase
+  Labels:       font-family: var(--sans); font-weight: 700; font-size: 18-22px; text-transform: uppercase; color: var(--muted-ink)
+  Annotations:  font-family: var(--sans); font-weight: 900; font-size: 22-28px; transform: rotate(-2deg to 3deg)
+  Stamps:       font-family: var(--sans); font-weight: 1000; font-size: 32-44px; transform: rotate(-12deg); border: 7px solid
+  Pivot text:   font-family: var(--serif); font-weight: 1000; font-size: 100-140px; text-align: center
+
+CANVAS:
+  - Canvas is 1920x1080 pixels
+  - Use position: absolute with pixel coordinates for all elements
+  - Safe area: 10% margin on all sides (192px left/right, 108px top/bottom)
+  - All elements must use z-index: scene background=1, visual elements=5, text=8, annotations=9, stamps=12, overlays=13
+
+TEXTURE LAYERS (provided by shell, do NOT recreate):
+  - Paper background (.paper-bg) — always present
+  - Film grain (.grain) — always present
+  - Vignette (.vignette) — always present
+  - Flash transition (.mav-flash) — handled by master timeline
+
+CSS VARIABLE FONTS (already loaded, use directly):
+  var(--serif) = Georgia, "Times New Roman", Times, serif
+  var(--sans) = Arial, Helvetica, sans-serif
+
+PHYSICS VISUAL RULES:
+  - The animation must reveal a physical relationship, not merely decorate narration.
+  - Preserve direction, relative magnitude, geometry, polarity, circuit connectivity, ray direction, graph axes, and units exactly as stated.
+  - Label every graph axis with quantity and unit. Show a scale when a numerical reading depends on it.
+  - Force/vector arrows begin at the correct object or point, point in the correct direction, and use length consistently when comparing magnitudes.
+  - Circuit paths must be topologically connected and use recognisable IGCSE symbols. Never imply current is consumed.
+  - Light rays must be straight within a uniform medium; normals and angles must meet at the point of incidence.
+  - Particle animations communicate a model. Use enough particles to show a pattern without suggesting precise molecular scale.
+  - Equations follow concept and symbol meaning. Animate substitution in a separate line and always display units.
+  - Do not show the answer to a prediction or retrieval prompt until its narration reveal.
+  - Keep on-screen prose short: one claim, label, equation step, or question at a time.
+  - Never reproduce a past-paper page, question, diagram, table, or mark scheme.

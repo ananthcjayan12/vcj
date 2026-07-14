@@ -1,0 +1,55 @@
+{
+  "version": "3.0",
+  "description": "The four active model tasks in the Physics V3 lesson pipeline.",
+  "tasks": {
+    "script_structure": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "provider_models": {
+        "gemini": "gemini-3.1-flash-lite",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 64000,
+      "provider_env_var": "MAV_SCRIPT_STRUCTURE_PROVIDER",
+      "env_var": "MAV_SCRIPT_STRUCTURE_MODEL",
+      "prompt_files": ["script_structure.system.txt", "script_structure.user.txt"]
+    },
+    "script_writing": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "provider_models": {
+        "gemini": "gemini-3.1-flash-lite",
+        "anthropic": "claude-opus-4-8"
+      },
+      "max_tokens": 64000,
+      "provider_env_var": "MAV_SCRIPT_WRITING_PROVIDER",
+      "env_var": "MAV_SCRIPT_WRITING_MODEL",
+      "prompt_files": ["script_writing.system.txt", "script_writing.user.txt"]
+    },
+    "v3_creative_director": {
+      "provider": "zai",
+      "model": "glm-5.2",
+      "provider_models": {
+        "zai": "glm-5.2",
+        "anthropic": "claude-opus-4-8"
+      },
+      "max_tokens": 16000,
+      "provider_env_var": "MAV_V3_CREATIVE_DIRECTOR_PROVIDER",
+      "env_var": "MAV_V3_CREATIVE_DIRECTOR_MODEL",
+      "prompt_files": ["v3_creative_director.system.txt", "v3_design_system.txt"]
+    },
+    "v3_scene_coder": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {
+        "moonshot": "kimi-k2.7-code",
+        "gemini": "gemini-3.5-flash",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 32000,
+      "provider_env_var": "MAV_V3_SCENE_CODER_PROVIDER",
+      "env_var": "MAV_V3_SCENE_CODER_MODEL",
+      "prompt_files": ["v3_scene_coder.system.txt"]
+    }
+  }
+}

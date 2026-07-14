@@ -1,0 +1,117 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Forces, Motion & Matter",
+  "subtitle": "Phase 1 Module Showcase",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_TitleCard",
+      "params": {
+        "title": "Physics, in motion.",
+        "subtitle": "A visual journey through forces, waves, circuits and matter.",
+        "badge": "MAV Physics · Phase 1"
+      },
+      "duration": 5.5,
+      "narration": "Physics becomes easier when we can see it in motion."
+    },
+    {
+      "scene": "Scene_ForceDiagram",
+      "params": {
+        "object": { "type": "block", "label": "Textbook", "mass": 2 },
+        "surface": "table",
+        "surfaceAngle": 0,
+        "forces": [
+          { "label": "Normal force, N", "direction": "up", "magnitude": 5, "color": "label" },
+          { "label": "Weight, W", "direction": "down", "magnitude": 5, "color": "force" }
+        ],
+        "showNetForce": true,
+        "netForceValue": 0,
+        "showAcceleration": false
+      },
+      "duration": 7,
+      "narration": "The upward normal force balances the downward weight. The net force is zero, so the textbook remains at rest."
+    },
+    {
+      "scene": "Scene_GraphPlotter",
+      "params": {
+        "title": "Velocity builds, then settles",
+        "xAxis": { "label": "Time", "min": 0, "max": 10, "unit": "s" },
+        "yAxis": { "label": "Velocity", "min": 0, "max": 30, "unit": "m/s" },
+        "curves": [
+          { "label": "Skater velocity", "color": "velocity", "dataPoints": [[0,0],[2,8],[4,20],[6,24],[8,24],[10,24]], "style": "solid" },
+          { "label": "Acceleration phase", "color": "label", "dataPoints": [[0,0],[2,5],[4,12],[6,12],[8,12],[10,12]], "style": "dashed" }
+        ],
+        "annotations": [{ "x": 6, "y": 24, "text": "Constant velocity" }]
+      },
+      "duration": 7,
+      "narration": "The graph is drawn live. Its gradient shows acceleration before the velocity becomes constant."
+    },
+    {
+      "scene": "Scene_WaveForm",
+      "params": {
+        "waveType": "transverse",
+        "amplitude": 105,
+        "wavelength": 340,
+        "frequency": 1.2,
+        "showLabels": true,
+        "labels": ["amplitude", "wavelength", "frequency", "period"],
+        "particleView": true
+      },
+      "duration": 7,
+      "narration": "In a transverse wave, particles oscillate at right angles to the direction that energy travels."
+    },
+    {
+      "scene": "Scene_CircuitDiagram",
+      "params": {
+        "type": "series",
+        "components": [
+          { "type": "cell", "label": "6 V cell", "position": "top" },
+          { "type": "resistor", "label": "R = 10 Ω", "position": "right" },
+          { "type": "lamp", "label": "Lamp", "position": "bottom" },
+          { "type": "ammeter", "label": "Ammeter", "position": "left" }
+        ],
+        "showCurrentFlow": true,
+        "currentDirection": "conventional"
+      },
+      "duration": 7,
+      "narration": "Conventional current flows around this complete series circuit, passing through every component."
+    },
+    {
+      "scene": "Scene_ParticleModel",
+      "params": {
+        "state": "liquid",
+        "temperature": "high",
+        "containerType": "beaker",
+        "particleCount": 42,
+        "showEnergyLabel": true,
+        "transitionTo": "gas"
+      },
+      "duration": 7,
+      "narration": "As the liquid gains energy, its particles move faster and spread out to form a gas."
+    },
+    {
+      "scene": "Scene_MathEquation",
+      "params": {
+        "equation": "\\sum F = ma",
+        "highlight": "a = \\frac{\\sum F}{m}",
+        "caption": "Acceleration follows the resultant force and decreases as mass increases."
+      },
+      "duration": 5.5,
+      "narration": "Newton's second law connects resultant force, mass and acceleration."
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "params": {
+        "heading": "Key Takeaways",
+        "points": [
+          "Balanced forces produce zero acceleration.",
+          "Graphs reveal how motion changes over time.",
+          "Waves transfer energy without transferring matter.",
+          "Particle energy controls the state of matter."
+        ]
+      },
+      "duration": 7,
+      "narration": "Let's recap the big ideas from this Phase 1 showcase."
+    }
+  ]
+}

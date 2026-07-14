@@ -1,0 +1,2223 @@
+{
+  "schema_version": 1,
+  "source": "repo-local physics_animation_engine/modules/_registry.js",
+  "scene_count": 35,
+  "scenes": [
+    {
+      "scene": "Scene_TitleCard",
+      "category": "lesson_structure",
+      "description": "Open a lesson or section with a concise title and subtitle.",
+      "module": "physics_animation_engine/modules/Scene_TitleCard.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json",
+        "physics_animation_engine/specs/pilot/01-scalars-vectors.json",
+        "physics_animation_engine/specs/pilot/02-density-worked-example.json",
+        "physics_animation_engine/specs/pilot/03-convection-explanation.json",
+        "physics_animation_engine/specs/pilot/04-speed-time-graph.json",
+        "physics_animation_engine/specs/pilot/05-pendulum-practical.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 60,
+            "default": "Physics, in motion."
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 100,
+            "default": ""
+          },
+          "badge": {
+            "type": "string",
+            "maxLength": 40,
+            "default": "GCSE Physics"
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "category": "lesson_structure",
+      "description": "Close a section with compact retrieval points.",
+      "module": "physics_animation_engine/modules/Scene_SummaryCard.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json",
+        "physics_animation_engine/specs/pilot/01-scalars-vectors.json",
+        "physics_animation_engine/specs/pilot/02-density-worked-example.json",
+        "physics_animation_engine/specs/pilot/03-convection-explanation.json",
+        "physics_animation_engine/specs/pilot/04-speed-time-graph.json",
+        "physics_animation_engine/specs/pilot/05-pendulum-practical.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "points"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "heading": {
+            "type": "string",
+            "maxLength": 60,
+            "default": "Key Takeaways"
+          },
+          "points": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "default": [
+              "Review the core idea",
+              "Apply it to a new example"
+            ],
+            "items": {
+              "type": "string",
+              "maxLength": 80
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_MathEquation",
+      "category": "mathematics",
+      "description": "Reveal and explain a physics equation step by step.",
+      "module": "physics_animation_engine/modules/Scene_MathEquation.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json",
+        "physics_animation_engine/specs/pilot/02-density-worked-example.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "equation"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "equation": {
+            "type": "string",
+            "maxLength": 180,
+            "default": "\\sum F = ma"
+          },
+          "highlight": {
+            "type": "string",
+            "maxLength": 100,
+            "default": ""
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 150,
+            "default": ""
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_ForceDiagram",
+      "category": "mechanics",
+      "description": "Draw an object, surface, force vectors, net force, and acceleration.",
+      "module": "physics_animation_engine/modules/Scene_ForceDiagram.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "object",
+          "forces"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "object",
+            "required": [
+              "type",
+              "label"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "block",
+                  "circle",
+                  "triangle",
+                  "car",
+                  "rocket"
+                ],
+                "default": "block"
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 40,
+                "default": "Object"
+              },
+              "mass": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100000,
+                "default": 1
+              }
+            }
+          },
+          "surface": {
+            "type": "string",
+            "enum": [
+              "none",
+              "table",
+              "floor",
+              "incline"
+            ],
+            "default": "floor"
+          },
+          "surfaceAngle": {
+            "type": "number",
+            "minimum": -60,
+            "maximum": 60,
+            "default": 0
+          },
+          "forces": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "direction",
+                "magnitude"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "default": "Force"
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "up",
+                    "down",
+                    "left",
+                    "right",
+                    "angle"
+                  ],
+                  "default": "right"
+                },
+                "angle": {
+                  "type": "number",
+                  "minimum": -360,
+                  "maximum": 360,
+                  "default": 0
+                },
+                "magnitude": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10,
+                  "default": 5
+                },
+                "color": {
+                  "type": "string",
+                  "enum": [
+                    "velocity",
+                    "force",
+                    "label",
+                    "energy",
+                    "orange",
+                    "yellow",
+                    "cyan",
+                    "green"
+                  ],
+                  "default": "force"
+                }
+              }
+            }
+          },
+          "showNetForce": {
+            "type": "boolean",
+            "default": true
+          },
+          "netForceValue": {
+            "type": "number",
+            "default": 0
+          },
+          "showAcceleration": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_GraphPlotter",
+      "category": "graphs",
+      "description": "Plot labelled data and animate how a graph is read.",
+      "module": "physics_animation_engine/modules/Scene_GraphPlotter.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json",
+        "physics_animation_engine/specs/pilot/04-speed-time-graph.json",
+        "physics_animation_engine/specs/pilot/05-pendulum-practical.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "xAxis",
+          "yAxis",
+          "curves"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 70,
+            "default": "Graph"
+          },
+          "xAxis": {
+            "type": "object",
+            "required": [
+              "label",
+              "min",
+              "max"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 30,
+                "default": "Axis"
+              },
+              "min": {
+                "type": "number",
+                "default": 0
+              },
+              "max": {
+                "type": "number",
+                "default": 10
+              },
+              "unit": {
+                "type": "string",
+                "maxLength": 12,
+                "default": ""
+              }
+            }
+          },
+          "yAxis": {
+            "type": "object",
+            "required": [
+              "label",
+              "min",
+              "max"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 30,
+                "default": "Axis"
+              },
+              "min": {
+                "type": "number",
+                "default": 0
+              },
+              "max": {
+                "type": "number",
+                "default": 10
+              },
+              "unit": {
+                "type": "string",
+                "maxLength": 12,
+                "default": ""
+              }
+            }
+          },
+          "curves": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "dataPoints"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "default": "Series"
+                },
+                "color": {
+                  "type": "string",
+                  "enum": [
+                    "velocity",
+                    "force",
+                    "label",
+                    "energy"
+                  ],
+                  "default": "velocity"
+                },
+                "dataPoints": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 30,
+                  "default": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      10,
+                      10
+                    ]
+                  ],
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number",
+                      "default": 0
+                    }
+                  }
+                },
+                "style": {
+                  "type": "string",
+                  "enum": [
+                    "solid",
+                    "dashed"
+                  ],
+                  "default": "solid"
+                }
+              }
+            }
+          },
+          "annotations": {
+            "type": "array",
+            "maxItems": 5,
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": [
+                "x",
+                "y",
+                "text"
+              ],
+              "properties": {
+                "x": {
+                  "type": "number",
+                  "default": 0
+                },
+                "y": {
+                  "type": "number",
+                  "default": 0
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 60,
+                  "default": "Point of interest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_WaveForm",
+      "category": "waves",
+      "description": "Animate transverse or longitudinal wave properties.",
+      "module": "physics_animation_engine/modules/Scene_WaveForm.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "waveType",
+          "amplitude",
+          "wavelength",
+          "frequency"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "waveType": {
+            "type": "string",
+            "enum": [
+              "transverse",
+              "longitudinal"
+            ],
+            "default": "transverse"
+          },
+          "amplitude": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 150,
+            "default": 90
+          },
+          "wavelength": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 400,
+            "default": 320
+          },
+          "frequency": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 4,
+            "default": 1
+          },
+          "showLabels": {
+            "type": "boolean",
+            "default": true
+          },
+          "labels": {
+            "type": "array",
+            "maxItems": 4,
+            "default": [
+              "amplitude",
+              "wavelength"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "amplitude",
+                "wavelength",
+                "frequency",
+                "period"
+              ],
+              "default": "amplitude"
+            }
+          },
+          "particleView": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_CircuitDiagram",
+      "category": "electricity",
+      "description": "Build and animate a circuit from recognised components.",
+      "module": "physics_animation_engine/modules/Scene_CircuitDiagram.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "type",
+          "components"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "series",
+              "parallel",
+              "mixed"
+            ],
+            "default": "series"
+          },
+          "components": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": [
+                "type",
+                "position"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "cell",
+                    "resistor",
+                    "lamp",
+                    "ammeter",
+                    "voltmeter"
+                  ],
+                  "default": "resistor"
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 30,
+                  "default": ""
+                },
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "top",
+                    "right",
+                    "bottom",
+                    "left"
+                  ],
+                  "default": "top"
+                }
+              }
+            }
+          },
+          "showCurrentFlow": {
+            "type": "boolean",
+            "default": true
+          },
+          "currentDirection": {
+            "type": "string",
+            "enum": [
+              "conventional",
+              "electron"
+            ],
+            "default": "conventional"
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_ParticleModel",
+      "category": "thermal",
+      "description": "Animate solid, liquid, or gas particle arrangements and motion.",
+      "module": "physics_animation_engine/modules/Scene_ParticleModel.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-one-showcase.json",
+        "physics_animation_engine/specs/pilot/03-convection-explanation.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "solid",
+              "liquid",
+              "gas"
+            ],
+            "default": "solid"
+          },
+          "temperature": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "medium"
+          },
+          "containerType": {
+            "type": "string",
+            "enum": [
+              "box",
+              "beaker",
+              "cylinder"
+            ],
+            "default": "box"
+          },
+          "particleCount": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 80,
+            "default": 40
+          },
+          "showEnergyLabel": {
+            "type": "boolean",
+            "default": true
+          },
+          "transitionTo": {
+            "type": "string",
+            "enum": [
+              "solid",
+              "liquid",
+              "gas"
+            ],
+            "default": ""
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_CollisionBlocks",
+      "category": "mechanics",
+      "description": "Visualise before-and-after motion in momentum collisions.",
+      "module": "physics_animation_engine/modules/Scene_CollisionBlocks.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-two-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "block1",
+          "block2",
+          "collisionType"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "block1": {
+            "type": "object",
+            "required": [
+              "mass",
+              "velocity",
+              "label"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "mass": {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 100,
+                "default": 1
+              },
+              "velocity": {
+                "type": "number",
+                "minimum": -30,
+                "maximum": 30,
+                "default": 0
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 20,
+                "default": "m"
+              },
+              "color": {
+                "type": "string",
+                "enum": [
+                  "velocity",
+                  "force",
+                  "label",
+                  "energy"
+                ],
+                "default": "velocity"
+              }
+            }
+          },
+          "block2": {
+            "type": "object",
+            "required": [
+              "mass",
+              "velocity",
+              "label"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "mass": {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 100,
+                "default": 1
+              },
+              "velocity": {
+                "type": "number",
+                "minimum": -30,
+                "maximum": 30,
+                "default": 0
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 20,
+                "default": "m"
+              },
+              "color": {
+                "type": "string",
+                "enum": [
+                  "velocity",
+                  "force",
+                  "label",
+                  "energy"
+                ],
+                "default": "velocity"
+              }
+            }
+          },
+          "collisionType": {
+            "type": "string",
+            "enum": [
+              "elastic",
+              "inelastic",
+              "explosion"
+            ],
+            "default": "elastic"
+          },
+          "showMomentumBars": {
+            "type": "boolean",
+            "default": true
+          },
+          "showVelocityLabels": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_SankeyDiagram",
+      "category": "energy",
+      "description": "Visualise energy input, useful output, and waste flows.",
+      "module": "physics_animation_engine/modules/Scene_SankeyDiagram.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-two-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "inputEnergy",
+          "outputs"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "inputEnergy": {
+            "type": "object",
+            "required": [
+              "label",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 48,
+                "default": "Input energy"
+              },
+              "value": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100000,
+                "default": 100
+              },
+              "unit": {
+                "type": "string",
+                "maxLength": 10,
+                "default": "J"
+              }
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "default": [
+              {
+                "label": "Useful",
+                "value": 100,
+                "color": "energy",
+                "useful": true
+              }
+            ],
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "value"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 38,
+                  "default": "Output"
+                },
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100000,
+                  "default": 0
+                },
+                "color": {
+                  "type": "string",
+                  "enum": [
+                    "velocity",
+                    "force",
+                    "label",
+                    "energy"
+                  ],
+                  "default": "energy"
+                },
+                "useful": {
+                  "type": "boolean",
+                  "default": false
+                }
+              }
+            }
+          },
+          "showEfficiency": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_EnergyBars",
+      "category": "energy",
+      "description": "Compare energy stores or transfers with animated bars.",
+      "module": "physics_animation_engine/modules/Scene_EnergyBars.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-two-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "bars",
+          "totalEnergy"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "bars": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "default": [
+              {
+                "label": "Energy",
+                "color": "energy",
+                "keyframes": [
+                  0,
+                  100
+                ]
+              }
+            ],
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "keyframes"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 22,
+                  "default": "Energy"
+                },
+                "color": {
+                  "type": "string",
+                  "enum": [
+                    "velocity",
+                    "force",
+                    "label",
+                    "energy"
+                  ],
+                  "default": "energy"
+                },
+                "keyframes": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 12,
+                  "default": [
+                    0,
+                    100
+                  ],
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000,
+                    "default": 0
+                  }
+                }
+              }
+            }
+          },
+          "totalEnergy": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000,
+            "default": 100
+          },
+          "showTotalLine": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_MagneticField",
+      "category": "magnetism",
+      "description": "Draw magnetic field patterns around magnets or conductors.",
+      "module": "physics_animation_engine/modules/Scene_MagneticField.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-two-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "bar_magnet",
+              "horseshoe",
+              "straight_wire",
+              "solenoid"
+            ],
+            "default": "bar_magnet"
+          },
+          "showFieldLines": {
+            "type": "boolean",
+            "default": true
+          },
+          "fieldLineCount": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 14,
+            "default": 8
+          },
+          "showCompass": {
+            "type": "boolean",
+            "default": false
+          },
+          "showLabels": {
+            "type": "boolean",
+            "default": true
+          },
+          "poleLabels": {
+            "type": "object",
+            "required": [
+              "north",
+              "south"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "north": {
+                "type": "string",
+                "maxLength": 4,
+                "default": "N"
+              },
+              "south": {
+                "type": "string",
+                "maxLength": 4,
+                "default": "S"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_AtomicModel",
+      "category": "nuclear",
+      "description": "Build the atomic model with nucleus, electrons, and labels.",
+      "module": "physics_animation_engine/modules/Scene_AtomicModel.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-two-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "element",
+          "protons",
+          "neutrons",
+          "electronConfig"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "element": {
+            "type": "string",
+            "maxLength": 30,
+            "default": "Carbon"
+          },
+          "protons": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 6
+          },
+          "neutrons": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 40,
+            "default": 6
+          },
+          "electronConfig": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "default": [
+              2,
+              4
+            ],
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "default": 2
+            }
+          },
+          "showLabels": {
+            "type": "boolean",
+            "default": true
+          },
+          "highlightShell": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "default": 0
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_NuclearDecay",
+      "category": "nuclear",
+      "description": "Animate alpha, beta, or gamma emission from a nucleus.",
+      "module": "physics_animation_engine/modules/Scene_NuclearDecay.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-two-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "decayType",
+          "parentNucleus",
+          "daughterNucleus"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "decayType": {
+            "type": "string",
+            "enum": [
+              "alpha",
+              "beta",
+              "gamma"
+            ],
+            "default": "alpha"
+          },
+          "parentNucleus": {
+            "type": "object",
+            "required": [
+              "element",
+              "massNumber",
+              "atomicNumber"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "element": {
+                "type": "string",
+                "maxLength": 18,
+                "default": "U"
+              },
+              "massNumber": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 300,
+                "default": 238
+              },
+              "atomicNumber": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 118,
+                "default": 92
+              }
+            }
+          },
+          "daughterNucleus": {
+            "type": "object",
+            "required": [
+              "element",
+              "massNumber",
+              "atomicNumber"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "element": {
+                "type": "string",
+                "maxLength": 18,
+                "default": "U"
+              },
+              "massNumber": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 300,
+                "default": 238
+              },
+              "atomicNumber": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 118,
+                "default": 92
+              }
+            }
+          },
+          "showPenetration": {
+            "type": "boolean",
+            "default": true
+          },
+          "barriers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "default": [
+              "paper",
+              "aluminium",
+              "lead"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "paper",
+                "aluminium",
+                "lead"
+              ],
+              "default": "paper"
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_WaveBehavior",
+      "category": "waves",
+      "description": "Demonstrate reflection, refraction, diffraction, or superposition.",
+      "module": "physics_animation_engine/modules/Scene_WaveBehavior.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-two-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "behavior",
+          "medium1",
+          "medium2"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "behavior": {
+            "type": "string",
+            "enum": [
+              "reflection",
+              "refraction",
+              "diffraction"
+            ],
+            "default": "reflection"
+          },
+          "incidentAngle": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 85,
+            "default": 45
+          },
+          "medium1": {
+            "type": "object",
+            "required": [
+              "label",
+              "speed"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 20,
+                "default": "Medium"
+              },
+              "speed": {
+                "type": "string",
+                "enum": [
+                  "fast",
+                  "slow"
+                ],
+                "default": "fast"
+              }
+            }
+          },
+          "medium2": {
+            "type": "object",
+            "required": [
+              "label",
+              "speed"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 20,
+                "default": "Medium"
+              },
+              "speed": {
+                "type": "string",
+                "enum": [
+                  "fast",
+                  "slow"
+                ],
+                "default": "fast"
+              }
+            }
+          },
+          "showNormal": {
+            "type": "boolean",
+            "default": true
+          },
+          "showAngles": {
+            "type": "boolean",
+            "default": true
+          },
+          "gapWidth": {
+            "type": "string",
+            "enum": [
+              "narrow",
+              "wide"
+            ],
+            "default": "narrow"
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_DefinitionCard",
+      "category": "lesson_structure",
+      "description": "Introduce a definition with symbols, units, and a focused visual hierarchy.",
+      "module": "physics_animation_engine/modules/phase3/Scene_DefinitionCard.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json",
+        "physics_animation_engine/specs/pilot/01-scalars-vectors.json",
+        "physics_animation_engine/specs/pilot/03-convection-explanation.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "term",
+          "definition"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "term": {
+            "type": "string",
+            "maxLength": 48,
+            "default": "Physics term"
+          },
+          "definition": {
+            "type": "string",
+            "maxLength": 260,
+            "default": "A clear scientific definition."
+          },
+          "example": {
+            "type": "string",
+            "maxLength": 180,
+            "default": ""
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_ComparisonTable",
+      "category": "lesson_structure",
+      "description": "Compare two or more cases without repeating prose.",
+      "module": "physics_animation_engine/modules/phase3/Scene_ComparisonTable.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json",
+        "physics_animation_engine/specs/pilot/01-scalars-vectors.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "heading1",
+          "heading2",
+          "rows"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "heading1": {
+            "type": "string",
+            "maxLength": 40,
+            "default": "Option A"
+          },
+          "heading2": {
+            "type": "string",
+            "maxLength": 40,
+            "default": "Option B"
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": [
+                "col1",
+                "col2"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "col1": {
+                  "type": "string",
+                  "maxLength": 120,
+                  "default": ""
+                },
+                "col2": {
+                  "type": "string",
+                  "maxLength": 120,
+                  "default": ""
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_NumericalExample",
+      "category": "mathematics",
+      "description": "Show a traceable worked calculation with explicit reasoning steps.",
+      "module": "physics_animation_engine/modules/phase3/Scene_NumericalExample.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json",
+        "physics_animation_engine/specs/pilot/02-density-worked-example.json",
+        "physics_animation_engine/specs/pilot/04-speed-time-graph.json",
+        "physics_animation_engine/specs/pilot/05-pendulum-practical.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "title",
+          "steps"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 70,
+            "default": "Worked example"
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 6,
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "content"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 55,
+                  "default": ""
+                },
+                "content": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "default": ""
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_ProjectileMotion",
+      "category": "mechanics",
+      "description": "Trace projectile motion with horizontal and vertical components.",
+      "module": "physics_animation_engine/modules/phase3/Scene_ProjectileMotion.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "launchAngle": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 85,
+            "default": 45
+          },
+          "launchSpeed": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 150,
+            "default": 20
+          },
+          "gravity": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 30,
+            "default": 9.81
+          },
+          "showComponents": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_CircularMotion",
+      "category": "mechanics",
+      "description": "Show tangential velocity and inward centripetal force.",
+      "module": "physics_animation_engine/modules/phase3/Scene_CircularMotion.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "radius": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 300,
+            "default": 150
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 10,
+            "default": 3
+          },
+          "showCentripetalForce": {
+            "type": "boolean",
+            "default": true
+          },
+          "showVelocityTangent": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_SpringMass",
+      "category": "mechanics",
+      "description": "Animate a spring-mass system, restoring force, and optional graph.",
+      "module": "physics_animation_engine/modules/phase3/Scene_SpringMass.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "springConstant": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 500,
+            "default": 15
+          },
+          "mass": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100,
+            "default": 2
+          },
+          "displacement": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 200,
+            "default": 80
+          },
+          "showForceArrow": {
+            "type": "boolean",
+            "default": true
+          },
+          "showGraph": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_InclinedPlane",
+      "category": "mechanics",
+      "description": "Resolve forces for an object on an inclined plane.",
+      "module": "physics_animation_engine/modules/phase3/Scene_InclinedPlane.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "angle": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 55,
+            "default": 30
+          },
+          "mass": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100,
+            "default": 5
+          },
+          "friction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5,
+            "default": 0.3
+          },
+          "showDecomposedWeight": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_ThermalHeating",
+      "category": "thermal",
+      "description": "Show heating curves, temperature change, and energy transfer.",
+      "module": "physics_animation_engine/modules/phase3/Scene_ThermalHeating.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "substance",
+          "startTemp",
+          "endTemp"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "substance": {
+            "type": "string",
+            "maxLength": 30,
+            "default": "Water"
+          },
+          "startTemp": {
+            "type": "number",
+            "minimum": -273,
+            "maximum": 3000,
+            "default": 20
+          },
+          "endTemp": {
+            "type": "number",
+            "minimum": -273,
+            "maximum": 3000,
+            "default": 120
+          },
+          "stateChanges": {
+            "type": "array",
+            "maxItems": 4,
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": [
+                "at",
+                "type"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "at": {
+                  "type": "number",
+                  "minimum": -273,
+                  "maximum": 3000,
+                  "default": 100
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "melting",
+                    "boiling",
+                    "freezing",
+                    "condensing"
+                  ],
+                  "default": "boiling"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_EMSpectrum",
+      "category": "waves",
+      "description": "Navigate the electromagnetic spectrum, wavelengths, and uses.",
+      "module": "physics_animation_engine/modules/phase3/Scene_EMSpectrum.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "highlightRegion": {
+            "type": "string",
+            "enum": [
+              "radio",
+              "microwave",
+              "infrared",
+              "visible",
+              "ultraviolet",
+              "xray",
+              "gamma"
+            ],
+            "default": "visible"
+          },
+          "showWavelengths": {
+            "type": "boolean",
+            "default": true
+          },
+          "showUses": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_StandingWave",
+      "category": "waves",
+      "description": "Show harmonics, nodes, and antinodes on a standing wave.",
+      "module": "physics_animation_engine/modules/phase3/Scene_StandingWave.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "harmonic": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "default": 1
+          },
+          "stringLength": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 800,
+            "default": 600
+          },
+          "showNodes": {
+            "type": "boolean",
+            "default": true
+          },
+          "showAntinodes": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_ElectronFlow",
+      "category": "electricity",
+      "description": "Contrast electron drift, current, and resistance effects.",
+      "module": "physics_animation_engine/modules/phase3/Scene_ElectronFlow.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "wireLength": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 1000,
+            "default": 800
+          },
+          "electronCount": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 40,
+            "default": 20
+          },
+          "current": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "default": "medium"
+          },
+          "showResistanceZone": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_MotorEffect",
+      "category": "electromagnetism",
+      "description": "Connect field, current, and force directions in the motor effect.",
+      "module": "physics_animation_engine/modules/phase3/Scene_MotorEffect.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "wireDirection": {
+            "type": "string",
+            "enum": [
+              "into_page",
+              "out_of_page"
+            ],
+            "default": "into_page"
+          },
+          "fieldDirection": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ],
+            "default": "right"
+          },
+          "showForceDirection": {
+            "type": "boolean",
+            "default": true
+          },
+          "showRule": {
+            "type": "string",
+            "enum": [
+              "flemings_left",
+              "none"
+            ],
+            "default": "flemings_left"
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_EMInduction",
+      "category": "electromagnetism",
+      "description": "Show induced current from changing magnetic flux.",
+      "module": "physics_animation_engine/modules/phase3/Scene_EMInduction.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "magnet_in_coil",
+              "rotating_coil"
+            ],
+            "default": "magnet_in_coil"
+          },
+          "speed": {
+            "type": "string",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ],
+            "default": "medium"
+          },
+          "showGalvanometer": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_Transformer",
+      "category": "electromagnetism",
+      "description": "Relate turns ratio, voltage, and changing core field.",
+      "module": "physics_animation_engine/modules/phase3/Scene_Transformer.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "primaryTurns",
+          "secondaryTurns",
+          "inputVoltage"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "primaryTurns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "default": 100
+          },
+          "secondaryTurns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "default": 50
+          },
+          "inputVoltage": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 10000,
+            "default": 240
+          },
+          "showFieldLines": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_GasParticles",
+      "category": "thermal",
+      "description": "Relate gas particle motion to temperature, volume, and pressure.",
+      "module": "physics_animation_engine/modules/phase3/Scene_GasParticles.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "containerType": {
+            "type": "string",
+            "enum": [
+              "fixed",
+              "piston"
+            ],
+            "default": "fixed"
+          },
+          "temperature": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "medium"
+          },
+          "showPressureArrows": {
+            "type": "boolean",
+            "default": true
+          },
+          "changeTo": {
+            "type": "string",
+            "enum": [
+              "higher_temp",
+              "smaller_volume",
+              "none"
+            ],
+            "default": "higher_temp"
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_NuclearReaction",
+      "category": "nuclear",
+      "description": "Show reactants, products, and energy in fission or fusion.",
+      "module": "physics_animation_engine/modules/phase3/Scene_NuclearReaction.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "type",
+          "reactants",
+          "products"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "fission",
+              "fusion"
+            ],
+            "default": "fission"
+          },
+          "reactants": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "default": [
+              "U-235",
+              "neutron"
+            ],
+            "items": {
+              "type": "string",
+              "maxLength": 24,
+              "default": ""
+            }
+          },
+          "products": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "default": [
+              "Ba-141",
+              "Kr-92"
+            ],
+            "items": {
+              "type": "string",
+              "maxLength": 28,
+              "default": ""
+            }
+          },
+          "showEnergyRelease": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_RayDiagram",
+      "category": "optics",
+      "description": "Draw principal rays for lenses, mirrors, or a prism.",
+      "module": "physics_animation_engine/modules/phase3/Scene_RayDiagram.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "opticalElement": {
+            "type": "string",
+            "enum": [
+              "converging_lens",
+              "diverging_lens",
+              "concave_mirror",
+              "convex_mirror",
+              "prism"
+            ],
+            "default": "converging_lens"
+          },
+          "objectDistance": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 300,
+            "default": 200
+          },
+          "focalLength": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 250,
+            "default": 100
+          },
+          "showFocalPoints": {
+            "type": "boolean",
+            "default": true
+          },
+          "showImage": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_OrbitalMotion",
+      "category": "space",
+      "description": "Visualise orbital velocity and gravitational force vectors.",
+      "module": "physics_animation_engine/modules/phase3/Scene_OrbitalMotion.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "centralBody",
+          "orbitingBody"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "centralBody": {
+            "type": "string",
+            "maxLength": 24,
+            "default": "Earth"
+          },
+          "orbitingBody": {
+            "type": "string",
+            "maxLength": 24,
+            "default": "Satellite"
+          },
+          "orbitRadius": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 500,
+            "default": 300
+          },
+          "showGravityVector": {
+            "type": "boolean",
+            "default": true
+          },
+          "showVelocityVector": {
+            "type": "boolean",
+            "default": true
+          },
+          "isElliptical": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_StarLifeCycle",
+      "category": "space",
+      "description": "Trace the ordered stages of average or massive stars.",
+      "module": "physics_animation_engine/modules/phase3/Scene_StarLifeCycle.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "starType",
+          "stages"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "starType": {
+            "type": "string",
+            "enum": [
+              "average",
+              "massive"
+            ],
+            "default": "average"
+          },
+          "stages": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 7,
+            "default": [
+              "nebula",
+              "protostar",
+              "main_sequence",
+              "red_giant",
+              "white_dwarf"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "nebula",
+                "protostar",
+                "main_sequence",
+                "red_giant",
+                "red_supergiant",
+                "planetary_nebula",
+                "white_dwarf",
+                "supernova",
+                "neutron_star",
+                "black_hole"
+              ],
+              "default": "main_sequence"
+            }
+          }
+        }
+      }
+    },
+    {
+      "scene": "Scene_RadiationPenetration",
+      "category": "nuclear",
+      "description": "Compare alpha, beta, and gamma penetration through barriers.",
+      "module": "physics_animation_engine/modules/phase3/Scene_RadiationPenetration.js",
+      "status": "available",
+      "example_specs": [
+        "physics_animation_engine/specs/phase-three-showcase.json"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "required": [
+          "radiationTypes",
+          "barriers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "radiationTypes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "default": [
+              "alpha",
+              "beta",
+              "gamma"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "alpha",
+                "beta",
+                "gamma"
+              ],
+              "default": "alpha"
+            }
+          },
+          "barriers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "default": [
+              "paper",
+              "aluminium",
+              "lead",
+              "concrete"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "paper",
+                "aluminium",
+                "lead",
+                "concrete"
+              ],
+              "default": "paper"
+            }
+          },
+          "showRange": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  ]
+}

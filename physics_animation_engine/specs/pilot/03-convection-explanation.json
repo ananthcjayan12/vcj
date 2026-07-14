@@ -1,0 +1,56 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Convection in a greenhouse",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_TitleCard",
+      "label": "Introduction",
+      "duration": 5,
+      "narration": "A heater near the floor creates a continuous circulation of air.",
+      "params": {
+        "title": "Why warm air rises",
+        "subtitle": "Convection in a greenhouse",
+        "badge": "IGCSE Physics 0625"
+      }
+    },
+    {
+      "scene": "Scene_ParticleModel",
+      "label": "Particle model",
+      "duration": 8,
+      "narration": "Air near the heater gains energy. Its particles move faster and spread out, reducing the density.",
+      "params": {
+        "state": "gas",
+        "temperature": "high",
+        "containerType": "box",
+        "particleCount": 42,
+        "showEnergyLabel": true
+      }
+    },
+    {
+      "scene": "Scene_DefinitionCard",
+      "label": "Convection current",
+      "duration": 7,
+      "narration": "Warmer, less dense air rises while cooler, denser air moves down to replace it.",
+      "params": {
+        "term": "Convection current",
+        "definition": "A circulation caused by density differences in a fluid.",
+        "example": "Warm air rises above the heater and cooler air returns near the floor."
+      }
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "label": "Retrieval summary",
+      "duration": 6,
+      "narration": "Explain the movement using energy, density and circulation.",
+      "params": {
+        "heading": "Pause and recall",
+        "points": [
+          "Heating makes the air expand",
+          "Expanded air is less dense and rises",
+          "Cooler air replaces it and circulation continues"
+        ]
+      }
+    }
+  ]
+}

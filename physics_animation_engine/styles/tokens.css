@@ -1,0 +1,26 @@
+:root {
+  --bg-primary: #0e1113;
+  --bg-deep: #080b0d;
+  --bg-surface: #151a1e;
+  --bg-card: rgba(26, 31, 35, 0.9);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --c-velocity: #00f5ff;
+  --c-force: #ff5a36;
+  --c-label: #ffd23f;
+  --c-energy: #39ff14;
+  --c-neutral: #f5f4ef;
+  --c-muted: #888880;
+  --glow-velocity: rgba(0, 245, 255, 0.35);
+  --glow-force: rgba(255, 90, 54, 0.35);
+  --glow-label: rgba(255, 210, 63, 0.35);
+  --glow-energy: rgba(57, 255, 20, 0.32);
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'Fira Code', monospace;
+  --font-math: 'KaTeX_Main', serif;
+  --stage-w: 1920px;
+  --stage-h: 1080px;
+  --padding-scene: 112px;
+  --grid-gap: 60px;
+}

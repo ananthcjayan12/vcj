@@ -1,0 +1,100 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Energy, Fields & Atomic Physics",
+  "subtitle": "Phase 2 Module Showcase",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_CollisionBlocks",
+      "params": {
+        "block1": { "mass": 3, "velocity": 5, "label": "m₁", "color": "velocity" },
+        "block2": { "mass": 1, "velocity": 0, "label": "m₂", "color": "force" },
+        "collisionType": "elastic",
+        "showMomentumBars": true,
+        "showVelocityLabels": true
+      },
+      "duration": 7.5,
+      "narration": "The module calculates both final velocities. Total momentum remains fifteen kilogram metres per second before and after this elastic collision."
+    },
+    {
+      "scene": "Scene_SankeyDiagram",
+      "params": {
+        "inputEnergy": { "label": "Electrical energy", "value": 100, "unit": "J" },
+        "outputs": [
+          { "label": "Light", "value": 25, "color": "energy", "useful": true },
+          { "label": "Thermal energy", "value": 65, "color": "force", "useful": false },
+          { "label": "Sound", "value": 10, "color": "label", "useful": false }
+        ],
+        "showEfficiency": true
+      },
+      "duration": 7,
+      "narration": "Flow thickness represents energy. Twenty-five joules become useful light, giving this lamp an efficiency of twenty-five percent."
+    },
+    {
+      "scene": "Scene_EnergyBars",
+      "params": {
+        "bars": [
+          { "label": "Kinetic", "color": "velocity", "keyframes": [0, 25, 65, 100, 65, 0] },
+          { "label": "Gravitational", "color": "energy", "keyframes": [100, 75, 35, 0, 0, 0] },
+          { "label": "Thermal", "color": "force", "keyframes": [0, 0, 0, 0, 35, 100] }
+        ],
+        "totalEnergy": 100,
+        "showTotalLine": true
+      },
+      "duration": 8,
+      "narration": "Energy first moves from the gravitational store to the kinetic store, and is then dissipated thermally. The total stays constant."
+    },
+    {
+      "scene": "Scene_MagneticField",
+      "params": {
+        "source": "bar_magnet",
+        "showFieldLines": true,
+        "fieldLineCount": 10,
+        "showCompass": true,
+        "showLabels": true,
+        "poleLabels": { "north": "N", "south": "S" }
+      },
+      "duration": 7,
+      "narration": "Magnetic field lines leave the north pole and curve toward the south pole. A small compass aligns tangentially with the local field."
+    },
+    {
+      "scene": "Scene_AtomicModel",
+      "params": {
+        "element": "Carbon",
+        "protons": 6,
+        "neutrons": 6,
+        "electronConfig": [2, 4],
+        "showLabels": true,
+        "highlightShell": 2
+      },
+      "duration": 8,
+      "narration": "Carbon has six protons and typically six neutrons in its nucleus. Its second shell contains four valence electrons."
+    },
+    {
+      "scene": "Scene_NuclearDecay",
+      "params": {
+        "decayType": "alpha",
+        "parentNucleus": { "element": "U", "massNumber": 238, "atomicNumber": 92 },
+        "daughterNucleus": { "element": "Th", "massNumber": 234, "atomicNumber": 90 },
+        "showPenetration": true,
+        "barriers": ["paper", "aluminium", "lead"]
+      },
+      "duration": 7,
+      "narration": "Uranium two thirty-eight emits an alpha particle and becomes thorium two thirty-four. Alpha radiation is stopped by paper."
+    },
+    {
+      "scene": "Scene_WaveBehavior",
+      "params": {
+        "behavior": "refraction",
+        "incidentAngle": 45,
+        "medium1": { "label": "Air", "speed": "fast" },
+        "medium2": { "label": "Glass", "speed": "slow" },
+        "showNormal": true,
+        "showAngles": true,
+        "gapWidth": "narrow"
+      },
+      "duration": 7,
+      "narration": "The wave slows as it enters glass, so its direction bends toward the normal and its wavefront spacing decreases."
+    }
+  ]
+}

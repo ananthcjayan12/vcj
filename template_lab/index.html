@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" data-composition-id="index" data-width="1920" data-height="1080" data-duration="0.01">
+  <head>
+    <meta charset="utf-8">
+    <title>Physics V3 Render Bootstrap</title>
+  </head>
+  <body>
+    <div
+      class="clip"
+      data-composition-id="index"
+      data-width="1920"
+      data-height="1080"
+      data-duration="0.01"
+      data-start="0"
+    ></div>
+    <script src="project/vendor/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines.index = gsap.timeline({ paused: true }).set({}, {}, 0.01);
+    </script>
+  </body>
+</html>

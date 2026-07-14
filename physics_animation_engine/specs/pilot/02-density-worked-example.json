@@ -1,0 +1,66 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Density worked example",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_TitleCard",
+      "label": "Introduction",
+      "duration": 5,
+      "narration": "Let us calculate the density of a ceramic sample and keep every unit consistent.",
+      "params": {
+        "title": "Density without guesswork",
+        "subtitle": "Mass divided by volume",
+        "badge": "IGCSE Physics 0625"
+      }
+    },
+    {
+      "scene": "Scene_MathEquation",
+      "label": "Equation",
+      "duration": 6,
+      "narration": "Density equals mass divided by volume.",
+      "params": {
+        "equation": "\\rho = \\frac{m}{V}",
+        "highlight": "\\rho",
+        "caption": "Use kilograms and cubic metres for kilograms per cubic metre."
+      }
+    },
+    {
+      "scene": "Scene_NumericalExample",
+      "label": "Worked solution",
+      "duration": 8,
+      "narration": "Substitute zero point three six zero kilograms and one point five times ten to the minus four cubic metres.",
+      "params": {
+        "title": "Ceramic sample",
+        "steps": [
+          {
+            "label": "Write",
+            "content": "density = mass / volume"
+          },
+          {
+            "label": "Substitute",
+            "content": "0.360 / (1.50 x 10^-4)"
+          },
+          {
+            "label": "Calculate",
+            "content": "density = 2400 kg/m^3"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "label": "Retrieval summary",
+      "duration": 6,
+      "narration": "The sample density is two thousand four hundred kilograms per cubic metre.",
+      "params": {
+        "heading": "Pause and recall",
+        "points": [
+          "Write the equation first",
+          "Keep the units consistent",
+          "Give the unit with the answer"
+        ]
+      }
+    }
+  ]
+}

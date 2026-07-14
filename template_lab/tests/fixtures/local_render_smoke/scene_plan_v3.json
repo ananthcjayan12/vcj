@@ -1,0 +1,17 @@
+{
+  "run_id": "local-render-smoke",
+  "title": "Force and Motion",
+  "scene_count": 1,
+  "scenes": [
+    {
+      "id": "scene_01",
+      "paragraph_id": "paragraph_01",
+      "start": 0.0,
+      "duration": 1.2,
+      "beat_label": "observation",
+      "narration_text": "Force can change motion.",
+      "scene_html": "<div id=\"b01_object\">OBJECT</div><svg id=\"b01_force\" viewBox=\"0 0 520 160\" aria-label=\"Force arrow pointing right\"><defs><marker id=\"b01_arrowhead\" markerWidth=\"12\" markerHeight=\"12\" refX=\"10\" refY=\"6\" orient=\"auto\"><path d=\"M0,0 L12,6 L0,12 z\" fill=\"var(--orange)\"></path></marker></defs><line x1=\"30\" y1=\"80\" x2=\"470\" y2=\"80\" marker-end=\"url(#b01_arrowhead)\"></line><text x=\"220\" y=\"55\">FORCE</text></svg><div id=\"b01_result\">MOTION CHANGES</div><style>.mav-v3-scene[data-scene-id=\"scene_01\"] #b01_object { position:absolute; left:300px; top:430px; width:300px; height:180px; display:grid; place-items:center; background:var(--paper-card); border:8px solid var(--ink); color:var(--ink); font:800 36px/1 var(--sans); } .mav-v3-scene[data-scene-id=\"scene_01\"] #b01_force { position:absolute; left:640px; top:440px; width:520px; height:160px; } .mav-v3-scene[data-scene-id=\"scene_01\"] #b01_force line { stroke:var(--orange); stroke-width:14; } .mav-v3-scene[data-scene-id=\"scene_01\"] #b01_force text { fill:var(--muted-ink); font:800 24px/1 var(--sans); } .mav-v3-scene[data-scene-id=\"scene_01\"] #b01_result { position:absolute; left:1240px; top:465px; opacity:0; color:var(--ink); font:800 46px/1 var(--serif); }</style>",
+      "scene_gsap": "function initScene(tl, start, dur) { const scene = document.querySelector('[data-scene-id=\"scene_01\"]'); const object = scene.querySelector('#b01_object'); const force = scene.querySelector('#b01_force'); const result = scene.querySelector('#b01_result'); tl.fromTo(object, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.25 }, start); tl.fromTo(force, { opacity: 0, scaleX: 0, transformOrigin: 'left center' }, { opacity: 1, scaleX: 1, duration: 0.35 }, start + 0.25); tl.to(object, { x: 180, duration: 0.35 }, start + 0.55); tl.fromTo(result, { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.25 }, start + 0.85); tl.to(scene.querySelector('.camera'), { scale: 1.01, duration: dur, ease: 'none' }, start); }"
+    }
+  ]
+}

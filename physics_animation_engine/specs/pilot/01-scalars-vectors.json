@@ -1,0 +1,67 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Scalars and vectors",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_TitleCard",
+      "label": "Introduction",
+      "duration": 5,
+      "narration": "A drone can report how fast it moves, but navigation also needs a direction.",
+      "params": {
+        "title": "Scalars and vectors",
+        "subtitle": "Magnitude alone, or magnitude with direction?",
+        "badge": "IGCSE Physics 0625"
+      }
+    },
+    {
+      "scene": "Scene_ComparisonTable",
+      "label": "Compare",
+      "duration": 7,
+      "narration": "Scalars have magnitude only. Vectors have both magnitude and direction.",
+      "params": {
+        "heading1": "Scalar",
+        "heading2": "Vector",
+        "rows": [
+          {
+            "col1": "time",
+            "col2": "displacement"
+          },
+          {
+            "col1": "energy",
+            "col2": "velocity"
+          },
+          {
+            "col1": "speed",
+            "col2": "force"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "Scene_DefinitionCard",
+      "label": "Exam idea",
+      "duration": 6,
+      "narration": "Direction is the deciding feature. Displacement and velocity are both vectors.",
+      "params": {
+        "term": "Vector",
+        "definition": "A quantity with both magnitude and direction.",
+        "example": "The drone moves at 6 metres per second north."
+      }
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "label": "Retrieval summary",
+      "duration": 6,
+      "narration": "Which two quantities in the drone problem require a direction?",
+      "params": {
+        "heading": "Pause and recall",
+        "points": [
+          "A scalar has magnitude only",
+          "A vector also has direction",
+          "Displacement and velocity are vectors"
+        ]
+      }
+    }
+  ]
+}

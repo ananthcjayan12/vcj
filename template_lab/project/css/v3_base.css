@@ -1,0 +1,32 @@
+.mav-v3-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.mav-v3-scene .paper-bg {
+  z-index: 1;
+}
+
+.mav-v3-scene .camera {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  transform-origin: center center;
+}
+
+.mav-v3-scene .v3-scene-content {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.mav-v3-scene svg {
+  overflow: visible;
+}
+
+.mav-v3-scene .grain,
+.mav-v3-scene .vignette {
+  z-index: 13;
+}

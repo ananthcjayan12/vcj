@@ -1,0 +1,1984 @@
+{
+  "schema_version": 1,
+  "syllabus": "Cambridge IGCSE Physics 0625",
+  "valid_states": [
+    "uncovered",
+    "planned",
+    "scripted",
+    "rendered",
+    "reviewed",
+    "covered",
+    "needs_revision"
+  ],
+  "updated_at": "2026-07-14T08:59:11+00:00",
+  "objectives": {
+    "1.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.1-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.1-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.1-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.1-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-C08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-S11": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-S12": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.2-S13": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.3-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.3-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.4-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.4-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.4-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-C08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-S11": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.1-S12": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.2-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.2-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.5.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.6-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.6-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.6-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.6-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.1-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.1-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.1-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.3-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.3-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.3-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.3-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.7.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.8-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.8-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.8-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.8-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "1.8-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.2-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.1.3-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.1-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.2-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.2-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.2-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.2.3-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.1-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.1-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.1-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-C07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-C08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-C09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.3-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "2.3.4-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-C08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.1-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.1-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.2-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.3-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.4-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.2.4-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.3-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-C09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-S11": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-S12": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "3.4-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-C09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.1-S11": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.1-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.2-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.2-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.3-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.3-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.3-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.3-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.4-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.4-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.4-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.4-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.5-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.5-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.5-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.2.5-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.1-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-C07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.2-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.3-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.3.3-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.4-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.4-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.4-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.4-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.1-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.1-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.3-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.3-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.4-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.4-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.5-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.5-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "4.5.6-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.1-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.1.2-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.1-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.1-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.2-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.2-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.3-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.3-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.3-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.4-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.4-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.4-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.5-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.5-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.5-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "5.2.5-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.1-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.1-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.1-S04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-C05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-C06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.1.2-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.1-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.1-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.2-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.2-S02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.2-S03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-C01": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-C02": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-C03": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-C04": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-S05": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-S06": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-S07": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-S08": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-S09": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-S10": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    },
+    "6.2.3-S11": {
+      "status": "uncovered",
+      "primary_video_id": null,
+      "reinforcement_video_ids": [],
+      "updated_at": null
+    }
+  }
+}

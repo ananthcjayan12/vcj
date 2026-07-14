@@ -1,0 +1,207 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Mechanics, Fields & The Cosmos",
+  "subtitle": "Phase 3 Module Showcase",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_DefinitionCard",
+      "label": "Definition Card",
+      "description": "Terms, definitions and examples",
+      "icon": "Aa",
+      "params": {
+        "term": "Inertia",
+        "definition": "The tendency of an object to resist a change in its state of motion.",
+        "example": "A passenger continues moving forward when a bus stops suddenly."
+      },
+      "duration": 5.5,
+      "narration": "Inertia is an object's tendency to resist a change in motion. Greater mass means greater inertia."
+    },
+    {
+      "scene": "Scene_ComparisonTable",
+      "label": "Comparison Table",
+      "description": "Aligned scientific comparisons",
+      "icon": "⇄",
+      "params": {
+        "heading1": "Scalar",
+        "heading2": "Vector",
+        "rows": [
+          { "col1": "Has magnitude only", "col2": "Has magnitude and direction" },
+          { "col1": "Speed, mass, energy", "col2": "Velocity, force, acceleration" },
+          { "col1": "Added arithmetically", "col2": "Combined using direction" }
+        ]
+      },
+      "duration": 6,
+      "narration": "Scalars have magnitude only, while vectors carry both magnitude and direction."
+    },
+    {
+      "scene": "Scene_NumericalExample",
+      "label": "Numerical Example",
+      "description": "Stepwise worked calculations",
+      "icon": "Σ",
+      "params": {
+        "title": "Calculating Weight",
+        "steps": [
+          { "label": "Write the equation", "content": "W = m × g" },
+          { "label": "Substitute values", "content": "W = 5 × 9.8" },
+          { "label": "Calculate with units", "content": "W = 49 N" }
+        ]
+      },
+      "duration": 6,
+      "narration": "Write the equation, substitute the known values, and calculate the answer with its unit."
+    },
+    {
+      "scene": "Scene_ProjectileMotion",
+      "label": "Projectile Motion",
+      "description": "Calculated parabolic trajectories",
+      "icon": "⌒",
+      "params": { "launchAngle": 45, "launchSpeed": 20, "gravity": 9.81, "showComponents": true },
+      "duration": 6.5,
+      "narration": "Horizontal velocity remains constant while gravity continuously changes the vertical velocity component."
+    },
+    {
+      "scene": "Scene_CircularMotion",
+      "label": "Circular Motion",
+      "description": "Live tangent and inward vectors",
+      "icon": "↻",
+      "params": { "radius": 180, "speed": 3, "showCentripetalForce": true, "showVelocityTangent": true },
+      "duration": 6.5,
+      "narration": "Velocity is always tangent to the circle, while centripetal force points toward its centre."
+    },
+    {
+      "scene": "Scene_SpringMass",
+      "label": "Spring Mass",
+      "description": "Hooke's law oscillator",
+      "icon": "≋",
+      "params": { "springConstant": 15, "mass": 2, "displacement": 80, "showForceArrow": true, "showGraph": true },
+      "duration": 6.5,
+      "narration": "The restoring force reverses at each extreme and is proportional to displacement from equilibrium."
+    },
+    {
+      "scene": "Scene_InclinedPlane",
+      "label": "Inclined Plane",
+      "description": "Resolved forces on a slope",
+      "icon": "◿",
+      "params": { "angle": 30, "mass": 5, "friction": 0.3, "showDecomposedWeight": true },
+      "duration": 6,
+      "narration": "Weight resolves into components parallel and perpendicular to the slope, while friction opposes motion."
+    },
+    {
+      "scene": "Scene_ThermalHeating",
+      "label": "Thermal Heating",
+      "description": "State-change heating curves",
+      "icon": "♨",
+      "params": { "substance": "Water", "startTemp": 20, "endTemp": 120, "stateChanges": [{ "at": 100, "type": "boiling" }] },
+      "duration": 6.5,
+      "narration": "Temperature rises until boiling, then remains constant while energy separates the particles."
+    },
+    {
+      "scene": "Scene_EMSpectrum",
+      "label": "EM Spectrum",
+      "description": "Regions, wavelengths and uses",
+      "icon": "▰",
+      "params": { "highlightRegion": "visible", "showWavelengths": true, "showUses": true },
+      "duration": 6,
+      "narration": "The visible region is a narrow part of the electromagnetic spectrum between infrared and ultraviolet."
+    },
+    {
+      "scene": "Scene_StandingWave",
+      "label": "Standing Wave",
+      "description": "Harmonics, nodes and antinodes",
+      "icon": "∿",
+      "params": { "harmonic": 3, "stringLength": 600, "showNodes": true, "showAntinodes": true },
+      "duration": 6.5,
+      "narration": "The third harmonic contains three loops, four nodes, and three antinodes."
+    },
+    {
+      "scene": "Scene_ElectronFlow",
+      "label": "Electron Flow",
+      "description": "Current and resistance zones",
+      "icon": "e⁻",
+      "params": { "wireLength": 800, "electronCount": 24, "current": "medium", "showResistanceZone": true },
+      "duration": 6.5,
+      "narration": "Electrons drift through the conductor and transfer energy during collisions in the resistance zone."
+    },
+    {
+      "scene": "Scene_MotorEffect",
+      "label": "Motor Effect",
+      "description": "Computed force direction",
+      "icon": "⊗",
+      "params": { "wireDirection": "into_page", "fieldDirection": "right", "showForceDirection": true, "showRule": "flemings_left" },
+      "duration": 6,
+      "narration": "Fleming's left-hand rule predicts the force direction from the magnetic field and current directions."
+    },
+    {
+      "scene": "Scene_EMInduction",
+      "label": "EM Induction",
+      "description": "Flux change and induced EMF",
+      "icon": "∿",
+      "params": { "method": "magnet_in_coil", "speed": "medium", "showGalvanometer": true },
+      "duration": 6.5,
+      "narration": "Moving the magnet changes magnetic flux through the coil and induces a changing electromotive force."
+    },
+    {
+      "scene": "Scene_Transformer",
+      "label": "Transformer",
+      "description": "Automatic turns-ratio voltage",
+      "icon": "∞",
+      "params": { "primaryTurns": 1000, "secondaryTurns": 250, "inputVoltage": 240, "showFieldLines": true },
+      "duration": 6,
+      "narration": "Four times fewer turns on the secondary coil steps two hundred forty volts down to sixty volts."
+    },
+    {
+      "scene": "Scene_GasParticles",
+      "label": "Gas Particles",
+      "description": "Temperature, volume and pressure",
+      "icon": "⠿",
+      "params": { "containerType": "piston", "temperature": "medium", "showPressureArrows": true, "changeTo": "smaller_volume" },
+      "duration": 6.5,
+      "narration": "Compressing the gas increases collision frequency, so the pressure on the container walls rises."
+    },
+    {
+      "scene": "Scene_NuclearReaction",
+      "label": "Nuclear Reaction",
+      "description": "Fission and fusion sequences",
+      "icon": "☢",
+      "params": { "type": "fission", "reactants": ["U-235", "neutron"], "products": ["Ba-141", "Kr-92", "3 neutrons"], "showEnergyRelease": true },
+      "duration": 6.3,
+      "narration": "A uranium nucleus absorbs a neutron, becomes unstable, and splits into smaller nuclei while releasing energy."
+    },
+    {
+      "scene": "Scene_RayDiagram",
+      "label": "Ray Diagram",
+      "description": "Calculated principal rays",
+      "icon": "↗",
+      "params": { "opticalElement": "converging_lens", "objectDistance": 220, "focalLength": 100, "showFocalPoints": true, "showImage": true },
+      "duration": 6.2,
+      "narration": "Principal rays converge to form a real inverted image on the far side of the lens."
+    },
+    {
+      "scene": "Scene_OrbitalMotion",
+      "label": "Orbital Motion",
+      "description": "Gravity and tangent velocity",
+      "icon": "◌",
+      "params": { "centralBody": "Earth", "orbitingBody": "Satellite", "orbitRadius": 300, "showGravityVector": true, "showVelocityVector": true, "isElliptical": true },
+      "duration": 6.5,
+      "narration": "Gravity always points toward Earth while orbital velocity stays tangent to the elliptical path."
+    },
+    {
+      "scene": "Scene_StarLifeCycle",
+      "label": "Star Life Cycle",
+      "description": "Mass-dependent stellar evolution",
+      "icon": "✦",
+      "params": { "starType": "massive", "stages": ["nebula", "protostar", "main_sequence", "red_supergiant", "supernova", "black_hole"] },
+      "duration": 6.5,
+      "narration": "A massive star evolves from a nebula to a supergiant before exploding as a supernova and potentially forming a black hole."
+    },
+    {
+      "scene": "Scene_RadiationPenetration",
+      "label": "Radiation Penetration",
+      "description": "Comparative barrier ranges",
+      "icon": "γ",
+      "params": { "radiationTypes": ["alpha", "beta", "gamma"], "barriers": ["paper", "aluminium", "lead", "concrete"], "showRange": true },
+      "duration": 6.2,
+      "narration": "Paper stops alpha, aluminium stops beta, and thick concrete is needed to stop highly penetrating gamma radiation."
+    }
+  ]
+}

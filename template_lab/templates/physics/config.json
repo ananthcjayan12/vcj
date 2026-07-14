@@ -1,0 +1,35 @@
+{
+  "id": "physics",
+  "name": "IGCSE Physics Explainer",
+  "description": "Concept-first physics lessons with precise diagrams, experiments, graphs, equations, and retrieval pauses.",
+  "icon": "atom",
+  "color": "#42b88b",
+  "default_duration": 480,
+  "default_tone": "patient, precise IGCSE Physics teacher",
+  "uses_selector": false,
+  "uses_harvester": false,
+  "visual_identity": {
+    "persona": "experienced IGCSE Physics teacher, scientific illustrator, and educational animation director",
+    "composition_style": "clean science-notebook explainer where physical cause and effect unfolds spatially before labels, graphs, and equations formalise it",
+    "motion_style": "prediction pauses, causal motion, progressive force and ray drawing, particle motion, graph traces, apparatus reveals, equation substitution, and restrained camera movement",
+    "required_elements": [
+      "physically_meaningful_diagram",
+      "direct_labels_with_units",
+      "cause_before_effect_animation",
+      "prediction_or_retrieval_pause",
+      "model_limit_when_relevant"
+    ],
+    "forbidden_elements": [
+      "financial_chart",
+      "candlestick",
+      "stock_counter",
+      "scoreboard",
+      "decorative_data",
+      "unlabelled_axis",
+      "unscaled_force_arrow",
+      "scientifically_incorrect_geometry",
+      "text_wall",
+      "copied_exam_question"
+    ]
+  }
+}

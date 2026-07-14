@@ -1,0 +1,45 @@
+{
+  "version": "2026-07-10",
+  "currency": "USD",
+  "unit": "per_1m_tokens",
+  "sources": {
+    "anthropic": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "google_gemini": "https://ai.google.dev/gemini-api/docs/pricing",
+    "moonshot_kimi": "https://platform.kimi.ai/docs/pricing/chat-k27-code",
+    "zai": "https://docs.z.ai/guides/overview/pricing"
+  },
+  "models": {
+    "anthropic:claude-opus-4-8": {
+      "input_usd_per_million": 5.0,
+      "cached_input_usd_per_million": 0.5,
+      "output_usd_per_million": 25.0
+    },
+    "anthropic:claude-sonnet-5": {
+      "input_usd_per_million": 2.0,
+      "cached_input_usd_per_million": 0.2,
+      "output_usd_per_million": 10.0,
+      "note": "Introductory rate through 2026-08-31; update to 3/0.3/15 on 2026-09-01."
+    },
+    "gemini:gemini-3.1-flash-lite": {
+      "input_usd_per_million": 0.25,
+      "cached_input_usd_per_million": 0.025,
+      "output_usd_per_million": 1.5
+    },
+    "gemini:gemini-3.1-flash-tts-preview": {
+      "input_usd_per_million": 1.0,
+      "cached_input_usd_per_million": 1.0,
+      "output_usd_per_million": 20.0
+    },
+    "moonshot:kimi-k2.7-code": {
+      "input_usd_per_million": 0.95,
+      "cached_input_usd_per_million": 0.19,
+      "output_usd_per_million": 4.0
+    },
+    "zai:glm-5.2": {
+      "input_usd_per_million": 1.4,
+      "cached_input_usd_per_million": 0.26,
+      "output_usd_per_million": 4.4
+    }
+  },
+  "audio": {}
+}

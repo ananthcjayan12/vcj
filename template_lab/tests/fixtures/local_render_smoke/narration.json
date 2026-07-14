@@ -1,0 +1,14 @@
+{
+  "title": "Force and Motion",
+  "target_duration_seconds": 1.2,
+  "spoken_word_count": 4,
+  "paragraphs": [
+    {
+      "id": "paragraph_01",
+      "beat_label": "observation",
+      "text": "Force can change motion.",
+      "claim_ids": []
+    }
+  ],
+  "elevenlabs_narration": "Force can change motion."
+}

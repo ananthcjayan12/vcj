@@ -1,0 +1,11 @@
+Lesson topic: {topic}
+Teaching tone: {tone}
+Teaching mode: {narrative_mode}
+Target duration: {target_duration} seconds
+Required beats/paragraphs: {min_paragraphs}-{max_paragraphs}
+Target spoken words: {min_words}-{max_words}
+
+Grounded fact handles:
+{fact_lines}
+
+Design the smallest coherent teaching sequence that completely covers the objectives assigned in these facts. Allocate one beat per meaningful learning move, use between {min_paragraphs} and {max_paragraphs} beats, and make visual or practical reasoning explicit. Use only supplied claim IDs. Return strict JSON only.

@@ -1,0 +1,193 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #28251f;
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+body.composition-body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.composition-root {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--paper);
+  transform-origin: top left;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.camera,
+.scene-content {
+  position: absolute;
+  inset: 0;
+  transform-origin: center center;
+}
+
+.paper-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+}
+
+.wood-bg {
+  position: absolute;
+  inset: 0;
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 100%),
+    linear-gradient(0deg, rgba(255,255,255,0.03), rgba(0,0,0,0.16)),
+    url("../assets/wood_texture.svg");
+  background-size: 96px 100%, cover, cover;
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: multiply;
+  background-image: url("../assets/paper_texture.svg");
+  background-size: 360px 360px;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 48% 44%, rgba(255,255,255,0) 0 56%, rgba(69,55,35,0.14) 100%);
+}
+
+.title-serif {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 0.96;
+}
+
+.label {
+  font-family: var(--sans);
+  color: var(--muted-ink);
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.tiny-label {
+  font-family: var(--sans);
+  color: var(--muted-ink);
+  font-size: 20px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.paper-card,
+.photo-card,
+.document-card {
+  position: absolute;
+  background: var(--paper-card);
+  border: 12px solid #fff8e8;
+  box-shadow: var(--soft-shadow);
+  transform-origin: center center;
+}
+
+.paper-card img,
+.photo-card img,
+.document-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.teal-rule {
+  position: absolute;
+  height: 10px;
+  background: var(--teal);
+  transform-origin: left center;
+}
+
+.paper-wipe {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: var(--paper);
+  transform: translateY(-1188px);
+}
+
+.accent-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 41;
+  background: var(--yellow);
+  opacity: 0;
+}
+
+.debug-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  display: none;
+}
+
+body.debug .debug-layer {
+  display: block;
+}
+
+.safe-area {
+  position: absolute;
+  left: 10%;
+  top: 10%;
+  width: 80%;
+  height: 80%;
+  border: 2px dashed rgba(66, 184, 139, 0.65);
+}
+
+.center-line-x,
+.center-line-y {
+  position: absolute;
+  background: rgba(231, 154, 99, 0.55);
+}
+
+.center-line-x {
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+}
+
+.center-line-y {
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 2px;
+}
+
+.debug-box {
+  position: absolute;
+  border: 2px solid rgba(242, 216, 75, 0.9);
+}
+
+.debug-readout {
+  position: absolute;
+  left: 28px;
+  bottom: 24px;
+  padding: 9px 12px;
+  background: rgba(23, 23, 20, 0.78);
+  color: #f7f2df;
+  font: 20px/1.2 var(--sans);
+}

@@ -1,0 +1,26 @@
+Teaching sequence:
+{story_skeleton}
+
+Lesson topic: {topic}
+Teaching tone: {tone}
+Target duration: {target_duration} seconds
+Required paragraphs: {min_paragraphs}-{max_paragraphs}
+Required spoken words: {min_words}-{max_words}
+
+Grounded fact handles:
+{fact_lines}
+
+Write one spoken paragraph for each beat in the teaching sequence.
+
+Before returning JSON, silently verify all of the following:
+- every assigned syllabus objective is taught by at least one paragraph;
+- the narration contains {min_paragraphs}-{max_paragraphs} paragraphs and {min_words}-{max_words} spoken words;
+- each paragraph performs one distinct learning move rather than repeating prior content;
+- all definitions, equations, units, calculations, practical advice, and misconceptions are grounded in the facts;
+- claim IDs are copied exactly from the fact handles;
+- questions give the learner time to think before the explanation;
+- worked examples use original contexts and numbers;
+- the language is age-appropriate, visual, concise, and easy to narrate;
+- elevenlabs_narration matches the paragraph text after performance tags are removed.
+
+Return strict JSON only.

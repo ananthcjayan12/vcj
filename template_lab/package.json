@@ -1,0 +1,13 @@
+{
+  "name": "template_lab",
+  "version": "2.0.0",
+  "description": "Repo-local physics lesson generation, preview, and MP4 render pipeline.",
+  "private": true,
+  "scripts": {
+    "test": "python3 -m unittest discover -s tests"
+  },
+  "devDependencies": {
+    "hyperframes": "0.7.48"
+  },
+  "license": "UNLICENSED"
+}

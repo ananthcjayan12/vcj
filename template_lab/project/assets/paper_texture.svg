@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360">
+  <rect width="360" height="360" fill="#f2efe4"/>
+  <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.92" numOctaves="3" seed="14"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.12"/></feComponentTransfer></filter>
+  <rect width="360" height="360" filter="url(#n)"/>
+  <path d="M0 84H360M0 218H360M93 0V360M246 0V360" stroke="#171714" stroke-opacity="0.035"/>
+</svg>

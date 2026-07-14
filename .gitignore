@@ -36,6 +36,11 @@ venv/
 env/
 ENV/
 
+# Local credentials
+.env
+.env.*
+!.env.example
+
 # Local tool state
 .playwright-cli/
 .python-version
@@ -55,3 +60,11 @@ pilot/index_output/
 *.sqlite3
 *.db
 *.log
+
+# Topic-video engine outputs and JavaScript dependencies
+physics_animation_engine/node_modules/
+template_lab/node_modules/
+template_lab/runs/
+template_lab/renders/
+video_engine/topics/
+video_engine/output/

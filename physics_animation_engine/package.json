@@ -1,0 +1,14 @@
+{
+  "name": "mav-physics-animation-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "python3 -m http.server 8765 --bind 127.0.0.1",
+    "catalog": "node scripts/export-catalog.mjs"
+  },
+  "dependencies": {
+    "gsap": "3.12.5",
+    "katex": "0.16.47"
+  }
+}

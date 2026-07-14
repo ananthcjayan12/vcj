@@ -1,5 +1,15 @@
 # PapaCambridge CAIE IGCSE Physics 0625 downloader
 
+## Physics Production Studio
+
+The repo now includes a local dashboard for syllabus coverage, lesson preparation, video generation, scene review, and rendering:
+
+```bash
+python3 -m studio.server
+```
+
+Open `http://127.0.0.1:8765`. See [`studio/README.md`](studio/README.md) and [`UI_IMPLEMENTATION_PLAN.md`](UI_IMPLEMENTATION_PLAN.md).
+
 This utility recursively crawls:
 
 `https://pastpapers.papacambridge.com/papers/caie/igcse-physics-0625`
@@ -61,3 +71,16 @@ open pilot/index_output/search.html
 ```
 
 Past-paper text and screenshots in the index are private research data and are not intended for publication. The earlier four-paper content-planning prototype is still available as `pilot/build_pilot.py`.
+
+## Build IGCSE Physics videos topic by topic
+
+The repository also contains a manual, curriculum-controlled video engine. It combines the 58-topic/328-objective syllabus registry, private aggregate question-pattern research, 35 reusable physics animation scenes, and a complete narration-to-MP4 Template Lab pipeline.
+
+```bash
+python3 -m video_engine.cli init
+python3 -m video_engine.cli doctor
+python3 -m video_engine.cli next-topic
+python3 -m video_engine.cli prepare-topic 1.1
+```
+
+Read [`END_TO_END_README.md`](END_TO_END_README.md) for installation and the complete generation, preview, render, review, and coverage workflow. Publication remains manual.

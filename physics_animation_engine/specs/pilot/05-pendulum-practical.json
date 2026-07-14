@@ -1,0 +1,108 @@
+{
+  "$schema": "mav-physics-video-spec-v1",
+  "title": "Pendulum period practical",
+  "totalDuration": "auto",
+  "slides": [
+    {
+      "scene": "Scene_TitleCard",
+      "label": "Introduction",
+      "duration": 5,
+      "narration": "A single swing is too short for reliable manual timing, so we measure many oscillations.",
+      "params": {
+        "title": "Measure a short period",
+        "subtitle": "Time many oscillations, then divide",
+        "badge": "IGCSE Physics 0625"
+      }
+    },
+    {
+      "scene": "Scene_GraphPlotter",
+      "label": "Repeated readings",
+      "duration": 8,
+      "narration": "Three repeated timings for fifteen oscillations are close together, with a mean of eighteen point five seconds.",
+      "params": {
+        "title": "Time for 15 oscillations",
+        "xAxis": {
+          "label": "trial",
+          "min": 1,
+          "max": 3,
+          "unit": ""
+        },
+        "yAxis": {
+          "label": "time",
+          "min": 18,
+          "max": 19,
+          "unit": "s"
+        },
+        "curves": [
+          {
+            "label": "reading",
+            "color": "label",
+            "style": "solid",
+            "dataPoints": [
+              [
+                1,
+                18.6
+              ],
+              [
+                2,
+                18.4
+              ],
+              [
+                3,
+                18.5
+              ]
+            ]
+          }
+        ],
+        "annotations": [
+          {
+            "x": 3,
+            "y": 18.5,
+            "text": "mean = 18.5 s"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "Scene_NumericalExample",
+      "label": "Mean period",
+      "duration": 9,
+      "narration": "Average the repeated timings, then divide by fifteen to find the period of one oscillation.",
+      "params": {
+        "title": "Calculate the period",
+        "steps": [
+          {
+            "label": "Mean time",
+            "content": "(18.6 + 18.4 + 18.5) / 3"
+          },
+          {
+            "label": "Mean",
+            "content": "time for 15 = 18.5 s"
+          },
+          {
+            "label": "One oscillation",
+            "content": "period = 18.5 / 15"
+          },
+          {
+            "label": "Answer",
+            "content": "period = 1.23 s"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "label": "Retrieval summary",
+      "duration": 6,
+      "narration": "Timing many oscillations reduces the percentage effect of reaction time.",
+      "params": {
+        "heading": "Pause and recall",
+        "points": [
+          "Repeat the timing",
+          "Time many oscillations",
+          "Divide the mean time by the number of oscillations"
+        ]
+      }
+    }
+  ]
+}

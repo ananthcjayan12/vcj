@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1114">
+    <title>MAV Physics Studio</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230b1114%22/><path d=%22M13 45V32M31 45V16M49 45V25%22 stroke=%22%2342b88b%22 stroke-width=%228%22 stroke-linecap=%22round%22/></svg>">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#production" aria-label="MAV Physics Studio home">
+          <span class="brand-mark"><i></i><i></i><i></i></span>
+          <span><strong>MAV Physics</strong><small>Production Studio</small></span>
+        </a>
+
+        <nav class="nav-list" aria-label="Studio navigation">
+          <button class="nav-item is-active" data-view="production"><span>⌁</span><b>Production</b></button>
+          <button class="nav-item" data-view="curriculum"><span>◫</span><b>Curriculum</b></button>
+          <button class="nav-item" data-view="assets"><span>◇</span><b>Scene library</b></button>
+          <button class="nav-item" data-view="runs"><span>↻</span><b>Runs</b><em id="run-count">0</em></button>
+        </nav>
+
+        <div class="sidebar-spacer"></div>
+        <div class="engine-card">
+          <div class="engine-status"><i></i><span>Local engine</span><b>Ready</b></div>
+          <p>Physics V3 · 1920 × 1080</p>
+          <div class="provider-dots" id="provider-dots"></div>
+        </div>
+        <a class="scene-link" href="/scene-library/" target="_blank" rel="noreferrer">Open animation browser <span>↗</span></a>
+      </aside>
+
+      <main class="main-shell">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="view-eyebrow">Manual lesson engine</p>
+            <h1 id="view-title">Production workspace</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="syllabus-chip">0625 · IGCSE Physics</span>
+            <button class="icon-button" id="refresh-button" title="Refresh studio" aria-label="Refresh studio">↻</button>
+          </div>
+        </header>
+
+        <div id="global-error" class="alert is-hidden" role="alert"></div>
+
+        <section class="view is-active" id="view-production">
+          <div class="stat-grid" id="summary-stats"></div>
+          <div class="production-grid">
+            <aside class="topic-panel panel">
+              <div class="panel-heading compact">
+                <div><p class="eyebrow">Production order</p><h2>Syllabus topics</h2></div>
+                <span class="count-chip" id="topic-count">—</span>
+              </div>
+              <label class="search-box"><span>⌕</span><input id="topic-search" type="search" placeholder="Search topics"></label>
+              <div class="topic-list" id="topic-list"></div>
+            </aside>
+
+            <div class="production-main">
+              <section class="panel topic-detail" id="topic-detail">
+                <div class="loading-card">Loading curriculum…</div>
+              </section>
+              <section class="panel pipeline-panel" id="pipeline-panel">
+                <div class="empty-pipeline">
+                  <span class="empty-orbit">◎</span>
+                  <h3>No active production run</h3>
+                  <p>Choose a topic, prepare its lesson packet, then create a run.</p>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-curriculum">
+          <div class="stat-grid" id="curriculum-stats"></div>
+          <div class="domain-grid" id="domain-grid"></div>
+          <section class="panel curriculum-table-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Complete syllabus</p><h2>Topic coverage</h2></div></div>
+            <div class="curriculum-table" id="curriculum-table"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-assets">
+          <div class="asset-hero panel">
+            <div><p class="eyebrow">Deterministic visual system</p><h2>Physics scene library</h2><p>Reusable, validated animations for equations, diagrams, experiments, graphs, and physical models.</p></div>
+            <a class="primary-button" href="/scene-library/" target="_blank" rel="noreferrer">Launch live browser ↗</a>
+          </div>
+          <div class="asset-toolbar">
+            <label class="search-box"><span>⌕</span><input id="asset-search" type="search" placeholder="Search 35 scenes"></label>
+            <select id="asset-category"><option value="">All categories</option></select>
+          </div>
+          <div class="asset-grid" id="asset-grid"></div>
+        </section>
+
+        <section class="view" id="view-runs">
+          <section class="panel runs-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Workspace history</p><h2>Production runs</h2></div><button class="secondary-button" id="runs-refresh">Refresh</button></div>
+            <div class="runs-table" id="runs-table"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
