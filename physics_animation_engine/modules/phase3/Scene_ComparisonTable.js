@@ -1,4 +1,4 @@
-import { append, el, finishPhase3, phase3Root, phase3Timeline, schemas } from './_shared.js';
+import { append, cueTimes, el, finishPhase3, phase3Root, phase3Timeline, schemas } from './_shared.js';
 
 export class Scene_ComparisonTable {
   setup(container, params) {
@@ -18,10 +18,13 @@ export class Scene_ComparisonTable {
   }
   buildTimeline(params) {
     const tl = phase3Timeline(this.root);
-    tl.fromTo(this.table, { y: 28, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .55 }, .35)
-      .fromTo(this.gridLines, { scale: 0 }, { scale: 1, duration: .7, stagger: .08 }, .55)
-      .fromTo(this.table.querySelectorAll('.is-header strong'), { y: -22, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .45, stagger: .12 }, .85)
-      .fromTo(this.rows, { x: 45, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .48, stagger: .18, ease: 'power3.out' }, 1.15);
+    const cues = cueTimes(params, 3 + this.rows.length);
+    tl.fromTo(this.table, { y: 28, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .55, ease: 'power3.out' }, cues[0])
+      .fromTo(this.gridLines, { scale: 0 }, { scale: 1, duration: .7, stagger: .08, ease: 'power2.inOut' }, cues[1])
+      .fromTo(this.table.querySelectorAll('.is-header strong'), { y: -22, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .45, stagger: .12, ease: 'power2.out' }, cues[2]);
+    this.rows.forEach((row, index) => {
+      tl.fromTo(row, { x: 45, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .48, ease: 'power3.out' }, cues[index + 3]);
+    });
     return finishPhase3(tl, this.root, params, 6);
   }
   teardown() { this.root?.remove(); }

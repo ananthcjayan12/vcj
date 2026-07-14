@@ -21,7 +21,6 @@ TIMING_TOLERANCE_SECONDS = 0.10
 DATE_RELATIVE_LANGUAGE_PATTERNS = (
     (re.compile(r"\btoday\b", re.IGNORECASE), "today"),
     (re.compile(r"\bright\s+now\b", re.IGNORECASE), "right now"),
-    (re.compile(r"\bnow\b", re.IGNORECASE), "now"),
     (re.compile(r"\bcurrently\b", re.IGNORECASE), "currently"),
     (re.compile(r"\bat\s+the\s+moment\b", re.IGNORECASE), "at the moment"),
     (re.compile(r"\bat\s+present\b", re.IGNORECASE), "at present"),
@@ -114,7 +113,9 @@ def narration_bounds(target_duration_seconds: float) -> dict[str, int]:
             "min_paragraphs": MIN_PARAGRAPHS,
             "max_paragraphs": MAX_PARAGRAPHS,
         }
-    min_words = max(MIN_WORDS, math.floor(duration * 1.85))
+    # A patient educational delivery can naturally sit near 108 words/minute.
+    # Keep the strict upper bound, but allow deliberate pauses in long lessons.
+    min_words = max(MIN_WORDS, math.floor(duration * 1.80))
     max_words = max(min_words + 20, math.ceil(duration * 2.55))
     min_paragraphs = max(MIN_PARAGRAPHS, math.ceil(duration / 35.0))
     max_paragraphs = max(min_paragraphs + 2, math.ceil(duration / 18.0))

@@ -1,4 +1,4 @@
-import { append, el, finishPhase3, phase3Root, phase3Timeline, schemas } from './_shared.js';
+import { append, cueTimes, el, finishPhase3, phase3Root, phase3Timeline, schemas } from './_shared.js';
 
 export class Scene_NumericalExample {
   setup(container, params) {
@@ -21,11 +21,12 @@ export class Scene_NumericalExample {
   }
   buildTimeline(params) {
     const tl = phase3Timeline(this.root);
-    tl.fromTo(this.panel, { y: 28, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .55 }, .3)
-      .fromTo(this.progress, { x: 30, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .45 }, .55);
+    const cues = cueTimes(params, this.steps.length + 2);
+    tl.fromTo(this.panel, { y: 28, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .55, ease: 'power3.out' }, cues[0])
+      .fromTo(this.progress, { x: 30, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .45, ease: 'power2.out' }, cues[1]);
     this.steps.forEach((step, index) => {
-      const at = .8 + index * .78;
-      tl.fromTo(step, { x: -40, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .45 }, at)
+      const at = cues[index + 2];
+      tl.fromTo(step, { x: -40, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .45, ease: 'power3.out' }, at)
         .to(step, { borderColor: 'rgba(255,210,63,.52)', backgroundColor: 'rgba(255,210,63,.065)', duration: .28 }, at + .18);
       if (index) tl.to(this.steps[index - 1], { opacity: .48, borderColor: 'rgba(255,255,255,.07)', duration: .28 }, at + .18);
       tl.to(this.progress.querySelector('span'), { width: `${(index + 1) / this.steps.length * 100}%`, duration: .45 }, at + .15);

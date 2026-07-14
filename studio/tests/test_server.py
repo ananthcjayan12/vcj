@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 import unittest
 import urllib.request
 
-from studio.server import _require_run_id, build_generation_command, build_server, dashboard_payload, topic_detail
+from pathlib import Path
+
+from studio.server import _infer_step, _require_run_id, build_generation_command, build_server, dashboard_payload, model_map_payload, topic_detail
 
 
 class StudioPayloadTest(unittest.TestCase):
@@ -42,6 +45,30 @@ class StudioPayloadTest(unittest.TestCase):
         command, _env = build_generation_command(meta, {"from_step": 2, "stop_after_step": 2, "confirm_paid_api": True})
         self.assertIn("--confirm-paid-api", command)
 
+    def test_task_model_overrides_are_injected_per_prompt(self) -> None:
+        meta = {"id": "physics-1-1-command-test", "facts_path": "video_engine/topics/1.1/facts.json", "settings": {"duration": 480, "model_provider": "gemini", "audio_provider": "gemini", "task_models": {"script_writing": {"provider": "anthropic", "model": "claude-opus-4-8"}}}}
+        _command, env = build_generation_command(meta, {"from_step": 2, "stop_after_step": 2, "confirm_paid_api": True})
+        self.assertEqual(env["MAV_SCRIPT_WRITING_PROVIDER"], "anthropic")
+        self.assertEqual(env["MAV_SCRIPT_WRITING_MODEL"], "claude-opus-4-8")
+
+    def test_model_map_covers_all_paid_pipeline_tasks(self) -> None:
+        tasks = {item["task"] for item in model_map_payload()["tasks"]}
+        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "scene_asset_shortlister", "scene_asset_router", "module_parameterizer", "v3_creative_director", "v3_scene_coder"})
+
+    def test_generation_summary_uses_actual_stopped_step(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_path = Path(directory)
+            (run_path / "input.json").write_text("{}")
+            (run_path / "generation_summary.json").write_text(json.dumps({"stopped_after_step": 2}))
+            self.assertEqual(_infer_step(run_path), 2)
+
+    def test_completed_generation_summary_infers_qa_step(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_path = Path(directory)
+            (run_path / "preview_manifest_v3.json").write_text("{}")
+            (run_path / "generation_summary.json").write_text(json.dumps({"visual_qa": "skipped"}))
+            self.assertEqual(_infer_step(run_path), 8)
+
 
 class StudioHttpTest(unittest.TestCase):
     @classmethod
@@ -61,6 +88,11 @@ class StudioHttpTest(unittest.TestCase):
         with urllib.request.urlopen(f"{self.base}/api/dashboard", timeout=5) as response:
             payload = json.load(response)
         self.assertEqual(payload["summary"]["topic_count"], 58)
+
+    def test_model_map_api(self) -> None:
+        with urllib.request.urlopen(f"{self.base}/api/model-map", timeout=5) as response:
+            payload = json.load(response)
+        self.assertEqual(len(payload["tasks"]), 8)
 
     def test_static_application(self) -> None:
         with urllib.request.urlopen(f"{self.base}/", timeout=5) as response:

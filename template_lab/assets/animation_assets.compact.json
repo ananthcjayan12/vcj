@@ -1,0 +1,2098 @@
+{
+  "version": "1.0",
+  "scene_count": 41,
+  "scenes": [
+    {
+      "scene": "Scene_TitleCard",
+      "category": "lesson_structure",
+      "purpose": "Open a lesson or section with a concise title and subtitle.",
+      "can_configure": [
+        "title",
+        "subtitle",
+        "badge"
+      ],
+      "required_parameters": [
+        "title"
+      ],
+      "parameter_hints": {
+        "title": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "badge": {
+          "type": "string",
+          "maxLength": 40
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "TitleCard",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_SummaryCard",
+      "category": "lesson_structure",
+      "purpose": "Close a section with compact retrieval points.",
+      "can_configure": [
+        "heading",
+        "points"
+      ],
+      "required_parameters": [
+        "points"
+      ],
+      "parameter_hints": {
+        "heading": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "points": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "SummaryCard",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_MathEquation",
+      "category": "mathematics",
+      "purpose": "Reveal and explain a physics equation step by step.",
+      "can_configure": [
+        "equation",
+        "highlight",
+        "caption"
+      ],
+      "required_parameters": [
+        "equation"
+      ],
+      "parameter_hints": {
+        "equation": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "highlight": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 150
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "MathEquation",
+      "visual_form": "one equation with a progressive highlight and short caption",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 8,
+        "max": 12
+      },
+      "motion_cues": [
+        "reveal equation",
+        "isolate important term",
+        "connect to meaning"
+      ],
+      "not_suitable_for": [
+        "apparatus procedure",
+        "vector construction",
+        "long numerical derivation"
+      ]
+    },
+    {
+      "scene": "Scene_ForceDiagram",
+      "category": "mechanics",
+      "purpose": "Draw an object, surface, force vectors, net force, and acceleration.",
+      "can_configure": [
+        "object",
+        "surface",
+        "surfaceAngle",
+        "forces",
+        "showNetForce",
+        "netForceValue",
+        "showAcceleration"
+      ],
+      "required_parameters": [
+        "object",
+        "forces"
+      ],
+      "parameter_hints": {
+        "object": {
+          "type": "object"
+        },
+        "surface": {
+          "type": "string",
+          "enum": [
+            "none",
+            "table",
+            "floor",
+            "incline"
+          ]
+        },
+        "surfaceAngle": {
+          "type": "number",
+          "minimum": -60,
+          "maximum": 60
+        },
+        "forces": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "showNetForce": {
+          "type": "boolean"
+        },
+        "netForceValue": {
+          "type": "number"
+        },
+        "showAcceleration": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "ForceDiagram",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_GraphPlotter",
+      "category": "graphs",
+      "purpose": "Plot labelled data and animate how a graph is read.",
+      "can_configure": [
+        "title",
+        "xAxis",
+        "yAxis",
+        "curves",
+        "annotations"
+      ],
+      "required_parameters": [
+        "xAxis",
+        "yAxis",
+        "curves"
+      ],
+      "parameter_hints": {
+        "title": {
+          "type": "string",
+          "maxLength": 70
+        },
+        "xAxis": {
+          "type": "object"
+        },
+        "yAxis": {
+          "type": "object"
+        },
+        "curves": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "annotations": {
+          "type": "array",
+          "maxItems": 5
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "GraphPlotter",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_WaveForm",
+      "category": "waves",
+      "purpose": "Animate transverse or longitudinal wave properties.",
+      "can_configure": [
+        "waveType",
+        "amplitude",
+        "wavelength",
+        "frequency",
+        "showLabels",
+        "labels",
+        "particleView"
+      ],
+      "required_parameters": [
+        "waveType",
+        "amplitude",
+        "wavelength",
+        "frequency"
+      ],
+      "parameter_hints": {
+        "waveType": {
+          "type": "string",
+          "enum": [
+            "transverse",
+            "longitudinal"
+          ]
+        },
+        "amplitude": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 150
+        },
+        "wavelength": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 400
+        },
+        "frequency": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 4
+        },
+        "showLabels": {
+          "type": "boolean"
+        },
+        "labels": {
+          "type": "array",
+          "maxItems": 4
+        },
+        "particleView": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "WaveForm",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_CircuitDiagram",
+      "category": "electricity",
+      "purpose": "Build and animate a circuit from recognised components.",
+      "can_configure": [
+        "type",
+        "components",
+        "showCurrentFlow",
+        "currentDirection"
+      ],
+      "required_parameters": [
+        "type",
+        "components"
+      ],
+      "parameter_hints": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "series",
+            "parallel",
+            "mixed"
+          ]
+        },
+        "components": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8
+        },
+        "showCurrentFlow": {
+          "type": "boolean"
+        },
+        "currentDirection": {
+          "type": "string",
+          "enum": [
+            "conventional",
+            "electron"
+          ]
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "CircuitDiagram",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_ParticleModel",
+      "category": "thermal",
+      "purpose": "Animate solid, liquid, or gas particle arrangements and motion.",
+      "can_configure": [
+        "state",
+        "temperature",
+        "containerType",
+        "particleCount",
+        "showEnergyLabel",
+        "transitionTo"
+      ],
+      "required_parameters": [
+        "state"
+      ],
+      "parameter_hints": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "solid",
+            "liquid",
+            "gas"
+          ]
+        },
+        "temperature": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "containerType": {
+          "type": "string",
+          "enum": [
+            "box",
+            "beaker",
+            "cylinder"
+          ]
+        },
+        "particleCount": {
+          "type": "integer",
+          "minimum": 20,
+          "maximum": 80
+        },
+        "showEnergyLabel": {
+          "type": "boolean"
+        },
+        "transitionTo": {
+          "type": "string",
+          "enum": [
+            "solid",
+            "liquid",
+            "gas"
+          ]
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "ParticleModel",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_CollisionBlocks",
+      "category": "mechanics",
+      "purpose": "Visualise before-and-after motion in momentum collisions.",
+      "can_configure": [
+        "block1",
+        "block2",
+        "collisionType",
+        "showMomentumBars",
+        "showVelocityLabels"
+      ],
+      "required_parameters": [
+        "block1",
+        "block2",
+        "collisionType"
+      ],
+      "parameter_hints": {
+        "block1": {
+          "type": "object"
+        },
+        "block2": {
+          "type": "object"
+        },
+        "collisionType": {
+          "type": "string",
+          "enum": [
+            "elastic",
+            "inelastic",
+            "explosion"
+          ]
+        },
+        "showMomentumBars": {
+          "type": "boolean"
+        },
+        "showVelocityLabels": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "CollisionBlocks",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_SankeyDiagram",
+      "category": "energy",
+      "purpose": "Visualise energy input, useful output, and waste flows.",
+      "can_configure": [
+        "inputEnergy",
+        "outputs",
+        "showEfficiency"
+      ],
+      "required_parameters": [
+        "inputEnergy",
+        "outputs"
+      ],
+      "parameter_hints": {
+        "inputEnergy": {
+          "type": "object"
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "showEfficiency": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "SankeyDiagram",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_EnergyBars",
+      "category": "energy",
+      "purpose": "Compare energy stores or transfers with animated bars.",
+      "can_configure": [
+        "bars",
+        "totalEnergy",
+        "showTotalLine"
+      ],
+      "required_parameters": [
+        "bars",
+        "totalEnergy"
+      ],
+      "parameter_hints": {
+        "bars": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5
+        },
+        "totalEnergy": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "showTotalLine": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "EnergyBars",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_MagneticField",
+      "category": "magnetism",
+      "purpose": "Draw magnetic field patterns around magnets or conductors.",
+      "can_configure": [
+        "source",
+        "showFieldLines",
+        "fieldLineCount",
+        "showCompass",
+        "showLabels",
+        "poleLabels"
+      ],
+      "required_parameters": [
+        "source"
+      ],
+      "parameter_hints": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "bar_magnet",
+            "horseshoe",
+            "straight_wire",
+            "solenoid"
+          ]
+        },
+        "showFieldLines": {
+          "type": "boolean"
+        },
+        "fieldLineCount": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 14
+        },
+        "showCompass": {
+          "type": "boolean"
+        },
+        "showLabels": {
+          "type": "boolean"
+        },
+        "poleLabels": {
+          "type": "object"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "MagneticField",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_AtomicModel",
+      "category": "nuclear",
+      "purpose": "Build the atomic model with nucleus, electrons, and labels.",
+      "can_configure": [
+        "element",
+        "protons",
+        "neutrons",
+        "electronConfig",
+        "showLabels",
+        "highlightShell"
+      ],
+      "required_parameters": [
+        "element",
+        "protons",
+        "neutrons",
+        "electronConfig"
+      ],
+      "parameter_hints": {
+        "element": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "protons": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "neutrons": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 40
+        },
+        "electronConfig": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "showLabels": {
+          "type": "boolean"
+        },
+        "highlightShell": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "AtomicModel",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_NuclearDecay",
+      "category": "nuclear",
+      "purpose": "Animate alpha, beta, or gamma emission from a nucleus.",
+      "can_configure": [
+        "decayType",
+        "parentNucleus",
+        "daughterNucleus",
+        "showPenetration",
+        "barriers"
+      ],
+      "required_parameters": [
+        "decayType",
+        "parentNucleus",
+        "daughterNucleus"
+      ],
+      "parameter_hints": {
+        "decayType": {
+          "type": "string",
+          "enum": [
+            "alpha",
+            "beta",
+            "gamma"
+          ]
+        },
+        "parentNucleus": {
+          "type": "object"
+        },
+        "daughterNucleus": {
+          "type": "object"
+        },
+        "showPenetration": {
+          "type": "boolean"
+        },
+        "barriers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "NuclearDecay",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_WaveBehavior",
+      "category": "waves",
+      "purpose": "Demonstrate reflection, refraction, diffraction, or superposition.",
+      "can_configure": [
+        "behavior",
+        "incidentAngle",
+        "medium1",
+        "medium2",
+        "showNormal",
+        "showAngles",
+        "gapWidth"
+      ],
+      "required_parameters": [
+        "behavior",
+        "medium1",
+        "medium2"
+      ],
+      "parameter_hints": {
+        "behavior": {
+          "type": "string",
+          "enum": [
+            "reflection",
+            "refraction",
+            "diffraction"
+          ]
+        },
+        "incidentAngle": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 85
+        },
+        "medium1": {
+          "type": "object"
+        },
+        "medium2": {
+          "type": "object"
+        },
+        "showNormal": {
+          "type": "boolean"
+        },
+        "showAngles": {
+          "type": "boolean"
+        },
+        "gapWidth": {
+          "type": "string",
+          "enum": [
+            "narrow",
+            "wide"
+          ]
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "WaveBehavior",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_DefinitionCard",
+      "category": "lesson_structure",
+      "purpose": "Introduce a definition with symbols, units, and a focused visual hierarchy.",
+      "can_configure": [
+        "term",
+        "definition",
+        "example"
+      ],
+      "required_parameters": [
+        "term",
+        "definition"
+      ],
+      "parameter_hints": {
+        "term": {
+          "type": "string",
+          "maxLength": 48
+        },
+        "definition": {
+          "type": "string",
+          "maxLength": 260
+        },
+        "example": {
+          "type": "string",
+          "maxLength": 180
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "DefinitionCard",
+      "visual_form": "definition card with progressive wording and one example",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 8,
+        "max": 11
+      },
+      "motion_cues": [
+        "introduce term",
+        "reveal definition",
+        "show example"
+      ],
+      "not_suitable_for": [
+        "physical process",
+        "apparatus procedure",
+        "spatial construction"
+      ]
+    },
+    {
+      "scene": "Scene_ComparisonTable",
+      "category": "lesson_structure",
+      "purpose": "Compare two or more cases without repeating prose.",
+      "can_configure": [
+        "heading1",
+        "heading2",
+        "rows"
+      ],
+      "required_parameters": [
+        "heading1",
+        "heading2",
+        "rows"
+      ],
+      "parameter_hints": {
+        "heading1": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "heading2": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "ComparisonTable",
+      "visual_form": "two-column comparison with rows revealed one at a time",
+      "duration_profile": {
+        "min": 6,
+        "ideal": 10,
+        "max": 14
+      },
+      "motion_cues": [
+        "establish headings",
+        "reveal comparison rows",
+        "emphasize deciding difference"
+      ],
+      "not_suitable_for": [
+        "physical process",
+        "apparatus manipulation",
+        "vector construction"
+      ]
+    },
+    {
+      "scene": "Scene_NumericalExample",
+      "category": "mathematics",
+      "purpose": "Show a traceable worked calculation with explicit reasoning steps.",
+      "can_configure": [
+        "title",
+        "steps"
+      ],
+      "required_parameters": [
+        "title",
+        "steps"
+      ],
+      "parameter_hints": {
+        "title": {
+          "type": "string",
+          "maxLength": 70
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "NumericalExample",
+      "visual_form": "worked calculation with sequential reasoning steps",
+      "duration_profile": {
+        "min": 7,
+        "ideal": 11,
+        "max": 15
+      },
+      "motion_cues": [
+        "state known values",
+        "apply relationship",
+        "reveal answer with unit"
+      ],
+      "not_suitable_for": [
+        "apparatus procedure",
+        "qualitative motion demonstration"
+      ]
+    },
+    {
+      "scene": "Scene_ProjectileMotion",
+      "category": "mechanics",
+      "purpose": "Trace projectile motion with horizontal and vertical components.",
+      "can_configure": [
+        "launchAngle",
+        "launchSpeed",
+        "gravity",
+        "showComponents"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "launchAngle": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 85
+        },
+        "launchSpeed": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 150
+        },
+        "gravity": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 30
+        },
+        "showComponents": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "ProjectileMotion",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_CircularMotion",
+      "category": "mechanics",
+      "purpose": "Show tangential velocity and inward centripetal force.",
+      "can_configure": [
+        "radius",
+        "speed",
+        "showCentripetalForce",
+        "showVelocityTangent"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "radius": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 300
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10
+        },
+        "showCentripetalForce": {
+          "type": "boolean"
+        },
+        "showVelocityTangent": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "CircularMotion",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_SpringMass",
+      "category": "mechanics",
+      "purpose": "Animate a spring-mass system, restoring force, and optional graph.",
+      "can_configure": [
+        "springConstant",
+        "mass",
+        "displacement",
+        "showForceArrow",
+        "showGraph"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "springConstant": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 500
+        },
+        "mass": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 100
+        },
+        "displacement": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 200
+        },
+        "showForceArrow": {
+          "type": "boolean"
+        },
+        "showGraph": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "SpringMass",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_InclinedPlane",
+      "category": "mechanics",
+      "purpose": "Resolve forces for an object on an inclined plane.",
+      "can_configure": [
+        "angle",
+        "mass",
+        "friction",
+        "showDecomposedWeight"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "angle": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 55
+        },
+        "mass": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 100
+        },
+        "friction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.5
+        },
+        "showDecomposedWeight": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "InclinedPlane",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_ThermalHeating",
+      "category": "thermal",
+      "purpose": "Show heating curves, temperature change, and energy transfer.",
+      "can_configure": [
+        "substance",
+        "startTemp",
+        "endTemp",
+        "stateChanges"
+      ],
+      "required_parameters": [
+        "substance",
+        "startTemp",
+        "endTemp"
+      ],
+      "parameter_hints": {
+        "substance": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "startTemp": {
+          "type": "number",
+          "minimum": -273,
+          "maximum": 3000
+        },
+        "endTemp": {
+          "type": "number",
+          "minimum": -273,
+          "maximum": 3000
+        },
+        "stateChanges": {
+          "type": "array",
+          "maxItems": 4
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "ThermalHeating",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_EMSpectrum",
+      "category": "waves",
+      "purpose": "Navigate the electromagnetic spectrum, wavelengths, and uses.",
+      "can_configure": [
+        "highlightRegion",
+        "showWavelengths",
+        "showUses"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "highlightRegion": {
+          "type": "string",
+          "enum": [
+            "radio",
+            "microwave",
+            "infrared",
+            "visible",
+            "ultraviolet",
+            "xray",
+            "gamma"
+          ]
+        },
+        "showWavelengths": {
+          "type": "boolean"
+        },
+        "showUses": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "EMSpectrum",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_StandingWave",
+      "category": "waves",
+      "purpose": "Show harmonics, nodes, and antinodes on a standing wave.",
+      "can_configure": [
+        "harmonic",
+        "stringLength",
+        "showNodes",
+        "showAntinodes"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "harmonic": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "stringLength": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 800
+        },
+        "showNodes": {
+          "type": "boolean"
+        },
+        "showAntinodes": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "StandingWave",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_ElectronFlow",
+      "category": "electricity",
+      "purpose": "Contrast electron drift, current, and resistance effects.",
+      "can_configure": [
+        "wireLength",
+        "electronCount",
+        "current",
+        "showResistanceZone"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "wireLength": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 1000
+        },
+        "electronCount": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 40
+        },
+        "current": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "showResistanceZone": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "ElectronFlow",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_MotorEffect",
+      "category": "electromagnetism",
+      "purpose": "Connect field, current, and force directions in the motor effect.",
+      "can_configure": [
+        "wireDirection",
+        "fieldDirection",
+        "showForceDirection",
+        "showRule"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "wireDirection": {
+          "type": "string",
+          "enum": [
+            "into_page",
+            "out_of_page"
+          ]
+        },
+        "fieldDirection": {
+          "type": "string",
+          "enum": [
+            "left",
+            "right"
+          ]
+        },
+        "showForceDirection": {
+          "type": "boolean"
+        },
+        "showRule": {
+          "type": "string",
+          "enum": [
+            "flemings_left",
+            "none"
+          ]
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "MotorEffect",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_EMInduction",
+      "category": "electromagnetism",
+      "purpose": "Show induced current from changing magnetic flux.",
+      "can_configure": [
+        "method",
+        "speed",
+        "showGalvanometer"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "magnet_in_coil",
+            "rotating_coil"
+          ]
+        },
+        "speed": {
+          "type": "string",
+          "enum": [
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "showGalvanometer": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "EMInduction",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_Transformer",
+      "category": "electromagnetism",
+      "purpose": "Relate turns ratio, voltage, and changing core field.",
+      "can_configure": [
+        "primaryTurns",
+        "secondaryTurns",
+        "inputVoltage",
+        "showFieldLines"
+      ],
+      "required_parameters": [
+        "primaryTurns",
+        "secondaryTurns",
+        "inputVoltage"
+      ],
+      "parameter_hints": {
+        "primaryTurns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "secondaryTurns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "inputVoltage": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10000
+        },
+        "showFieldLines": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "Transformer",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_GasParticles",
+      "category": "thermal",
+      "purpose": "Relate gas particle motion to temperature, volume, and pressure.",
+      "can_configure": [
+        "containerType",
+        "temperature",
+        "showPressureArrows",
+        "changeTo"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "containerType": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "piston"
+          ]
+        },
+        "temperature": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "showPressureArrows": {
+          "type": "boolean"
+        },
+        "changeTo": {
+          "type": "string",
+          "enum": [
+            "higher_temp",
+            "smaller_volume",
+            "none"
+          ]
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "GasParticles",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_NuclearReaction",
+      "category": "nuclear",
+      "purpose": "Show reactants, products, and energy in fission or fusion.",
+      "can_configure": [
+        "type",
+        "reactants",
+        "products",
+        "showEnergyRelease"
+      ],
+      "required_parameters": [
+        "type",
+        "reactants",
+        "products"
+      ],
+      "parameter_hints": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "fission",
+            "fusion"
+          ]
+        },
+        "reactants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "products": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "showEnergyRelease": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "NuclearReaction",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_RayDiagram",
+      "category": "optics",
+      "purpose": "Draw principal rays for lenses, mirrors, or a prism.",
+      "can_configure": [
+        "opticalElement",
+        "objectDistance",
+        "focalLength",
+        "showFocalPoints",
+        "showImage"
+      ],
+      "required_parameters": [],
+      "parameter_hints": {
+        "opticalElement": {
+          "type": "string",
+          "enum": [
+            "converging_lens",
+            "diverging_lens",
+            "concave_mirror",
+            "convex_mirror",
+            "prism"
+          ]
+        },
+        "objectDistance": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 300
+        },
+        "focalLength": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 250
+        },
+        "showFocalPoints": {
+          "type": "boolean"
+        },
+        "showImage": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "RayDiagram",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_OrbitalMotion",
+      "category": "space",
+      "purpose": "Visualise orbital velocity and gravitational force vectors.",
+      "can_configure": [
+        "centralBody",
+        "orbitingBody",
+        "orbitRadius",
+        "showGravityVector",
+        "showVelocityVector",
+        "isElliptical"
+      ],
+      "required_parameters": [
+        "centralBody",
+        "orbitingBody"
+      ],
+      "parameter_hints": {
+        "centralBody": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "orbitingBody": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "orbitRadius": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 500
+        },
+        "showGravityVector": {
+          "type": "boolean"
+        },
+        "showVelocityVector": {
+          "type": "boolean"
+        },
+        "isElliptical": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "OrbitalMotion",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_StarLifeCycle",
+      "category": "space",
+      "purpose": "Trace the ordered stages of average or massive stars.",
+      "can_configure": [
+        "starType",
+        "stages"
+      ],
+      "required_parameters": [
+        "starType",
+        "stages"
+      ],
+      "parameter_hints": {
+        "starType": {
+          "type": "string",
+          "enum": [
+            "average",
+            "massive"
+          ]
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 7
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "StarLifeCycle",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_RadiationPenetration",
+      "category": "nuclear",
+      "purpose": "Compare alpha, beta, and gamma penetration through barriers.",
+      "can_configure": [
+        "radiationTypes",
+        "barriers",
+        "showRange"
+      ],
+      "required_parameters": [
+        "radiationTypes",
+        "barriers"
+      ],
+      "parameter_hints": {
+        "radiationTypes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "barriers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "showRange": {
+          "type": "boolean"
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "RadiationPenetration",
+      "visual_form": "progressive scientific diagram",
+      "duration_profile": {
+        "min": 5,
+        "ideal": 9,
+        "max": 15
+      },
+      "motion_cues": [
+        "establish the visual",
+        "develop the physics",
+        "reveal the payoff"
+      ],
+      "not_suitable_for": []
+    },
+    {
+      "scene": "Scene_MeasuringInstrument",
+      "category": "measurement",
+      "purpose": "Demonstrate choosing, aligning, and reading a measuring instrument from its zero reference.",
+      "can_configure": [
+        "instrument",
+        "quantity",
+        "objectLabel",
+        "reading",
+        "unit"
+      ],
+      "required_parameters": [
+        "instrument",
+        "quantity",
+        "reading",
+        "unit"
+      ],
+      "parameter_hints": {
+        "instrument": {
+          "type": "string",
+          "enum": [
+            "ruler",
+            "vernier_calipers",
+            "micrometer",
+            "measuring_cylinder",
+            "stopwatch"
+          ]
+        },
+        "quantity": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "objectLabel": {
+          "type": "string",
+          "maxLength": 36
+        },
+        "reading": {
+          "type": "string",
+          "maxLength": 18
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 12
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "MeasuringInstrument",
+      "visual_form": "instrument and object aligned before a reading cursor reveals the measurement",
+      "duration_profile": {
+        "min": 7,
+        "ideal": 10,
+        "max": 14
+      },
+      "motion_cues": [
+        "choose instrument",
+        "align object with zero",
+        "read scale",
+        "report value and unit"
+      ],
+      "not_suitable_for": [
+        "vector addition",
+        "pure definition"
+      ]
+    },
+    {
+      "scene": "Scene_PendulumTiming",
+      "category": "measurement",
+      "purpose": "Show a pendulum practical in which several oscillations are timed and divided to find one period.",
+      "can_configure": [
+        "oscillations",
+        "totalTime",
+        "unit"
+      ],
+      "required_parameters": [
+        "oscillations",
+        "totalTime",
+        "unit"
+      ],
+      "parameter_hints": {
+        "oscillations": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 50
+        },
+        "totalTime": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 1000
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 8
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "PendulumTiming",
+      "visual_form": "swinging pendulum with oscillation counter, stopwatch, and period calculation",
+      "duration_profile": {
+        "min": 8,
+        "ideal": 11,
+        "max": 15
+      },
+      "motion_cues": [
+        "set pendulum",
+        "count oscillations",
+        "record total time",
+        "divide for one period"
+      ],
+      "not_suitable_for": [
+        "single static definition",
+        "unrelated circular motion"
+      ]
+    },
+    {
+      "scene": "Scene_VectorAdditionTriangle",
+      "category": "mechanics",
+      "purpose": "Construct head-to-tail vector addition and reveal the resultant from start to finish.",
+      "can_configure": [
+        "firstLabel",
+        "secondLabel",
+        "resultantLabel"
+      ],
+      "required_parameters": [
+        "firstLabel",
+        "secondLabel",
+        "resultantLabel"
+      ],
+      "parameter_hints": {
+        "firstLabel": {
+          "type": "string",
+          "maxLength": 35
+        },
+        "secondLabel": {
+          "type": "string",
+          "maxLength": 35
+        },
+        "resultantLabel": {
+          "type": "string",
+          "maxLength": 35
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "VectorAdditionTriangle",
+      "visual_form": "two vectors drawn head-to-tail followed by the resultant triangle side",
+      "duration_profile": {
+        "min": 7,
+        "ideal": 10,
+        "max": 14
+      },
+      "motion_cues": [
+        "draw first vector",
+        "place second head-to-tail",
+        "join start to finish",
+        "label resultant"
+      ],
+      "not_suitable_for": [
+        "free-body force balance",
+        "scalar comparison"
+      ]
+    },
+    {
+      "scene": "Scene_ScaleVectorDrawing",
+      "category": "mechanics",
+      "purpose": "Convert a vector magnitude through a stated scale into a measured directional arrow.",
+      "can_configure": [
+        "vectorLabel",
+        "magnitude",
+        "unit",
+        "scaleStatement",
+        "drawnLength",
+        "directionLabel"
+      ],
+      "required_parameters": [
+        "vectorLabel",
+        "magnitude",
+        "unit",
+        "scaleStatement",
+        "drawnLength",
+        "directionLabel"
+      ],
+      "parameter_hints": {
+        "vectorLabel": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "magnitude": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 100000
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 12
+        },
+        "scaleStatement": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "drawnLength": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 50
+        },
+        "directionLabel": {
+          "type": "string",
+          "maxLength": 24
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "ScaleVectorDrawing",
+      "visual_form": "scale statement, ruler measurement, and arrow construction",
+      "duration_profile": {
+        "min": 7,
+        "ideal": 10,
+        "max": 14
+      },
+      "motion_cues": [
+        "state scale",
+        "calculate paper length",
+        "measure length",
+        "draw and label arrow"
+      ],
+      "not_suitable_for": [
+        "force-body interaction",
+        "qualitative scalar definition"
+      ]
+    },
+    {
+      "scene": "Scene_MultipleMeasurementAverage",
+      "category": "measurement",
+      "purpose": "Reveal repeated readings, their scatter, and the calculation of a representative mean.",
+      "can_configure": [
+        "quantity",
+        "readings",
+        "unit",
+        "decimalPlaces"
+      ],
+      "required_parameters": [
+        "quantity",
+        "readings",
+        "unit"
+      ],
+      "parameter_hints": {
+        "quantity": {
+          "type": "string",
+          "maxLength": 70
+        },
+        "readings": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 12
+        },
+        "decimalPlaces": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "MultipleMeasurementAverage",
+      "visual_form": "reading chips accumulated before a mean calculation is revealed",
+      "duration_profile": {
+        "min": 8,
+        "ideal": 11,
+        "max": 15
+      },
+      "motion_cues": [
+        "collect readings",
+        "compare scatter",
+        "sum readings",
+        "divide and report mean"
+      ],
+      "not_suitable_for": [
+        "single reading",
+        "vector geometry"
+      ]
+    },
+    {
+      "scene": "Scene_RetrievalClassification",
+      "category": "lesson_structure",
+      "purpose": "Pause for retrieval, then sort named quantities into scalar and vector groups.",
+      "can_configure": [
+        "prompt",
+        "items"
+      ],
+      "required_parameters": [
+        "prompt",
+        "items"
+      ],
+      "parameter_hints": {
+        "prompt": {
+          "type": "string",
+          "maxLength": 70
+        },
+        "items": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6
+        }
+      },
+      "supports_overlay": true,
+      "search_label": "RetrievalClassification",
+      "visual_form": "answer-covered classification followed by animated sorting",
+      "duration_profile": {
+        "min": 8,
+        "ideal": 11,
+        "max": 15
+      },
+      "motion_cues": [
+        "present quantities",
+        "hold for prediction",
+        "reveal categories",
+        "sort answers"
+      ],
+      "not_suitable_for": [
+        "first explanation before teaching",
+        "apparatus procedure"
+      ]
+    }
+  ]
+}

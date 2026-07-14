@@ -22,8 +22,8 @@ class VideoEngineRegistryTest(unittest.TestCase):
 
     def test_animation_catalog_is_complete_and_machine_readable(self) -> None:
         scenes = _registered_scenes()
-        self.assertEqual(len(scenes), 35)
-        self.assertEqual(len({item["scene"] for item in scenes}), 35)
+        self.assertEqual(len(scenes), 41)
+        self.assertEqual(len({item["scene"] for item in scenes}), 41)
         self.assertTrue(all(item.get("category") for item in scenes))
         self.assertTrue(all(item.get("description") for item in scenes))
         self.assertTrue(all(item.get("parameter_schema", {}).get("type") == "object" for item in scenes))

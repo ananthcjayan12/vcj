@@ -1,0 +1,117 @@
+{
+  "version": "1.0",
+  "scene_count": 41,
+  "groups": [
+    {
+      "module": "lesson_structure",
+      "scenes": [
+        "Scene_TitleCard",
+        "Scene_SummaryCard",
+        "Scene_DefinitionCard",
+        "Scene_ComparisonTable",
+        "Scene_RetrievalClassification"
+      ]
+    },
+    {
+      "module": "mathematics",
+      "scenes": [
+        "Scene_MathEquation",
+        "Scene_NumericalExample"
+      ]
+    },
+    {
+      "module": "mechanics",
+      "scenes": [
+        "Scene_ForceDiagram",
+        "Scene_CollisionBlocks",
+        "Scene_ProjectileMotion",
+        "Scene_CircularMotion",
+        "Scene_SpringMass",
+        "Scene_InclinedPlane",
+        "Scene_VectorAdditionTriangle",
+        "Scene_ScaleVectorDrawing"
+      ]
+    },
+    {
+      "module": "graphs",
+      "scenes": [
+        "Scene_GraphPlotter"
+      ]
+    },
+    {
+      "module": "waves",
+      "scenes": [
+        "Scene_WaveForm",
+        "Scene_WaveBehavior",
+        "Scene_EMSpectrum",
+        "Scene_StandingWave"
+      ]
+    },
+    {
+      "module": "electricity",
+      "scenes": [
+        "Scene_CircuitDiagram",
+        "Scene_ElectronFlow"
+      ]
+    },
+    {
+      "module": "thermal",
+      "scenes": [
+        "Scene_ParticleModel",
+        "Scene_ThermalHeating",
+        "Scene_GasParticles"
+      ]
+    },
+    {
+      "module": "energy",
+      "scenes": [
+        "Scene_SankeyDiagram",
+        "Scene_EnergyBars"
+      ]
+    },
+    {
+      "module": "magnetism",
+      "scenes": [
+        "Scene_MagneticField"
+      ]
+    },
+    {
+      "module": "nuclear",
+      "scenes": [
+        "Scene_AtomicModel",
+        "Scene_NuclearDecay",
+        "Scene_NuclearReaction",
+        "Scene_RadiationPenetration"
+      ]
+    },
+    {
+      "module": "electromagnetism",
+      "scenes": [
+        "Scene_MotorEffect",
+        "Scene_EMInduction",
+        "Scene_Transformer"
+      ]
+    },
+    {
+      "module": "optics",
+      "scenes": [
+        "Scene_RayDiagram"
+      ]
+    },
+    {
+      "module": "space",
+      "scenes": [
+        "Scene_OrbitalMotion",
+        "Scene_StarLifeCycle"
+      ]
+    },
+    {
+      "module": "measurement",
+      "scenes": [
+        "Scene_MeasuringInstrument",
+        "Scene_PendulumTiming",
+        "Scene_MultipleMeasurementAverage"
+      ]
+    }
+  ]
+}

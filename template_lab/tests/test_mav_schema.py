@@ -37,7 +37,7 @@ class MavSchemaTest(unittest.TestCase):
         short = narration_bounds(50)
         lesson = narration_bounds(480)
         self.assertEqual(short, {"min_words": 115, "max_words": 155, "min_paragraphs": 6, "max_paragraphs": 8})
-        self.assertEqual(lesson, {"min_words": 888, "max_words": 1224, "min_paragraphs": 14, "max_paragraphs": 27})
+        self.assertEqual(lesson, {"min_words": 864, "max_words": 1224, "min_paragraphs": 14, "max_paragraphs": 27})
 
     def sample_narration(self) -> dict:
         paragraphs = [
@@ -86,6 +86,22 @@ class MavSchemaTest(unittest.TestCase):
         violations = validate_narration(narration, payload)
         self.assertTrue(any(v.code == "NARRATION_DATE_RELATIVE_LANGUAGE" for v in violations))
 
+    def test_narration_allows_instructional_now(self) -> None:
+        payload = self.sample_input()
+        narration = self.sample_narration()
+        narration["paragraphs"][0]["text"] = "Now consider how memory demand turns server capacity into pricing power and market pressure."
+        narration["elevenlabs_narration"] = " ".join(item["text"] for item in narration["paragraphs"])
+        violations = validate_narration(narration, payload)
+        self.assertFalse(any(v.code == "NARRATION_DATE_RELATIVE_LANGUAGE" for v in violations))
+
+    def test_narration_still_rejects_right_now(self) -> None:
+        payload = self.sample_input()
+        narration = self.sample_narration()
+        narration["paragraphs"][0]["text"] = "Right now, memory demand turns server capacity into pricing power and market pressure."
+        narration["elevenlabs_narration"] = " ".join(item["text"] for item in narration["paragraphs"])
+        violations = validate_narration(narration, payload)
+        self.assertTrue(any(v.code == "NARRATION_DATE_RELATIVE_LANGUAGE" for v in violations))
+
     def test_narration_rejects_symbol_damaged_words(self) -> None:
         payload = self.sample_input()
         narration = self.sample_narration()
@@ -119,6 +135,9 @@ class MavSchemaTest(unittest.TestCase):
         expected = {
             "script_structure": ("gemini", "gemini-3.1-flash-lite", "claude-sonnet-5", "MAV_SCRIPT_STRUCTURE_MODEL", 64000),
             "script_writing": ("gemini", "gemini-3.1-flash-lite", "claude-opus-4-8", "MAV_SCRIPT_WRITING_MODEL", 64000),
+            "scene_asset_shortlister": ("gemini", "gemini-3.1-flash-lite", "claude-sonnet-5", "MAV_SCENE_ASSET_SHORTLISTER_MODEL", 4000),
+            "scene_asset_router": ("gemini", "gemini-3.5-flash", "claude-sonnet-5", "MAV_SCENE_ASSET_ROUTER_MODEL", 12000),
+            "module_parameterizer": ("gemini", "gemini-3.1-flash-lite", "claude-sonnet-5", "MAV_MODULE_PARAMETERIZER_MODEL", 12000),
             "v3_creative_director": ("zai", "glm-5.2", "claude-opus-4-8", "MAV_V3_CREATIVE_DIRECTOR_MODEL", 16000),
             "v3_scene_coder": ("moonshot", "kimi-k2.7-code", "claude-sonnet-5", "MAV_V3_SCENE_CODER_MODEL", 32000),
         }

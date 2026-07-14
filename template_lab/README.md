@@ -8,10 +8,12 @@ Pipeline stages:
 2. generate a duration-aware teaching sequence and narration;
 3. create voiceover audio;
 4. align narration with local Whisper;
-5. generate V3 custom HTML/CSS/GSAP scenes in the approved physics style;
+5. select a grounded typed recipe locally from the narration beat's objective IDs
+   and compile it into reusable DOM/SVG/GSAP workbenches; uncovered objectives fail
+   clearly unless the legacy model fallback is explicitly enabled;
 6. validate and repair scene artifacts;
 7. build a browser preview;
-8. run QA and render an MP4 with pinned HyperFrames plus FFmpeg.
+8. review the preview manually, then render an MP4 with pinned HyperFrames plus FFmpeg.
 
 Run all commands from the repository root. See `END_TO_END_README.md` for the complete manual workflow and `video_engine/README.md` for curriculum/coverage commands.
 
@@ -31,4 +33,8 @@ Generated artifacts go to `template_lab/runs/<run-id>/` and are intentionally ig
 
 ## Why prompts remain
 
-Reusable scene assets establish the visual language, but they cannot decide the teaching sequence, narration, topic-specific diagram, or its timing. The pipeline therefore retains only seven active prompt files: two for lesson structure, two for narration, a visual design-system/creative-director pair, and one scene coder. See `prompts/README.md`.
+Prompts still support story structure, narration, and the explicitly optional legacy
+fallback. Covered objectives do not use scene shortlisting, routing,
+parameterization, direction, or coding models. Their diagrams and timing come from
+validated local recipes in `assets/objective_visual_recipes.json`. See
+`prompts/README.md` for the remaining model tasks.

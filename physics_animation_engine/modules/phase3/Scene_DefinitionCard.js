@@ -1,4 +1,4 @@
-import { append, el, finishPhase3, phase3Root, phase3Timeline, schemas } from './_shared.js';
+import { append, cueTimes, el, finishPhase3, phase3Root, phase3Timeline, schemas } from './_shared.js';
 
 export class Scene_DefinitionCard {
   setup(container, params) {
@@ -22,11 +22,12 @@ export class Scene_DefinitionCard {
 
   buildTimeline(params) {
     const tl = phase3Timeline(this.root);
-    tl.fromTo(this.card, { scale: .94, y: 28, autoAlpha: 0 }, { scale: 1, y: 0, autoAlpha: 1, duration: .65, ease: 'power3.out' }, .35)
-      .fromTo(this.term, { x: -80, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .65, ease: 'power3.out' }, .65)
-      .fromTo(this.rule, { scaleX: 0 }, { scaleX: 1, duration: .55 }, 1.0)
-      .fromTo(this.words, { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .18, stagger: .045 }, 1.25);
-    if (this.example) tl.fromTo(this.example, { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .5, ease: 'back.out(1.4)' }, 2.35);
+    const cues = cueTimes(params, this.example ? 5 : 4);
+    tl.fromTo(this.card, { scale: .94, y: 28, autoAlpha: 0 }, { scale: 1, y: 0, autoAlpha: 1, duration: .65, ease: 'power3.out' }, cues[0])
+      .fromTo(this.term, { x: -80, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: .65, ease: 'power3.out' }, cues[1])
+      .fromTo(this.rule, { scaleX: 0 }, { scaleX: 1, duration: .55, ease: 'power2.inOut' }, cues[2])
+      .fromTo(this.words, { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .18, stagger: .045, ease: 'power2.out' }, cues[3]);
+    if (this.example) tl.fromTo(this.example, { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .5, ease: 'back.out(1.4)' }, cues[4]);
     return finishPhase3(tl, this.root, params, 5.5);
   }
 

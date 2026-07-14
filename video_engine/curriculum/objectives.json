@@ -2,7 +2,7 @@
   "schema_version": 1,
   "syllabus": "697209-2026-2028-syllabus.pdf",
   "topic_count": 58,
-  "objective_count": 328,
+  "objective_count": 324,
   "objectives": [
     {
       "objective_id": "1.1-C01",
@@ -743,16 +743,6 @@
       "route": "supplement",
       "objective_number": 4,
       "objective_text": "Recall and use the equation for the change in pressure beneath the surface of a liquid ∆p = ρg∆h"
-    },
-    {
-      "objective_id": "1.8-S02",
-      "topic_ref": "1.8",
-      "topic_title": "Pressure",
-      "domain_ref": "1",
-      "domain_title": "Motion, forces and energy",
-      "route": "supplement",
-      "objective_number": 2,
-      "objective_text": "Thermal physics 2.1 Kinetic particle model of matter"
     },
     {
       "objective_id": "2.1.1-C01",
@@ -1765,16 +1755,6 @@
       "objective_text": "Describe the uses of ultrasound in non- destructive testing of materials, medical scanning of soft tissue and sonar including calculation of depth or distance from time and wave speed"
     },
     {
-      "objective_id": "3.4-S04",
-      "topic_ref": "3.4",
-      "topic_title": "Sound",
-      "domain_ref": "3",
-      "domain_title": "Waves",
-      "route": "supplement",
-      "objective_number": 4,
-      "objective_text": "Electricity and magnetism"
-    },
-    {
       "objective_id": "4.1-C01",
       "topic_ref": "4.1",
       "topic_title": "Simple phenomena of magnetism",
@@ -2655,16 +2635,6 @@
       "objective_text": "Recall and use the equation P = I2R to explain why power losses in cables are smaller when the voltage is greater"
     },
     {
-      "objective_id": "4.5.6-S05",
-      "topic_ref": "4.5.6",
-      "topic_title": "The transformer",
-      "domain_ref": "4",
-      "domain_title": "Electricity and magnetism",
-      "route": "supplement",
-      "objective_number": 5,
-      "objective_text": "Nuclear physics 5.1 The nuclear model of the atom"
-    },
-    {
       "objective_id": "5.1.1-C01",
       "topic_ref": "5.1.1",
       "topic_title": "The atom",
@@ -2973,16 +2943,6 @@
       "route": "supplement",
       "objective_number": 3,
       "objective_text": "Explain safety precautions for all ionising radiation in terms of reducing exposure time, increasing distance between source and living tissue and using shielding to absorb radiation"
-    },
-    {
-      "objective_id": "5.2.5-S06",
-      "topic_ref": "5.2.5",
-      "topic_title": "Safety precautions",
-      "domain_ref": "5",
-      "domain_title": "Nuclear physics",
-      "route": "supplement",
-      "objective_number": 6,
-      "objective_text": "Space physics 6.1 The Earth and the Solar System"
     },
     {
       "objective_id": "6.1.1-C01",

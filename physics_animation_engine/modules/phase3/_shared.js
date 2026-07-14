@@ -5,6 +5,21 @@ export { append, color, duration, el, finishTimeline, formatNumber, svg, svgEl }
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 export const lerp = (from, to, progress) => from + (to - from) * progress;
 
+export function cueTimes(params, count, { start = .55, endPadding = 1.15 } = {}) {
+  const seconds = duration(params, 6);
+  const latest = Math.max(start, seconds - Math.max(endPadding, Number(params.finalHoldSeconds) || 1));
+  const supplied = Array.isArray(params.cuePoints)
+    ? params.cuePoints.map(Number).filter(Number.isFinite).map(value => clamp(value, start, latest)).sort((a, b) => a - b)
+    : [];
+  if (supplied.length >= count) return supplied.slice(0, count);
+  const result = [...supplied];
+  while (result.length < count) {
+    const index = result.length;
+    result.push(start + (latest - start) * index / Math.max(1, count - 1));
+  }
+  return result.sort((a, b) => a - b);
+}
+
 export function phase3Root(container, sceneName, kicker, title, description, className = '') {
   const sceneRoot = root(container, sceneName, `scene-p3 ${className}`.trim());
   const header = el('header', 'p3-scene-header');

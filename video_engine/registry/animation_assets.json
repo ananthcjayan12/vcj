@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source": "repo-local physics_animation_engine/modules/_registry.js",
-  "scene_count": 35,
+  "scene_count": 41,
   "scenes": [
     {
       "scene": "Scene_TitleCard",
@@ -88,6 +88,10 @@
       "scene": "Scene_MathEquation",
       "category": "mathematics",
       "description": "Reveal and explain a physics equation step by step.",
+      "visual_form": "one equation with a progressive highlight and short caption",
+      "duration_profile": {"min": 5, "ideal": 8, "max": 12},
+      "motion_cues": ["reveal equation", "isolate important term", "connect to meaning"],
+      "not_suitable_for": ["apparatus procedure", "vector construction", "long numerical derivation"],
       "module": "physics_animation_engine/modules/Scene_MathEquation.js",
       "status": "available",
       "example_specs": [
@@ -1291,6 +1295,10 @@
       "scene": "Scene_DefinitionCard",
       "category": "lesson_structure",
       "description": "Introduce a definition with symbols, units, and a focused visual hierarchy.",
+      "visual_form": "definition card with progressive wording and one example",
+      "duration_profile": {"min": 5, "ideal": 8, "max": 11},
+      "motion_cues": ["introduce term", "reveal definition", "show example"],
+      "not_suitable_for": ["physical process", "apparatus procedure", "spatial construction"],
       "module": "physics_animation_engine/modules/phase3/Scene_DefinitionCard.js",
       "status": "available",
       "example_specs": [
@@ -1328,6 +1336,10 @@
       "scene": "Scene_ComparisonTable",
       "category": "lesson_structure",
       "description": "Compare two or more cases without repeating prose.",
+      "visual_form": "two-column comparison with rows revealed one at a time",
+      "duration_profile": {"min": 6, "ideal": 10, "max": 14},
+      "motion_cues": ["establish headings", "reveal comparison rows", "emphasize deciding difference"],
+      "not_suitable_for": ["physical process", "apparatus manipulation", "vector construction"],
       "module": "physics_animation_engine/modules/phase3/Scene_ComparisonTable.js",
       "status": "available",
       "example_specs": [
@@ -1386,6 +1398,10 @@
       "scene": "Scene_NumericalExample",
       "category": "mathematics",
       "description": "Show a traceable worked calculation with explicit reasoning steps.",
+      "visual_form": "worked calculation with sequential reasoning steps",
+      "duration_profile": {"min": 7, "ideal": 11, "max": 15},
+      "motion_cues": ["state known values", "apply relationship", "reveal answer with unit"],
+      "not_suitable_for": ["apparatus procedure", "qualitative motion demonstration"],
       "module": "physics_animation_engine/modules/phase3/Scene_NumericalExample.js",
       "status": "available",
       "example_specs": [
@@ -2216,6 +2232,146 @@
             "type": "boolean",
             "default": true
           }
+        }
+      }
+    },
+    {
+      "scene": "Scene_MeasuringInstrument",
+      "category": "measurement",
+      "description": "Demonstrate choosing, aligning, and reading a measuring instrument from its zero reference.",
+      "visual_form": "instrument and object aligned before a reading cursor reveals the measurement",
+      "duration_profile": {"min": 7, "ideal": 10, "max": 14},
+      "motion_cues": ["choose instrument", "align object with zero", "read scale", "report value and unit"],
+      "not_suitable_for": ["vector addition", "pure definition"],
+      "module": "physics_animation_engine/modules/phase3/Scene_MeasuringInstrument.js",
+      "status": "available",
+      "example_specs": [],
+      "parameter_schema": {
+        "type": "object",
+        "required": ["instrument", "quantity", "reading", "unit"],
+        "additionalProperties": false,
+        "properties": {
+          "instrument": {"type": "string", "enum": ["ruler", "vernier_calipers", "micrometer", "measuring_cylinder", "stopwatch"], "default": "ruler"},
+          "quantity": {"type": "string", "maxLength": 30, "default": "length"},
+          "objectLabel": {"type": "string", "maxLength": 36, "default": "object"},
+          "reading": {"type": "string", "maxLength": 18, "default": "12.4"},
+          "unit": {"type": "string", "maxLength": 12, "default": "cm"}
+        }
+      }
+    },
+    {
+      "scene": "Scene_PendulumTiming",
+      "category": "measurement",
+      "description": "Show a pendulum practical in which several oscillations are timed and divided to find one period.",
+      "visual_form": "swinging pendulum with oscillation counter, stopwatch, and period calculation",
+      "duration_profile": {"min": 8, "ideal": 11, "max": 15},
+      "motion_cues": ["set pendulum", "count oscillations", "record total time", "divide for one period"],
+      "not_suitable_for": ["single static definition", "unrelated circular motion"],
+      "module": "physics_animation_engine/modules/phase3/Scene_PendulumTiming.js",
+      "status": "available",
+      "example_specs": ["physics_animation_engine/specs/pilot/05-pendulum-practical.json"],
+      "parameter_schema": {
+        "type": "object",
+        "required": ["oscillations", "totalTime", "unit"],
+        "additionalProperties": false,
+        "properties": {
+          "oscillations": {"type": "integer", "minimum": 2, "maximum": 50, "default": 10},
+          "totalTime": {"type": "number", "minimum": 0.01, "maximum": 1000, "default": 12.4},
+          "unit": {"type": "string", "maxLength": 8, "default": "s"}
+        }
+      }
+    },
+    {
+      "scene": "Scene_VectorAdditionTriangle",
+      "category": "mechanics",
+      "description": "Construct head-to-tail vector addition and reveal the resultant from start to finish.",
+      "visual_form": "two vectors drawn head-to-tail followed by the resultant triangle side",
+      "duration_profile": {"min": 7, "ideal": 10, "max": 14},
+      "motion_cues": ["draw first vector", "place second head-to-tail", "join start to finish", "label resultant"],
+      "not_suitable_for": ["free-body force balance", "scalar comparison"],
+      "module": "physics_animation_engine/modules/phase3/Scene_VectorAdditionTriangle.js",
+      "status": "available",
+      "example_specs": ["physics_animation_engine/specs/pilot/01-scalars-vectors.json"],
+      "parameter_schema": {
+        "type": "object",
+        "required": ["firstLabel", "secondLabel", "resultantLabel"],
+        "additionalProperties": false,
+        "properties": {
+          "firstLabel": {"type": "string", "maxLength": 35, "default": "vector A"},
+          "secondLabel": {"type": "string", "maxLength": 35, "default": "vector B"},
+          "resultantLabel": {"type": "string", "maxLength": 35, "default": "resultant R"}
+        }
+      }
+    },
+    {
+      "scene": "Scene_ScaleVectorDrawing",
+      "category": "mechanics",
+      "description": "Convert a vector magnitude through a stated scale into a measured directional arrow.",
+      "visual_form": "scale statement, ruler measurement, and arrow construction",
+      "duration_profile": {"min": 7, "ideal": 10, "max": 14},
+      "motion_cues": ["state scale", "calculate paper length", "measure length", "draw and label arrow"],
+      "not_suitable_for": ["force-body interaction", "qualitative scalar definition"],
+      "module": "physics_animation_engine/modules/phase3/Scene_ScaleVectorDrawing.js",
+      "status": "available",
+      "example_specs": ["physics_animation_engine/specs/pilot/01-scalars-vectors.json"],
+      "parameter_schema": {
+        "type": "object",
+        "required": ["vectorLabel", "magnitude", "unit", "scaleStatement", "drawnLength", "directionLabel"],
+        "additionalProperties": false,
+        "properties": {
+          "vectorLabel": {"type": "string", "maxLength": 30, "default": "force"},
+          "magnitude": {"type": "number", "minimum": 0.01, "maximum": 100000, "default": 10},
+          "unit": {"type": "string", "maxLength": 12, "default": "N"},
+          "scaleStatement": {"type": "string", "maxLength": 60, "default": "1 cm represents 2 N"},
+          "drawnLength": {"type": "number", "minimum": 0.01, "maximum": 50, "default": 5},
+          "directionLabel": {"type": "string", "maxLength": 24, "default": "east"}
+        }
+      }
+    },
+    {
+      "scene": "Scene_MultipleMeasurementAverage",
+      "category": "measurement",
+      "description": "Reveal repeated readings, their scatter, and the calculation of a representative mean.",
+      "visual_form": "reading chips accumulated before a mean calculation is revealed",
+      "duration_profile": {"min": 8, "ideal": 11, "max": 15},
+      "motion_cues": ["collect readings", "compare scatter", "sum readings", "divide and report mean"],
+      "not_suitable_for": ["single reading", "vector geometry"],
+      "module": "physics_animation_engine/modules/phase3/Scene_MultipleMeasurementAverage.js",
+      "status": "available",
+      "example_specs": [],
+      "parameter_schema": {
+        "type": "object",
+        "required": ["quantity", "readings", "unit"],
+        "additionalProperties": false,
+        "properties": {
+          "quantity": {"type": "string", "maxLength": 70, "default": "Repeated length measurements"},
+          "readings": {"type": "array", "minItems": 2, "maxItems": 6, "default": [12.3, 12.4, 12.5], "items": {"type": "number", "minimum": -100000, "maximum": 100000}},
+          "unit": {"type": "string", "maxLength": 12, "default": "cm"},
+          "decimalPlaces": {"type": "integer", "minimum": 0, "maximum": 3, "default": 1}
+        }
+      }
+    },
+    {
+      "scene": "Scene_RetrievalClassification",
+      "category": "lesson_structure",
+      "description": "Pause for retrieval, then sort named quantities into scalar and vector groups.",
+      "visual_form": "answer-covered classification followed by animated sorting",
+      "duration_profile": {"min": 8, "ideal": 11, "max": 15},
+      "motion_cues": ["present quantities", "hold for prediction", "reveal categories", "sort answers"],
+      "not_suitable_for": ["first explanation before teaching", "apparatus procedure"],
+      "module": "physics_animation_engine/modules/phase3/Scene_RetrievalClassification.js",
+      "status": "available",
+      "example_specs": ["physics_animation_engine/specs/pilot/01-scalars-vectors.json"],
+      "parameter_schema": {
+        "type": "object",
+        "required": ["prompt", "items"],
+        "additionalProperties": false,
+        "properties": {
+          "prompt": {"type": "string", "maxLength": 70, "default": "Scalar or vector?"},
+          "items": {"type": "array", "minItems": 2, "maxItems": 6, "default": [], "items": {"type": "object", "required": ["label", "type"], "additionalProperties": false, "properties": {
+            "label": {"type": "string", "maxLength": 30, "default": "speed"},
+            "type": {"type": "string", "enum": ["scalar", "vector"], "default": "scalar"}
+          }}}
         }
       }
     }

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import html as html_mod
+import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -48,10 +50,18 @@ def _scene_section(scene: dict[str, Any]) -> str:
     sid = html_mod.escape(scene["id"])
     start = float(scene["start"])
     duration = float(scene["duration"])
-    scene_html, _ = normalize_scene_html_for_shell(scene["scene_html"], scene["id"])
+    if scene.get("renderer") == "module":
+        scene_html = '<div class="module-scene-content"></div>'
+        scene_class = "mav-module-scene"
+    elif scene.get("renderer") == "recipe":
+        scene_html = '<div class="recipe-scene-content"></div>'
+        scene_class = "mav-recipe-scene"
+    else:
+        scene_html, _ = normalize_scene_html_for_shell(scene["scene_html"], scene["id"])
+        scene_class = "mav-v3-scene"
 
     return f"""
-      <section class="mav-scene mav-v3-scene" data-scene-id="{sid}" data-start="{start}" data-duration="{duration}" style="--scene-start:{start}s;--scene-duration:{duration}s">
+      <section class="mav-scene {scene_class}" data-scene-id="{sid}" data-start="{start}" data-duration="{duration}" style="--scene-start:{start}s;--scene-duration:{duration}s">
         <div class="paper-bg"></div>
         <div class="camera">
           <div class="v3-scene-content">
@@ -68,6 +78,8 @@ def _gsap_init_calls(scenes: list[dict[str, Any]]) -> str:
     """Generate JavaScript that registers each scene's initScene function."""
     blocks = []
     for scene in scenes:
+        if scene.get("renderer") == "module":
+            continue
         sid = html_mod.escape(scene["id"])
         gsap_code = scene.get("scene_gsap", "")
         if not gsap_code:
@@ -84,11 +96,107 @@ def _gsap_init_calls(scenes: list[dict[str, Any]]) -> str:
     return "\n".join(blocks)
 
 
+def _module_init_calls(scenes: list[dict[str, Any]]) -> str:
+    blocks = []
+    for scene in scenes:
+        if scene.get("renderer") != "module":
+            continue
+        scene_id = str(scene["id"])
+        module = scene.get("module") or {}
+        timing = scene.get("timing") or {}
+        payload = json.dumps(
+            {
+                "scene": module.get("scene"),
+                "params": {
+                    **(module.get("params") or {}),
+                    "duration": float(scene["duration"]),
+                    "cuePoints": timing.get("cue_points") or [],
+                    "finalHoldSeconds": float(timing.get("final_hold_seconds", 1.0)),
+                },
+            },
+            ensure_ascii=False,
+        ).replace("</", "<\\/")
+        blocks.append(
+            f"""
+      // === deterministic module {html_mod.escape(scene_id)} ===
+      (function() {{
+        const definition = {payload};
+        const ModuleClass = moduleRegistry[definition.scene];
+        if (!ModuleClass) throw new Error(`Unknown module ${{definition.scene}}`);
+        const host = document.querySelector('[data-scene-id="{html_mod.escape(scene_id)}"] .module-scene-content');
+        const instance = new ModuleClass();
+        instance.setup(host, definition.params);
+        const moduleTimeline = instance.buildTimeline(definition.params);
+        tl.add(moduleTimeline.paused(false), {float(scene['start'])});
+        window.__mavModuleInstances.push(instance);
+      }})();
+"""
+        )
+    return "\n".join(blocks)
+
+
+def _recipe_init_calls(scenes: list[dict[str, Any]]) -> str:
+    """Instantiate typed local recipes without generated HTML or JavaScript."""
+    blocks = []
+    for scene in scenes:
+        if scene.get("renderer") != "recipe":
+            continue
+        scene_id = str(scene["id"])
+        timing = scene.get("timing") or {}
+        payload = json.dumps(
+            {
+                "recipe": scene.get("recipe") or {},
+                "duration": float(scene["duration"]),
+                "cuePoints": timing.get("cue_points") or [],
+                "finalHoldSeconds": float(timing.get("final_hold_seconds", 1.0)),
+            },
+            ensure_ascii=False,
+        ).replace("</", "<\\/")
+        blocks.append(
+            f"""
+      // === deterministic recipe {html_mod.escape(scene_id)} ===
+      (function() {{
+        const definition = {payload};
+        const host = document.querySelector('[data-scene-id="{html_mod.escape(scene_id)}"] .recipe-scene-content');
+        const instance = new RecipeScene();
+        instance.setup(host, definition);
+        const recipeTimeline = instance.buildTimeline(definition);
+        tl.add(recipeTimeline.paused(false), {float(scene['start'])});
+        window.__mavRecipeInstances.push(instance);
+      }})();
+"""
+        )
+    return "\n".join(blocks)
+
+
+def _copy_module_runtime() -> None:
+    source = Path(__file__).resolve().parents[2] / "physics_animation_engine"
+    target = Path(__file__).resolve().parents[1] / "project" / "module_runtime"
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(source / "modules", target / "modules")
+    (target / "engine").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source / "engine" / "renderer.js", target / "engine" / "renderer.js")
+    shutil.copy2(source / "engine" / "scene_recipe.js", target / "engine" / "scene_recipe.js")
+    shutil.copytree(source / "styles" / "modules", target / "styles" / "modules")
+    shutil.copy2(source / "styles" / "tokens.css", target / "styles" / "tokens.css")
+    katex = source / "node_modules" / "katex" / "dist"
+    if not katex.exists():
+        raise RuntimeError(
+            "KaTeX runtime is missing. Run `cd physics_animation_engine && npm install` "
+            "before building a module-backed preview."
+        )
+    shutil.copytree(katex, target / "katex")
+
+
 def _master_html(
     *,
     title: str,
     body: str,
     gsap_inits: str,
+    module_inits: str,
+    recipe_inits: str,
+    module_runtime_prefix: str,
     project_prefix: str,
     duration: float,
     audio_src: str | None,
@@ -122,6 +230,12 @@ def _master_html(
     <link rel="stylesheet" href="{project_prefix}/css/tokens.css">
     <link rel="stylesheet" href="{project_prefix}/css/common.css">
     <link rel="stylesheet" href="{project_prefix}/css/v3_base.css">
+    <link rel="stylesheet" href="{module_runtime_prefix}/styles/tokens.css">
+    <link rel="stylesheet" href="{module_runtime_prefix}/styles/modules/phase1.css">
+    <link rel="stylesheet" href="{module_runtime_prefix}/styles/modules/phase2.css">
+    <link rel="stylesheet" href="{module_runtime_prefix}/styles/modules/phase3.css">
+    <link rel="stylesheet" href="{module_runtime_prefix}/styles/modules/recipe.css">
+    <link rel="stylesheet" href="{module_runtime_prefix}/katex/katex.min.css">
     <style>
       body {{ margin:0; background:#28251f; overflow:hidden; }}
       .mav-scene {{ position:absolute; inset:0; overflow:hidden; opacity:0; background:var(--paper); }}
@@ -134,6 +248,9 @@ def _master_html(
       body.mav-render-mode .mav-controls {{ display:none; }}
       .camera {{ position:absolute; inset:0; transform-origin:center center; }}
       .v3-scene-content {{ position:absolute; inset:0; overflow:hidden; }}
+      .module-scene-content, .module-scene-content .scene-root {{ position:absolute; inset:0; overflow:hidden; }}
+      .module-scene-content .scene-root {{ visibility:hidden; opacity:0; }}
+      .recipe-scene-content, .recipe-scene-content .recipe-scene {{ position:absolute; inset:0; overflow:hidden; }}
     </style>
   </head>
   <body class="composition-body">
@@ -147,14 +264,19 @@ def _master_html(
     </div>
     {controls}
     <script src="{project_prefix}/vendor/gsap.min.js"></script>
+    <script src="{module_runtime_prefix}/katex/katex.min.js"></script>
     <script type="module">
       import {{ scaleToViewport, registerTimeline }} from "{project_prefix}/js/composition_runtime.js";
+      import {{ registry as moduleRegistry }} from "{module_runtime_prefix}/modules/_registry.js";
+      import {{ RecipeScene }} from "{module_runtime_prefix}/engine/scene_recipe.js";
       const root = document.querySelector(".composition-root");
       if (window.__hf || new URLSearchParams(location.search).get("render") === "1") {{
         document.body.classList.add("mav-render-mode");
       }}
       scaleToViewport(root);
       const tl = gsap.timeline({{ paused: true }});
+      window.__mavModuleInstances = [];
+      window.__mavRecipeInstances = [];
       const scenes = Array.from(document.querySelectorAll(".mav-scene"));
 
       function resetPlaybackState() {{
@@ -174,6 +296,8 @@ def _master_html(
       }});
 
       {gsap_inits}
+      {module_inits}
+      {recipe_inits}
 
       tl.set({{}}, {{}}, {duration});
       registerTimeline("{html_mod.escape(timeline_id)}", tl, {duration});
@@ -268,14 +392,20 @@ def build_preview_v3(run_path: Path) -> dict[str, Any]:
     scene_dir = composition_dir / "scenes_v3"
     composition_dir.mkdir(parents=True, exist_ok=True)
     scene_dir.mkdir(parents=True, exist_ok=True)
+    _copy_module_runtime()
 
     body = "\n".join(_scene_section(scene) for scene in plan["scenes"])
     gsap_inits = _gsap_init_calls(plan["scenes"])
+    module_inits = _module_init_calls(plan["scenes"])
+    recipe_inits = _recipe_init_calls(plan["scenes"])
 
     master_html = _master_html(
         title=f"{plan['title']} V3",
         body=body,
         gsap_inits=gsap_inits,
+        module_inits=module_inits,
+        recipe_inits=recipe_inits,
+        module_runtime_prefix="../../../project/module_runtime",
         project_prefix="../../../project",
         duration=duration,
         audio_src=_audio_src_for_run(run_path),
@@ -293,6 +423,9 @@ def build_preview_v3(run_path: Path) -> dict[str, Any]:
             title=f"{scene['id']} {plan['title']} V3",
             body=_scene_section(single_scene),
             gsap_inits=_gsap_init_calls([single_scene]),
+            module_inits=_module_init_calls([single_scene]),
+            recipe_inits=_recipe_init_calls([single_scene]),
+            module_runtime_prefix="../../../../project/module_runtime",
             project_prefix="../../../../project",
             duration=scene_duration,
             audio_src=None,
@@ -310,6 +443,10 @@ def build_preview_v3(run_path: Path) -> dict[str, Any]:
                 "duration": scene_duration,
                 "paragraph_id": scene.get("paragraph_id"),
                 "beat_label": scene.get("beat_label"),
+                "renderer": scene.get("renderer", "v3_custom"),
+                "route": scene.get("route", "custom"),
+                "module": (scene.get("module") or {}).get("scene"),
+                "recipe": (scene.get("recipe") or {}).get("id"),
             }
         )
 
@@ -330,7 +467,7 @@ def build_preview_v3(run_path: Path) -> dict[str, Any]:
         },
         "validation": {
             "plan": "validation/plan_validation_v3.json",
-            "visual_qa": "validation/visual_qa.json",
+            "visual_review": "manual",
         },
         "narration_paragraphs": read_json(run_path / "narration.json").get("paragraphs", []),
         "audio_timing": timing,

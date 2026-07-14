@@ -202,6 +202,60 @@
       "params": { "radiationTypes": ["alpha", "beta", "gamma"], "barriers": ["paper", "aluminium", "lead", "concrete"], "showRange": true },
       "duration": 6.2,
       "narration": "Paper stops alpha, aluminium stops beta, and thick concrete is needed to stop highly penetrating gamma radiation."
+    },
+    {
+      "scene": "Scene_MeasuringInstrument",
+      "label": "Measuring Instrument",
+      "description": "Align and read a scale",
+      "icon": "↔",
+      "params": { "instrument": "ruler", "quantity": "length", "objectLabel": "metal block", "reading": "12.4", "unit": "cm", "cuePoints": [0.5, 2, 4, 6, 8] },
+      "duration": 10,
+      "narration": "Choose the ruler, align the object with zero, read the scale at eye level, and include the unit."
+    },
+    {
+      "scene": "Scene_PendulumTiming",
+      "label": "Pendulum Timing",
+      "description": "Time multiple oscillations",
+      "icon": "◡",
+      "params": { "oscillations": 10, "totalTime": 12.4, "unit": "s", "cuePoints": [0.5, 2, 4, 7, 9] },
+      "duration": 11,
+      "narration": "Count ten complete oscillations, record the total time, then divide to estimate one period."
+    },
+    {
+      "scene": "Scene_VectorAdditionTriangle",
+      "label": "Vector Addition",
+      "description": "Head-to-tail construction",
+      "icon": "△",
+      "params": { "firstLabel": "3 N north", "secondLabel": "4 N east", "resultantLabel": "5 N resultant", "cuePoints": [0.5, 2, 4, 6, 8] },
+      "duration": 10,
+      "narration": "Draw the first vector, place the second head to tail, then connect the start to the finish to reveal the resultant."
+    },
+    {
+      "scene": "Scene_ScaleVectorDrawing",
+      "label": "Scale Vector Drawing",
+      "description": "Turn magnitude into arrow length",
+      "icon": "↗",
+      "params": { "vectorLabel": "force", "magnitude": 10, "unit": "N", "scaleStatement": "1 cm represents 2 N", "drawnLength": 5, "directionLabel": "east", "cuePoints": [0.5, 2, 4, 6, 8] },
+      "duration": 10,
+      "narration": "State the scale, calculate five centimetres, measure that length, and draw the arrow east."
+    },
+    {
+      "scene": "Scene_MultipleMeasurementAverage",
+      "label": "Measurement Average",
+      "description": "Repeat and calculate a mean",
+      "icon": "x̄",
+      "params": { "quantity": "Repeated length measurements", "readings": [12.3, 12.4, 12.5], "unit": "cm", "decimalPlaces": 1, "cuePoints": [0.5, 2, 4, 6, 8, 9] },
+      "duration": 11,
+      "narration": "Collect repeated readings, compare their scatter, add the values, and divide by the number of readings."
+    },
+    {
+      "scene": "Scene_RetrievalClassification",
+      "label": "Retrieval Classification",
+      "description": "Predict, reveal and sort",
+      "icon": "?",
+      "params": { "prompt": "Scalar or vector?", "items": [{"label":"energy","type":"scalar"},{"label":"time","type":"scalar"},{"label":"force","type":"vector"},{"label":"momentum","type":"vector"}], "cuePoints": [0.5, 2, 4, 7, 9] },
+      "duration": 11,
+      "narration": "Classify energy, time, force, and momentum before revealing which quantities also require direction."
     }
   ]
 }

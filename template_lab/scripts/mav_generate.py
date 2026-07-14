@@ -26,7 +26,6 @@ from mav_schema import (
 from mav_script import generate_narration
 from mav_timing import derive_timing
 from mav_validate_v3 import repair_v3_plan, validate_v3_plan
-from mav_visual_qa import visual_qa
 
 STEP_LABELS = {
     1: "inputs",
@@ -36,7 +35,6 @@ STEP_LABELS = {
     5: "scene_plan",
     6: "validate_repair",
     7: "build_preview",
-    8: "qa",
 }
 
 
@@ -81,10 +79,15 @@ def build_input(args: argparse.Namespace) -> dict[str, Any]:
     topic = args.topic or str(pipeline_inputs.get("topic") or "").strip()
     if not topic:
         raise RuntimeError("A topic is required. Pass --topic or include top-level topic in the facts JSON.")
+    objective_ids = pipeline_inputs.get("objective_ids", [])
+    if not isinstance(objective_ids, list):
+        raise RuntimeError("Top-level objective_ids in the facts JSON must be a list.")
     return {
         "run_id": args.run_id,
         "template_id": args.template_id or "physics",
         "topic": topic,
+        "topic_ref": str(pipeline_inputs.get("topic_ref") or "").strip(),
+        "objective_ids": list(dict.fromkeys(str(value).strip() for value in objective_ids if str(value).strip())),
         "tone": args.tone or pipeline_inputs.get("tone") or "patient, precise IGCSE Physics teacher",
         "target_duration_seconds": float(args.duration),
         "facts": pipeline_inputs["facts"],
@@ -123,7 +126,7 @@ def _step_summary(
         "status": "stopped",
         "stopped_after_step": step,
         "stopped_after": STEP_LABELS[step],
-        "next_step": step + 1 if step < 8 else None,
+        "next_step": step + 1 if step < 7 else None,
         "artifacts": artifacts,
     }
     summary.update(extra)
@@ -138,7 +141,7 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
     initial_payload = build_input(args)
     os.environ["MAV_RUN_ID"] = initial_payload["run_id"]
     from_step = getattr(args, "from_step", 1)
-    stop_after_step = getattr(args, "stop_after_step", 8)
+    stop_after_step = getattr(args, "stop_after_step", 7)
     path = run_dir(initial_payload["run_id"])
     model_provider = _configure_model_provider(args)
     audio_provider = _configure_audio_provider(args)
@@ -151,10 +154,6 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
     )
     if not use_model and from_step <= 2 <= stop_after_step:
         raise RuntimeError("Script generation requires --use-model, --use-gemini, or --use-claude.")
-    if not use_model and from_step <= 5 <= stop_after_step:
-        raise RuntimeError(
-            "Physics V3 scene generation requires --use-model, --use-gemini, or --use-claude."
-        )
     if args.clean and from_step > 1:
         raise RuntimeError("--clean cannot be combined with --from-step > 1 because cached artifacts are required.")
     if paid_requested and not args.confirm_paid_api:
@@ -171,8 +170,15 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         write_json(path / "input.json", input_payload)
     else:
         input_payload = _read_cached_json(path / "input.json", "input payload")
+        metadata_updated = False
+        for key in ("topic_ref", "objective_ids"):
+            if not input_payload.get(key) and initial_payload.get(key):
+                input_payload[key] = initial_payload[key]
+                metadata_updated = True
         if getattr(args, "template_id", "") and input_payload.get("template_id") != args.template_id:
             input_payload["template_id"] = args.template_id
+            metadata_updated = True
+        if metadata_updated:
             write_json(path / "input.json", input_payload)
         raise_if_invalid(validate_run_input(input_payload))
     if stop_after_step == 1:
@@ -267,10 +273,19 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
     )
     if from_step <= 5:
         if v3_scene_id:
-            _log(f"step 5: regenerating only {v3_scene_id}; this makes one director call and one coder call")
+            _log(f"step 5: regenerating only {v3_scene_id} through its cached recipe/module/custom route")
         else:
-            _log("step 5: generating V3 scenes; each scene group uses one director call and one coder call")
-        v3_plan = generate_v3_scenes(input_payload, narration, timing, target_scene_id=v3_scene_id)
+            _log(
+                "step 5: selecting objective-grounded local recipes first; "
+                "legacy module/custom routing runs only for uncovered groups when explicitly enabled"
+            )
+        v3_plan = generate_v3_scenes(
+            input_payload,
+            narration,
+            timing,
+            target_scene_id=v3_scene_id,
+            allow_model_fallback=use_model,
+        )
     else:
         _log("step 5: loading cached scene_plan_v3.json plus editable v3_scenes/*.json overrides")
         v3_plan = load_v3_plan_with_scene_files(path)
@@ -288,14 +303,20 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
             input_payload,
             path,
             5,
-            ["scene_plan_v3.json"],
+            [
+                "asset_index_used.json",
+                "asset_shortlist.json",
+                "asset_catalog_used.json",
+                "scene_routes.json",
+                "scene_plan_v3.json",
+            ],
             mode="v3_generative",
             scenes=v3_plan["scene_count"],
         )
 
     validation_path = path / "validation" / "plan_validation_v3.json"
     if from_step <= 6:
-        _log("step 6: validating generated V3 HTML and GSAP safety constraints")
+        _log("step 6: validating typed recipes plus legacy V3 HTML/GSAP safety constraints")
         v3_violations = validate_v3_plan(v3_plan)
         v3_report = {
             "status": "passed" if not v3_violations else "failed",
@@ -333,18 +354,6 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         _log("step 7: loading cached preview_manifest_v3.json")
         manifest_payload = _read_cached_json(path / "preview_manifest_v3.json", "V3 preview manifest")
     _log(f"step 7 complete: preview={manifest_payload['master']}")
-    if stop_after_step == 7:
-        return _step_summary(
-            input_payload,
-            path,
-            7,
-            ["preview_manifest_v3.json", manifest_payload["master"]],
-            mode="v3_generative",
-            preview=str(path / manifest_payload["master"]),
-        )
-
-    _log("step 8: running V3 visual QA hook")
-    visual_report = visual_qa(path, enabled=args.visual_qa)
     summary = {
         "run_id": input_payload["run_id"],
         "mode": "v3_generative",
@@ -352,9 +361,7 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         "audio_duration_seconds": timing["audio_duration_seconds"],
         "scenes": v3_plan["scene_count"],
         "plan_validation": v3_report["status"],
-        "layout_validation": "visual_only",
-        "presentation_risk": "not_applicable",
-        "visual_qa": visual_report["status"],
+        "manual_review": "required",
         "preview": str(path / manifest_payload["master"]),
         "mp4": "not rendered",
     }
@@ -394,19 +401,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--confirm-paid-api", action="store_true", help="Required for any command that may call paid external APIs")
     parser.add_argument("--force-paid-api", action="store_true", help="Allow deleting paid run caches or refreshing paid API artifacts")
-    parser.add_argument("--visual-qa", action="store_true", help="Enable optional subjective visual QA hook")
     parser.add_argument(
         "--from-step",
         type=int,
         default=1,
-        choices=range(1, 9),
-        help="Resume from step N (1=inputs, 2=script, 3=audio, 4=timing, 5=plan, 6=validate, 7=build, 8=qa)",
+        choices=range(1, 8),
+        help="Resume from step N (1=inputs, 2=script, 3=audio, 4=timing, 5=plan, 6=technical validation, 7=build)",
     )
     parser.add_argument(
         "--stop-after-step",
         type=int,
-        default=8,
-        choices=range(1, 9),
+        default=7,
+        choices=range(1, 8),
         help="Stop after step N for one-step-at-a-time debugging.",
     )
     return parser.parse_args()
@@ -437,12 +443,7 @@ def main() -> int:
     print(f"Scenes: {summary['scenes']}")
     if "plan_validation" in summary:
         print(f"Plan validation: {summary['plan_validation']}")
-    if "layout_validation" in summary:
-        print(f"Layout validation: {summary['layout_validation']}")
-    if "presentation_risk" in summary:
-        print(f"Presentation risk: {summary['presentation_risk']}")
-    if "visual_qa" in summary:
-        print(f"Visual QA: {summary['visual_qa']}")
+    print("Manual visual review: required")
     print("Preview ready")
     print(f"Render MP4: python3 template_lab/scripts/mav_render.py --run-id {summary['run_id']}")
     print(f"Open with: python3 template_lab/scripts/mav_preview.py --run-id {summary['run_id']}")

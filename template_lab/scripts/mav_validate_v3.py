@@ -468,6 +468,23 @@ def validate_v3_plan(plan: dict[str, Any]) -> list[V3Violation]:
 
     for scene in scenes:
         sid = scene.get("id", "unknown")
+        if scene.get("renderer") == "module":
+            module = scene.get("module") or {}
+            if not module.get("scene"):
+                violations.append(V3Violation("MISSING_MODULE", "Module scene has no registered scene name", sid))
+            if not isinstance(module.get("params"), dict):
+                violations.append(V3Violation("INVALID_MODULE_PARAMS", "Module scene params must be an object", sid))
+            continue
+        if scene.get("renderer") == "recipe":
+            from mav_recipes import validate_recipe
+
+            recipe = scene.get("recipe")
+            if not isinstance(recipe, dict):
+                violations.append(V3Violation("INVALID_RECIPE", "Recipe scene must contain a recipe object", sid))
+                continue
+            for message in validate_recipe(recipe):
+                violations.append(V3Violation("INVALID_RECIPE", message, sid))
+            continue
         html = scene.get("scene_html", "")
         gsap = scene.get("scene_gsap", "")
         start = float(scene.get("start", 0))

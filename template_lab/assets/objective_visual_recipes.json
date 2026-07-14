@@ -1,0 +1,412 @@
+{
+  "version": 1,
+  "syllabus": "Cambridge IGCSE Physics 0625 (2026-2028)",
+  "workbenches": [
+    "Measurement and apparatus",
+    "Mechanics, forces and vectors",
+    "Materials and fluids",
+    "Energy and system flow",
+    "Matter and thermal physics",
+    "Waves, optics and signals",
+    "Fields, charge and magnetism",
+    "Circuits and electrical systems",
+    "Electromagnetic devices",
+    "Atomic and nuclear physics",
+    "Space, scale and timelines"
+  ],
+  "recipes": [
+    {
+      "objective_id": "1.1-C01",
+      "beat_labels": ["curiosity_hook", "hook", "lesson_open"],
+      "cue_terms": ["heartbeat", "wristwatch", "tiny gear", "instincts", "guessing", "precision", "standardized", "verifiable data"],
+      "recipe": {
+        "id": "measurement_precision_hook",
+        "workbench": "Measurement and apparatus",
+        "layout": "comparison",
+        "title": "A guess becomes a measurement",
+        "nodes": [
+          {"id": "watch", "type": "clock", "x": 0.1, "y": 0.25, "width": 0.24, "height": 0.34, "label": "heartbeat"},
+          {"id": "gear", "type": "object", "x": 0.39, "y": 0.28, "width": 0.18, "height": 0.28, "label": "tiny gear"},
+          {"id": "ruler", "type": "ruler", "x": 0.63, "y": 0.28, "width": 0.27, "height": 0.16, "minimum": 0, "maximum": 10, "unit": "mm"},
+          {"id": "result", "type": "quantity_card", "x": 0.31, "y": 0.67, "width": 0.38, "height": 0.14, "label": "standardized and verifiable", "items": ["number", "unit", "method"]}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "watch", "at": 0.02, "duration": 0.16},
+          {"type": "compare", "target": "gear", "at": 0.2, "duration": 0.18},
+          {"type": "measure", "target": "ruler", "at": 0.43, "duration": 0.2},
+          {"type": "highlight", "target": "result", "at": 0.7, "duration": 0.22}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C01",
+      "beat_labels": ["mechanism", "practical_skill", "instrument_demo"],
+      "cue_terms": ["ruler", "length", "align the zero", "scale"],
+      "recipe": {
+        "id": "measurement_ruler_alignment",
+        "workbench": "Measurement and apparatus",
+        "layout": "instrument_demo",
+        "title": "Measure length from the zero mark",
+        "nodes": [
+          {"id": "ruler", "type": "ruler", "x": 0.12, "y": 0.62, "width": 0.76, "height": 0.12, "minimum": 0, "maximum": 15, "unit": "cm"},
+          {"id": "object", "type": "object", "x": 0.24, "y": 0.43, "width": 0.42, "height": 0.12, "label": "object"},
+          {"id": "zero", "type": "label", "x": 0.2, "y": 0.76, "width": 0.12, "height": 0.08, "label": "zero aligned"},
+          {"id": "reading", "type": "label", "x": 0.62, "y": 0.28, "width": 0.22, "height": 0.1, "label": "read the far end"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "ruler", "at": 0.02, "duration": 0.16},
+          {"type": "move", "target": "object", "at": 0.18, "duration": 0.25, "to": {"x": 0.2, "y": 0.43}},
+          {"type": "highlight", "target": "zero", "at": 0.45, "duration": 0.2},
+          {"type": "measure", "target": "reading", "at": 0.7, "duration": 0.22}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C01",
+      "beat_labels": ["mechanism", "diagram_reading", "worked_example"],
+      "cue_terms": ["measuring cylinder", "displacement", "volume", "immersing", "water level"],
+      "recipe": {
+        "id": "measurement_cylinder_displacement",
+        "workbench": "Measurement and apparatus",
+        "layout": "experiment_bench",
+        "title": "Volume by displacement",
+        "nodes": [
+          {"id": "cylinder", "type": "measuring_cylinder", "x": 0.3, "y": 0.2, "width": 0.3, "height": 0.64, "minimum": 0, "maximum": 100, "unit": "cm³"},
+          {"id": "liquid", "type": "liquid", "x": 0.39, "y": 0.55, "width": 0.12, "height": 0.22, "reading": 45, "unit": "cm³"},
+          {"id": "object", "type": "object", "x": 0.68, "y": 0.24, "width": 0.12, "height": 0.12, "label": "irregular solid"},
+          {"id": "equation", "type": "equation", "x": 0.64, "y": 0.62, "width": 0.28, "height": 0.12, "value": "final − initial = volume"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "cylinder", "at": 0.02, "duration": 0.14},
+          {"type": "move", "target": "object", "at": 0.2, "duration": 0.28, "to": {"x": 0.39, "y": 0.58}},
+          {"type": "update", "target": "liquid", "at": 0.48, "duration": 0.18, "value": 62},
+          {"type": "reveal", "target": "equation", "at": 0.7, "duration": 0.22}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C01",
+      "beat_labels": ["diagram_reading", "misconception_check", "practical_skill"],
+      "cue_terms": ["meniscus", "parallax", "eye level", "from above", "from below", "sight line"],
+      "recipe": {
+        "id": "measurement_meniscus_parallax",
+        "workbench": "Measurement and apparatus",
+        "layout": "evidence_zoom",
+        "title": "Read the meniscus at eye level",
+        "nodes": [
+          {"id": "cylinder", "type": "measuring_cylinder", "x": 0.38, "y": 0.15, "width": 0.24, "height": 0.7, "minimum": 0, "maximum": 100, "unit": "cm³"},
+          {"id": "meniscus", "type": "meniscus", "x": 0.42, "y": 0.48, "width": 0.16, "height": 0.06, "reading": 56},
+          {"id": "eye_high", "type": "eye", "x": 0.12, "y": 0.24, "width": 0.12, "height": 0.08, "state": "incorrect"},
+          {"id": "eye_level", "type": "eye", "x": 0.12, "y": 0.48, "width": 0.12, "height": 0.08, "state": "correct"},
+          {"id": "sight_line", "type": "sight_line", "x": 0.22, "y": 0.48, "width": 0.2, "height": 0.06, "orientation": "horizontal"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "eye_high", "at": 0.04, "duration": 0.14},
+          {"type": "trace", "target": "sight_line", "at": 0.22, "duration": 0.18},
+          {"type": "compare", "target": "eye_level", "at": 0.46, "duration": 0.2},
+          {"type": "highlight", "target": "meniscus", "at": 0.7, "duration": 0.22}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C02",
+      "beat_labels": ["mechanism", "comparison", "practical_skill"],
+      "cue_terms": ["clock", "digital timer", "time interval", "fractions of a second", "long duration"],
+      "recipe": {
+        "id": "timing_clock_timer_compare",
+        "workbench": "Measurement and apparatus",
+        "layout": "comparison",
+        "title": "Choose a timer for the interval",
+        "nodes": [
+          {"id": "clock", "type": "clock", "x": 0.12, "y": 0.25, "width": 0.3, "height": 0.42, "label": "long interval"},
+          {"id": "divider", "type": "divider", "x": 0.49, "y": 0.16, "width": 0.02, "height": 0.68},
+          {"id": "timer", "type": "digital_timer", "x": 0.58, "y": 0.3, "width": 0.3, "height": 0.24, "value": "0.00", "unit": "s", "label": "short interval"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "clock", "at": 0.04, "duration": 0.2},
+          {"type": "reveal", "target": "timer", "at": 0.34, "duration": 0.2},
+          {"type": "count", "target": "timer", "at": 0.58, "duration": 0.34, "count": 12}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C02",
+      "beat_labels": ["mechanism", "misconception_check", "evidence"],
+      "cue_terms": ["reaction time", "reaction speed", "human trigger", "delay", "multiple trials"],
+      "recipe": {
+        "id": "timing_reaction_delay",
+        "workbench": "Measurement and apparatus",
+        "layout": "timeline",
+        "title": "Reaction delay shifts the reading",
+        "nodes": [
+          {"id": "timeline", "type": "timeline", "x": 0.1, "y": 0.45, "width": 0.8, "height": 0.12, "minimum": 0, "maximum": 1, "unit": "s"},
+          {"id": "event", "type": "label", "x": 0.16, "y": 0.28, "width": 0.18, "height": 0.08, "label": "event begins"},
+          {"id": "press", "type": "label", "x": 0.58, "y": 0.28, "width": 0.18, "height": 0.08, "label": "button pressed"},
+          {"id": "error", "type": "error_bar", "x": 0.32, "y": 0.58, "width": 0.28, "height": 0.1, "value": 0.2, "minimum": 0, "maximum": 0.2, "unit": "s"}
+        ],
+        "actions": [
+          {"type": "trace", "target": "timeline", "at": 0.02, "duration": 0.25},
+          {"type": "reveal", "target": "event", "at": 0.3, "duration": 0.14},
+          {"type": "reveal", "target": "press", "at": 0.5, "duration": 0.14},
+          {"type": "measure", "target": "error", "at": 0.68, "duration": 0.24}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C03",
+      "beat_labels": ["model_build", "mechanism", "practical_skill"],
+      "cue_terms": ["pendulum", "oscillation", "ten complete oscillations", "period", "divide"],
+      "recipe": {
+        "id": "averaging_pendulum_multiples",
+        "workbench": "Measurement and apparatus",
+        "layout": "experiment_bench",
+        "title": "Time many oscillations",
+        "nodes": [
+          {"id": "pendulum", "type": "pendulum", "x": 0.2, "y": 0.14, "width": 0.34, "height": 0.58, "count": 10},
+          {"id": "stopwatch", "type": "stopwatch", "x": 0.64, "y": 0.24, "width": 0.2, "height": 0.24, "value": "12.4", "unit": "s"},
+          {"id": "counter", "type": "counter", "x": 0.62, "y": 0.54, "width": 0.24, "height": 0.1, "value": 10, "label": "oscillations"},
+          {"id": "equation", "type": "equation", "x": 0.27, "y": 0.78, "width": 0.46, "height": 0.1, "value": "period = total time ÷ number"}
+        ],
+        "actions": [
+          {"type": "oscillate", "target": "pendulum", "at": 0.04, "duration": 0.56, "count": 10, "amplitude": 0.12},
+          {"type": "count", "target": "counter", "at": 0.08, "duration": 0.52, "count": 10},
+          {"type": "count", "target": "stopwatch", "at": 0.08, "duration": 0.52, "count": 12},
+          {"type": "reveal", "target": "equation", "at": 0.68, "duration": 0.24}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C03",
+      "beat_labels": ["misconception_check", "evidence", "comparison"],
+      "cue_terms": ["averaging", "reaction error", "single measurement", "spread", "reducing error"],
+      "recipe": {
+        "id": "averaging_error_comparison",
+        "workbench": "Measurement and apparatus",
+        "layout": "comparison",
+        "title": "The same delay matters less over many cycles",
+        "nodes": [
+          {"id": "single", "type": "error_bar", "x": 0.12, "y": 0.32, "width": 0.32, "height": 0.16, "value": 0.2, "minimum": 0, "maximum": 0.2, "unit": "s", "label": "one cycle"},
+          {"id": "multiple", "type": "error_bar", "x": 0.56, "y": 0.32, "width": 0.32, "height": 0.16, "value": 0.02, "minimum": 0, "maximum": 0.2, "unit": "s", "label": "average of ten"},
+          {"id": "divide", "type": "equation", "x": 0.3, "y": 0.62, "width": 0.4, "height": 0.12, "value": "0.2 s ÷ 10 = 0.02 s"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "single", "at": 0.06, "duration": 0.2},
+          {"type": "compare", "target": "multiple", "at": 0.34, "duration": 0.22},
+          {"type": "reveal", "target": "divide", "at": 0.64, "duration": 0.26}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-C03",
+      "beat_labels": ["transfer_question", "worked_example", "practical_skill"],
+      "cue_terms": ["sheet of paper", "stack", "thickness", "small distance", "fifty sheets"],
+      "recipe": {
+        "id": "averaging_paper_stack",
+        "workbench": "Measurement and apparatus",
+        "layout": "worked_example",
+        "title": "Measure a stack, then divide",
+        "nodes": [
+          {"id": "stack", "type": "object", "x": 0.2, "y": 0.36, "width": 0.32, "height": 0.3, "label": "50 sheets", "count": 50},
+          {"id": "ruler", "type": "ruler", "x": 0.12, "y": 0.2, "width": 0.1, "height": 0.54, "minimum": 0, "maximum": 10, "unit": "mm", "orientation": "vertical"},
+          {"id": "equation", "type": "equation", "x": 0.6, "y": 0.4, "width": 0.3, "height": 0.14, "value": "stack thickness ÷ 50"}
+        ],
+        "actions": [
+          {"type": "count", "target": "stack", "at": 0.04, "duration": 0.28, "count": 50},
+          {"type": "measure", "target": "ruler", "at": 0.36, "duration": 0.22},
+          {"type": "reveal", "target": "equation", "at": 0.66, "duration": 0.25}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S04",
+      "beat_labels": ["model_build", "explain", "comparison"],
+      "cue_terms": ["scalar", "vector", "magnitude", "direction", "two families"],
+      "recipe": {
+        "id": "quantities_scalar_vector_compare",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "comparison",
+        "title": "Magnitude only or magnitude and direction?",
+        "nodes": [
+          {"id": "scalar", "type": "quantity_card", "x": 0.1, "y": 0.24, "width": 0.34, "height": 0.5, "label": "scalar", "items": ["magnitude"]},
+          {"id": "divider", "type": "divider", "x": 0.49, "y": 0.18, "width": 0.02, "height": 0.64},
+          {"id": "vector", "type": "quantity_card", "x": 0.56, "y": 0.24, "width": 0.34, "height": 0.5, "label": "vector", "items": ["magnitude", "direction"]}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "scalar", "at": 0.04, "duration": 0.22},
+          {"type": "reveal", "target": "vector", "at": 0.34, "duration": 0.22},
+          {"type": "compare", "target": "divider", "at": 0.64, "duration": 0.24}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S04",
+      "beat_labels": ["mechanism", "diagram_reading", "misconception_check"],
+      "cue_terms": ["how fast", "where headed", "velocity", "speed", "arrow"],
+      "recipe": {
+        "id": "quantities_magnitude_direction",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "evidence_zoom",
+        "title": "Direction changes the quantity",
+        "nodes": [
+          {"id": "speed", "type": "label", "x": 0.12, "y": 0.42, "width": 0.24, "height": 0.12, "label": "5 m/s"},
+          {"id": "velocity", "type": "vector", "x": 0.48, "y": 0.36, "width": 0.38, "height": 0.2, "magnitude": 5, "direction": "east", "unit": "m/s"},
+          {"id": "direction", "type": "label", "x": 0.58, "y": 0.62, "width": 0.22, "height": 0.1, "label": "east"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "speed", "at": 0.06, "duration": 0.2},
+          {"type": "trace", "target": "velocity", "at": 0.34, "duration": 0.26},
+          {"type": "highlight", "target": "direction", "at": 0.68, "duration": 0.22}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S05",
+      "beat_labels": ["retrieval_check", "classification", "practice"],
+      "cue_terms": ["distance", "speed", "time", "mass", "energy", "temperature", "scalars"],
+      "recipe": {
+        "id": "quantities_scalar_classification",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "classification",
+        "title": "Classify the scalars",
+        "nodes": [
+          {"id": "cards", "type": "quantity_card", "x": 0.12, "y": 0.18, "width": 0.76, "height": 0.26, "items": ["distance", "speed", "time", "mass", "energy", "temperature"]},
+          {"id": "scalar_bin", "type": "quantity_card", "x": 0.28, "y": 0.58, "width": 0.44, "height": 0.2, "label": "magnitude only"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "cards", "at": 0.04, "duration": 0.2},
+          {"type": "classify", "target": "scalar_bin", "at": 0.34, "duration": 0.5, "count": 6}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S05",
+      "beat_labels": ["model_build", "synthesis", "example"],
+      "cue_terms": ["energy and time", "mass", "temperature", "magnitude only", "no direction"],
+      "recipe": {
+        "id": "quantities_scalar_examples",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "comparison",
+        "title": "Scalars need a value and unit",
+        "nodes": [
+          {"id": "mass", "type": "quantity_card", "x": 0.1, "y": 0.3, "width": 0.23, "height": 0.34, "label": "mass", "value": 2, "unit": "kg"},
+          {"id": "time", "type": "quantity_card", "x": 0.385, "y": 0.3, "width": 0.23, "height": 0.34, "label": "time", "value": 8, "unit": "s"},
+          {"id": "energy", "type": "quantity_card", "x": 0.67, "y": 0.3, "width": 0.23, "height": 0.34, "label": "energy", "value": 40, "unit": "J"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "mass", "at": 0.06, "duration": 0.18},
+          {"type": "reveal", "target": "time", "at": 0.34, "duration": 0.18},
+          {"type": "reveal", "target": "energy", "at": 0.62, "duration": 0.2}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S06",
+      "beat_labels": ["retrieval_check", "classification", "practice"],
+      "cue_terms": ["force", "weight", "velocity", "acceleration", "momentum", "field strength", "vectors"],
+      "recipe": {
+        "id": "quantities_vector_classification",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "classification",
+        "title": "Classify the vectors",
+        "nodes": [
+          {"id": "cards", "type": "quantity_card", "x": 0.08, "y": 0.16, "width": 0.84, "height": 0.3, "items": ["force", "weight", "velocity", "acceleration", "momentum", "electric field strength", "gravitational field strength"]},
+          {"id": "vector_bin", "type": "quantity_card", "x": 0.27, "y": 0.6, "width": 0.46, "height": 0.2, "label": "magnitude and direction"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "cards", "at": 0.04, "duration": 0.2},
+          {"type": "classify", "target": "vector_bin", "at": 0.32, "duration": 0.54, "count": 7}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S06",
+      "beat_labels": ["model_build", "synthesis", "example"],
+      "cue_terms": ["force and momentum", "velocity", "direction", "headed", "arrow"],
+      "recipe": {
+        "id": "quantities_vector_examples",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "comparison",
+        "title": "Vectors carry direction",
+        "nodes": [
+          {"id": "force", "type": "vector", "x": 0.1, "y": 0.28, "width": 0.24, "height": 0.24, "label": "force", "magnitude": 6, "direction": "east", "unit": "N"},
+          {"id": "velocity", "type": "vector", "x": 0.38, "y": 0.28, "width": 0.24, "height": 0.24, "label": "velocity", "magnitude": 4, "direction": "north", "unit": "m/s"},
+          {"id": "momentum", "type": "vector", "x": 0.66, "y": 0.28, "width": 0.24, "height": 0.24, "label": "momentum", "magnitude": 8, "direction": "west", "unit": "kg m/s"}
+        ],
+        "actions": [
+          {"type": "trace", "target": "force", "at": 0.05, "duration": 0.2},
+          {"type": "trace", "target": "velocity", "at": 0.34, "duration": 0.2},
+          {"type": "trace", "target": "momentum", "at": 0.63, "duration": 0.2}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S07",
+      "beat_labels": ["worked_example", "mechanism", "diagram_reading"],
+      "cue_terms": ["right angle", "resultant", "triangle", "3 newtons", "4 newtons", "hypotenuse"],
+      "recipe": {
+        "id": "vectors_right_angle_triangle",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "worked_example",
+        "title": "Add right-angle vectors tip to tail",
+        "nodes": [
+          {"id": "first", "type": "vector", "x": 0.2, "y": 0.64, "width": 0.34, "height": 0.1, "magnitude": 4, "direction": "east", "unit": "N", "label": "4 N"},
+          {"id": "second", "type": "vector", "x": 0.5, "y": 0.28, "width": 0.1, "height": 0.38, "magnitude": 3, "direction": "north", "unit": "N", "label": "3 N"},
+          {"id": "resultant", "type": "vector", "x": 0.2, "y": 0.28, "width": 0.4, "height": 0.46, "magnitude": 5, "direction": "north-east", "unit": "N", "label": "5 N resultant"}
+        ],
+        "actions": [
+          {"type": "trace", "target": "first", "at": 0.04, "duration": 0.22},
+          {"type": "trace", "target": "second", "at": 0.32, "duration": 0.22},
+          {"type": "trace", "target": "resultant", "at": 0.62, "duration": 0.28}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S07",
+      "beat_labels": ["equation_meaning", "worked_example", "calculation"],
+      "cue_terms": ["Pythagorean", "square root", "3 squared", "4 squared", "5 newtons", "calculate"],
+      "recipe": {
+        "id": "vectors_pythagoras_resultant",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "worked_example",
+        "title": "Calculate the resultant magnitude",
+        "nodes": [
+          {"id": "triangle", "type": "vector", "x": 0.12, "y": 0.24, "width": 0.36, "height": 0.48, "points": [{"x": 0.05, "y": 0.9}, {"x": 0.9, "y": 0.9}, {"x": 0.9, "y": 0.1}], "label": "3–4–5 triangle"},
+          {"id": "formula", "type": "equation", "x": 0.56, "y": 0.24, "width": 0.34, "height": 0.12, "value": "R = √(3² + 4²)"},
+          {"id": "working", "type": "equation", "x": 0.56, "y": 0.46, "width": 0.34, "height": 0.12, "value": "R = √25"},
+          {"id": "answer", "type": "label", "x": 0.62, "y": 0.68, "width": 0.22, "height": 0.1, "label": "R = 5 N"}
+        ],
+        "actions": [
+          {"type": "trace", "target": "triangle", "at": 0.02, "duration": 0.22},
+          {"type": "reveal", "target": "formula", "at": 0.3, "duration": 0.18},
+          {"type": "update", "target": "working", "at": 0.54, "duration": 0.16, "value": "√25"},
+          {"type": "highlight", "target": "answer", "at": 0.76, "duration": 0.2}
+        ]
+      }
+    },
+    {
+      "objective_id": "1.1-S07",
+      "beat_labels": ["practical_skill", "diagram_reading", "prediction"],
+      "cue_terms": ["consistent scale", "centimeter representing", "scale drawing", "sharp pencil", "protractor", "doubled our scale"],
+      "recipe": {
+        "id": "vectors_scale_drawing",
+        "workbench": "Mechanics, forces and vectors",
+        "layout": "scale_drawing",
+        "title": "Draw vectors using one consistent scale",
+        "nodes": [
+          {"id": "scale", "type": "scale_key", "x": 0.08, "y": 0.2, "width": 0.26, "height": 0.08, "label": "1 cm represents 1 N", "scale": 1},
+          {"id": "ruler", "type": "ruler", "x": 0.12, "y": 0.74, "width": 0.62, "height": 0.08, "minimum": 0, "maximum": 8, "unit": "cm"},
+          {"id": "first", "type": "vector", "x": 0.24, "y": 0.62, "width": 0.38, "height": 0.08, "magnitude": 4, "direction": "east", "unit": "N"},
+          {"id": "second", "type": "vector", "x": 0.58, "y": 0.3, "width": 0.08, "height": 0.34, "magnitude": 3, "direction": "north", "unit": "N"},
+          {"id": "resultant", "type": "vector", "x": 0.24, "y": 0.3, "width": 0.42, "height": 0.4, "magnitude": 5, "direction": "north-east", "unit": "N"}
+        ],
+        "actions": [
+          {"type": "reveal", "target": "scale", "at": 0.02, "duration": 0.14},
+          {"type": "measure", "target": "ruler", "at": 0.2, "duration": 0.14},
+          {"type": "trace", "target": "first", "at": 0.38, "duration": 0.16},
+          {"type": "trace", "target": "second", "at": 0.58, "duration": 0.16},
+          {"type": "trace", "target": "resultant", "at": 0.78, "duration": 0.2}
+        ]
+      }
+    }
+  ]
+}

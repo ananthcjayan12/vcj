@@ -33,6 +33,12 @@ import { Scene_RayDiagram } from './phase3/Scene_RayDiagram.js';
 import { Scene_OrbitalMotion } from './phase3/Scene_OrbitalMotion.js';
 import { Scene_StarLifeCycle } from './phase3/Scene_StarLifeCycle.js';
 import { Scene_RadiationPenetration } from './phase3/Scene_RadiationPenetration.js';
+import { Scene_MeasuringInstrument } from './phase3/Scene_MeasuringInstrument.js';
+import { Scene_PendulumTiming } from './phase3/Scene_PendulumTiming.js';
+import { Scene_VectorAdditionTriangle } from './phase3/Scene_VectorAdditionTriangle.js';
+import { Scene_ScaleVectorDrawing } from './phase3/Scene_ScaleVectorDrawing.js';
+import { Scene_MultipleMeasurementAverage } from './phase3/Scene_MultipleMeasurementAverage.js';
+import { Scene_RetrievalClassification } from './phase3/Scene_RetrievalClassification.js';
 
 export const registry = {
   Scene_TitleCard,
@@ -69,5 +75,11 @@ export const registry = {
   Scene_RayDiagram,
   Scene_OrbitalMotion,
   Scene_StarLifeCycle,
-  Scene_RadiationPenetration
+  Scene_RadiationPenetration,
+  Scene_MeasuringInstrument,
+  Scene_PendulumTiming,
+  Scene_VectorAdditionTriangle,
+  Scene_ScaleVectorDrawing,
+  Scene_MultipleMeasurementAverage,
+  Scene_RetrievalClassification
 };

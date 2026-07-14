@@ -8,7 +8,11 @@ The repo now includes a local dashboard for syllabus coverage, lesson preparatio
 python3 -m studio.server
 ```
 
-Open `http://127.0.0.1:8765`. See [`studio/README.md`](studio/README.md) and [`UI_IMPLEMENTATION_PLAN.md`](UI_IMPLEMENTATION_PLAN.md).
+Open `http://127.0.0.1:8765`. Keep the Terminal window open while the server runs, and press `Ctrl+C` in that same Terminal to stop it.
+
+If you get `OSError: [Errno 48] Address already in use`, another Studio process is already using port `8765`. Stop the old process or launch on a different port with `python3 -m studio.server --port 8877`.
+
+See [`studio/README.md`](studio/README.md) and [`UI_IMPLEMENTATION_PLAN.md`](UI_IMPLEMENTATION_PLAN.md).
 
 This utility recursively crawls:
 
@@ -74,7 +78,7 @@ Past-paper text and screenshots in the index are private research data and are n
 
 ## Build IGCSE Physics videos topic by topic
 
-The repository also contains a manual, curriculum-controlled video engine. It combines the 58-topic/328-objective syllabus registry, private aggregate question-pattern research, 35 reusable physics animation scenes, and a complete narration-to-MP4 Template Lab pipeline.
+The repository also contains a manual, curriculum-controlled video engine. It combines a 58-topic/328-row raw syllabus extraction (324 teachable objectives after removing section headings), private aggregate question-pattern research, 41 reusable physics animation scenes, and a complete narration-to-MP4 Template Lab pipeline.
 
 ```bash
 python3 -m video_engine.cli init
@@ -83,4 +87,4 @@ python3 -m video_engine.cli next-topic
 python3 -m video_engine.cli prepare-topic 1.1
 ```
 
-Read [`END_TO_END_README.md`](END_TO_END_README.md) for installation and the complete generation, preview, render, review, and coverage workflow. Publication remains manual.
+Read [`END_TO_END_README.md`](END_TO_END_README.md) for installation and the complete generation, preview, render, review, and coverage workflow. For a stage-by-stage account of scene selection, recipe compilation, slowdown diagnosis, and low-engagement repair, see [`SCENE_GENERATION_PIPELINE_README.md`](SCENE_GENERATION_PIPELINE_README.md). Publication remains manual.

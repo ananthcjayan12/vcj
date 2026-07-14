@@ -122,6 +122,25 @@ class MavValidateV3Test(unittest.TestCase):
         self.assertIn('.mav-v3-scene[data-scene-id="scene_01"] .pitch-line', html)
         self.assertEqual(validate_v3_plan(repaired), [])
 
+    def test_typed_recipe_scene_does_not_require_generated_html(self) -> None:
+        plan = {
+            "scenes": [{
+                "id": "scene_04",
+                "renderer": "recipe",
+                "start": 0,
+                "duration": 6,
+                "recipe": {
+                    "id": "measurement_ruler",
+                    "workbench": "Measurement and apparatus",
+                    "layout": "instrument_demo",
+                    "nodes": [{"id": "ruler", "type": "ruler", "x": .2, "y": .3, "width": .6, "height": .2}],
+                    "actions": [{"target": "ruler", "type": "reveal", "at": .1, "duration": .1}],
+                },
+            }]
+        }
+
+        self.assertEqual(validate_v3_plan(plan), [])
+
 
 if __name__ == "__main__":
     unittest.main()

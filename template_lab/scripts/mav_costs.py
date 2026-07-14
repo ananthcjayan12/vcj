@@ -118,6 +118,7 @@ def _summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     priced_total = 0.0
     unpriced_records = 0
     by_task: dict[str, dict[str, Any]] = {}
+    by_provider_model: dict[str, dict[str, Any]] = {}
     for record in records:
         task = str(record.get("task") or record.get("provider") or "unknown")
         item = by_task.setdefault(
@@ -144,7 +145,21 @@ def _summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         else:
             item["estimated_cost_usd"] += float(cost)
             priced_total += float(cost)
+        provider_model = f"{record.get('provider') or 'unknown'}:{record.get('model') or 'unknown'}"
+        model_item = by_provider_model.setdefault(
+            provider_model,
+            {"calls": 0, "input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "audio_chars": 0, "estimated_cost_usd": 0.0, "unpriced_calls": 0},
+        )
+        model_item["calls"] += 1
+        for key in ("input_tokens", "cached_input_tokens", "output_tokens", "total_tokens", "audio_chars"):
+            model_item[key] += int(record.get(key) or 0)
+        if cost is None:
+            model_item["unpriced_calls"] += 1
+        else:
+            model_item["estimated_cost_usd"] += float(cost)
     for item in by_task.values():
+        item["estimated_cost_usd"] = round(float(item["estimated_cost_usd"]), 6)
+    for item in by_provider_model.values():
         item["estimated_cost_usd"] = round(float(item["estimated_cost_usd"]), 6)
     return {
         "version": "1.0",
@@ -152,7 +167,14 @@ def _summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "estimated_cost_usd": round(priced_total, 6),
         "priced_records": len(records) - unpriced_records,
         "unpriced_records": unpriced_records,
+        "calls": len(records),
+        "input_tokens": sum(int(record.get("input_tokens") or 0) for record in records),
+        "cached_input_tokens": sum(int(record.get("cached_input_tokens") or 0) for record in records),
+        "output_tokens": sum(int(record.get("output_tokens") or 0) for record in records),
+        "total_tokens": sum(int(record.get("total_tokens") or 0) for record in records),
+        "audio_chars": sum(int(record.get("audio_chars") or 0) for record in records),
         "by_task": by_task,
+        "by_provider_model": by_provider_model,
         "note": "Costs are estimates from configured pricing. Records remain useful for token/character accounting even when pricing is unconfigured.",
     }
 

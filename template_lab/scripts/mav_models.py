@@ -19,6 +19,30 @@ GEMINI_TIMEOUT_MILLISECONDS = 600_000
 ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 MOONSHOT_CHAT_COMPLETIONS_URL = "https://api.moonshot.ai/v1/chat/completions"
 SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot"}
+GEMINI_JSON_SCHEMA_KEYS = {
+    "$id",
+    "$defs",
+    "$ref",
+    "$anchor",
+    "type",
+    "format",
+    "title",
+    "description",
+    "enum",
+    "items",
+    "prefixItems",
+    "minItems",
+    "maxItems",
+    "minimum",
+    "maximum",
+    "anyOf",
+    "oneOf",
+    "properties",
+    "additionalProperties",
+    "required",
+    "propertyOrdering",
+}
+GEMINI_MAX_SCHEMA_ENUM_VALUES = 20
 
 
 @dataclass(frozen=True)
@@ -629,6 +653,40 @@ def _gemini_usage(response: Any) -> dict[str, Any]:
     return payload
 
 
+def _gemini_compatible_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Return the documented Gemini JSON-Schema subset at safe complexity.
+
+    The animation registry is also our authoritative local validator, so large
+    classification enums and unsupported presentation constraints can be
+    removed from the provider schema without weakening the pipeline boundary.
+    """
+
+    def clean(node: Any) -> Any:
+        if isinstance(node, list):
+            return [clean(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+
+        compatible: dict[str, Any] = {}
+        for key, value in node.items():
+            if key not in GEMINI_JSON_SCHEMA_KEYS:
+                continue
+            if key in {"properties", "$defs"} and isinstance(value, dict):
+                compatible[key] = {name: clean(child) for name, child in value.items()}
+                continue
+            if key == "enum" and isinstance(value, list) and len(value) > GEMINI_MAX_SCHEMA_ENUM_VALUES:
+                continue
+            compatible[key] = clean(value)
+        return compatible
+
+    return clean(schema)
+
+
+def _is_gemini_invalid_argument(exc: Exception) -> bool:
+    message = str(exc).upper()
+    return "INVALID_ARGUMENT" in message or "INVALID ARGUMENT" in message
+
+
 def _call_gemini_json(
     resolved: ResolvedModelConfig,
     *,
@@ -647,7 +705,7 @@ def _call_gemini_json(
         "http_options": http_options,
     }
     if output_schema is not None:
-        config_payload["response_json_schema"] = output_schema
+        config_payload["response_json_schema"] = _gemini_compatible_json_schema(output_schema)
 
     client = genai.Client(api_key=_api_key_for_provider("gemini"), http_options=http_options)
     try:
@@ -657,7 +715,30 @@ def _call_gemini_json(
             config=types.GenerateContentConfig(**config_payload),
         )
     except Exception as exc:
-        raise RuntimeError(f"Gemini {resolved.task} call failed: {exc}") from exc
+        if output_schema is None or not _is_gemini_invalid_argument(exc):
+            raise RuntimeError(f"Gemini {resolved.task} call failed: {exc}") from exc
+
+        # Some model revisions impose a lower undocumented schema-complexity
+        # ceiling. JSON MIME mode still guarantees a JSON response, after which
+        # the task-specific local validator enforces the authoritative schema.
+        print(
+            f"MAV model warning: Gemini rejected the {resolved.task} response schema; "
+            "retrying once in JSON mode with strict local validation.",
+            file=sys.stderr,
+            flush=True,
+        )
+        fallback_payload = dict(config_payload)
+        fallback_payload.pop("response_json_schema", None)
+        try:
+            response = client.models.generate_content(
+                model=resolved.model,
+                contents=user,
+                config=types.GenerateContentConfig(**fallback_payload),
+            )
+        except Exception as fallback_exc:
+            raise RuntimeError(
+                f"Gemini {resolved.task} call failed after response-schema fallback: {fallback_exc}"
+            ) from fallback_exc
 
     finish_reasons = _gemini_finish_reasons(response)
     joined_reasons = ",".join(finish_reasons).upper()

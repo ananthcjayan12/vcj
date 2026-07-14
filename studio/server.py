@@ -34,6 +34,7 @@ OBJECTIVES_PATH = CURRICULUM_ROOT / "objectives.json"
 COVERAGE_PATH = CURRICULUM_ROOT / "coverage_registry.json"
 ASSETS_PATH = REGISTRY_ROOT / "animation_assets.json"
 VIDEOS_PATH = REGISTRY_ROOT / "videos.json"
+MODEL_MAP_PATH = TEMPLATE_LAB_ROOT / "prompts" / "prompt_model_mapping.json"
 
 STEP_NAMES = ("Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA")
 PAID_STEPS = {2, 3, 5}
@@ -79,6 +80,50 @@ def _require_topic_ref(topic_ref: str) -> str:
 
 def _run_dir(run_id: str) -> Path:
     return RUNS_ROOT / _require_run_id(run_id)
+
+
+def model_map_payload() -> dict[str, Any]:
+    payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
+    tasks = []
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder"}
+    for task, config in payload.get("tasks", {}).items():
+        provider_models = dict(config.get("provider_models") or {})
+        provider_models.setdefault(str(config.get("provider")), str(config.get("model")))
+        tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
+    tasks.append({"task": "audio_generation", "label": labels["audio_generation"], "step": 3, "provider": "gemini", "model": os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview"), "provider_models": {"gemini": "gemini-3.1-flash-tts-preview", "elevenlabs": os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3")}, "prompt_files": [], "max_tokens": None})
+    return {"version": payload.get("version"), "tasks": sorted(tasks, key=lambda item: (item.get("step") or 99, item["task"]))}
+
+
+def _validate_task_models(value: Any) -> dict[str, dict[str, str]]:
+    if value in (None, {}):
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("Task model overrides must be an object")
+    catalog = {item["task"]: item for item in model_map_payload()["tasks"]}
+    overrides: dict[str, dict[str, str]] = {}
+    for task, selection in value.items():
+        if task not in catalog or not isinstance(selection, dict):
+            raise ValueError(f"Unsupported model task: {task}")
+        provider = str(selection.get("provider", "")).strip().lower()
+        model = str(selection.get("model", "")).strip()
+        allowed = catalog[task]["provider_models"]
+        if provider not in allowed or model != allowed[provider]:
+            raise ValueError(f"Unsupported model selection for {task}: {provider}:{model}")
+        overrides[task] = {"provider": provider, "model": model}
+    return overrides
+
+
+def update_run_models(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    meta = _load_meta(run_id)
+    with _process_lock:
+        process = _processes.get(run_id)
+        if process and process.poll() is None:
+            raise RuntimeError("Stop the active process before changing its model map")
+    meta.setdefault("settings", {})["task_models"] = _validate_task_models(payload.get("task_models"))
+    _append_log(run_id, "Prompt/model map updated")
+    _save_meta(meta)
+    return run_detail(run_id)
 
 
 def _meta_path(run_id: str) -> Path:
@@ -230,12 +275,16 @@ def _infer_step(run_path: Path) -> int:
         "scene_plan_v3.json",
         "validation/plan_validation_v3.json",
         "preview_manifest_v3.json",
-        "generation_summary.json",
     )
     completed = 0
     for index, marker in enumerate(markers, 1):
         if (run_path / marker).exists():
             completed = index
+    summary = _read_json(run_path / "generation_summary.json", {}) or {}
+    if summary.get("stopped_after_step") is not None:
+        completed = max(completed, max(0, min(int(summary["stopped_after_step"]), 8)))
+    elif summary.get("visual_qa") is not None and (run_path / "preview_manifest_v3.json").exists():
+        completed = 8
     return completed
 
 
@@ -286,13 +335,25 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
             "duration": scene.get("duration"),
             "beat_label": scene.get("beat_label", ""),
             "narration_text": scene.get("narration_text", ""),
+            "renderer": scene.get("renderer", "v3_custom"),
+            "route": scene.get("route", "custom"),
+            "module": (scene.get("module") or {}).get("scene"),
+            "routing": scene.get("routing", {}),
         }
         for scene in scenes_payload.get("scenes", [])
     ]
     files = []
     for relative in (
-        "input.json", "story_skeleton.json", "narration.json", "voiceover.mp3", "audio_timing.json",
+        "input.json", "story_skeleton.json", "narration.json", "narration.txt",
+        "narration_elevenlabs.txt", "voiceover.mp3", "audio_generation.json", "audio_timing.json",
+        "audio_word_timestamps.json",
         "scene_plan_v3.json", "preview_manifest_v3.json", "generation_summary.json", "render_report.json",
+        "scene_routes.json", "asset_index_used.json", "asset_shortlist.json", "asset_catalog_used.json",
+        "debug/scene_asset_shortlister_request.json", "debug/scene_asset_router_request.json",
+        "debug/script_generation_debug.json", "debug/narration_model_raw.json",
+        "debug/narration_normalized.json", "debug/narration_validation.json",
+        "debug/step_02_script.json", "validation/plan_validation_v3.json",
+        "validation/v3_repair_report.json", "costs/summary.json", "costs/model_usage.json",
     ):
         if (run_path / relative).exists():
             files.append(relative)
@@ -303,6 +364,10 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "mp4_url": f"/artifacts/runs/{run_id}/{Path(output).relative_to(run_path)}" if output and Path(output).is_relative_to(run_path) else None,
         "summary": _read_json(run_path / "generation_summary.json", {}) or {},
         "validation": _read_json(run_path / "validation" / "plan_validation_v3.json", {}) or {},
+        "cost_summary": _read_json(run_path / "costs" / "summary.json", {}) or {},
+        "usage_records": (_read_json(run_path / "costs" / "model_usage.json", {}) or {}).get("records", []),
+        "routing_summary": scenes_payload.get("routing_summary", {}),
+        "asset_shortlist": _read_json(run_path / "asset_shortlist.json", {}) or {},
     }
 
 
@@ -310,6 +375,7 @@ def run_detail(run_id: str) -> dict[str, Any]:
     meta = _load_meta(run_id)
     meta["current_step"] = max(int(meta.get("current_step", 0)), _infer_step(_run_dir(run_id)))
     meta["artifacts"] = _artifact_snapshot(run_id)
+    meta["model_map"] = model_map_payload()
     with _process_lock:
         process = _processes.get(run_id)
         meta["process_active"] = bool(process and process.poll() is None)
@@ -361,8 +427,10 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         facts_path = REPO_ROOT / facts_path
     if not facts_path.exists():
         raise FileNotFoundError(facts_path)
+    task_models = _validate_task_models(request.get("task_models", settings.get("task_models", {})))
+    audio_selection = task_models.get("audio_generation", {})
     provider = str(settings.get("model_provider", "gemini"))
-    audio_provider = str(settings.get("audio_provider", "gemini"))
+    audio_provider = str(audio_selection.get("provider") or settings.get("audio_provider", "gemini"))
     if provider not in MODEL_PROVIDERS:
         raise ValueError("Unsupported model provider")
     if audio_provider not in AUDIO_PROVIDERS:
@@ -388,6 +456,13 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
             raise ValueError("Invalid scene ID")
         command.extend(["--v3-scene-id", str(scene_id)])
     env = os.environ.copy()
+    for task, selection in task_models.items():
+        if task == "audio_generation":
+            env["GEMINI_TTS_MODEL" if selection["provider"] == "gemini" else "ELEVENLABS_MODEL_ID"] = selection["model"]
+            continue
+        prefix = f"MAV_{task.upper()}"
+        env[f"{prefix}_PROVIDER"] = selection["provider"]
+        env[f"{prefix}_MODEL"] = selection["model"]
     instruction = str(request.get("custom_instruction", "")).strip()
     if instruction:
         env["MAV_SCENE_REGEN_INSTRUCTION" if scene_id else "MAV_STEP_REGEN_INSTRUCTION"] = instruction
@@ -468,6 +543,7 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
         "audio_provider": payload.get("audio_provider", "gemini"),
         "scene_concurrency": max(1, min(int(payload.get("scene_concurrency", 1)), 8)),
         "confirm_paid_api": bool(payload.get("confirm_paid_api", False)),
+        "task_models": _validate_task_models(payload.get("task_models")),
     }
     meta = {
         "id": run_id,
@@ -492,6 +568,9 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
 
 def execute_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     meta = _load_meta(run_id)
+    if "task_models" in payload:
+        meta.setdefault("settings", {})["task_models"] = _validate_task_models(payload.get("task_models"))
+        _save_meta(meta)
     command, env = build_generation_command(meta, payload)
     return _start_process(run_id, command, env, mode="generation", target_step=int(payload.get("stop_after_step", 8)))
 
@@ -603,6 +682,8 @@ class StudioHandler(BaseHTTPRequestHandler):
                 return self._json(_read_json(ASSETS_PATH, {"scenes": []}))
             if path == "/api/runs":
                 return self._json({"runs": list_runs()})
+            if path == "/api/model-map":
+                return self._json(model_map_payload())
             match = re.fullmatch(r"/api/topics/([^/]+)", path)
             if match:
                 return self._json(topic_detail(match.group(1)))
@@ -646,6 +727,9 @@ class StudioHandler(BaseHTTPRequestHandler):
             match = re.fullmatch(r"/api/runs/([^/]+)/execute", path)
             if match:
                 return self._json({"run": execute_run(match.group(1), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/models", path)
+            if match:
+                return self._json({"run": update_run_models(match.group(1), body)})
             match = re.fullmatch(r"/api/runs/([^/]+)/scenes/([^/]+)/regenerate", path)
             if match:
                 body.update({"from_step": 5, "stop_after_step": 8, "target_scene_id": match.group(2), "force_paid_api": True})

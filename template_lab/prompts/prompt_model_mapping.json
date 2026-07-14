@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "description": "The four active model tasks in the Physics V3 lesson pipeline.",
+  "description": "The seven active model tasks in the Physics V3 lesson pipeline.",
   "tasks": {
     "script_structure": {
       "provider": "gemini",
@@ -25,6 +25,42 @@
       "provider_env_var": "MAV_SCRIPT_WRITING_PROVIDER",
       "env_var": "MAV_SCRIPT_WRITING_MODEL",
       "prompt_files": ["script_writing.system.txt", "script_writing.user.txt"]
+    },
+    "scene_asset_shortlister": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "provider_models": {
+        "gemini": "gemini-3.1-flash-lite",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 4000,
+      "provider_env_var": "MAV_SCENE_ASSET_SHORTLISTER_PROVIDER",
+      "env_var": "MAV_SCENE_ASSET_SHORTLISTER_MODEL",
+      "prompt_files": ["scene_asset_shortlister.system.txt"]
+    },
+    "scene_asset_router": {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash",
+      "provider_models": {
+        "gemini": "gemini-3.5-flash",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 12000,
+      "provider_env_var": "MAV_SCENE_ASSET_ROUTER_PROVIDER",
+      "env_var": "MAV_SCENE_ASSET_ROUTER_MODEL",
+      "prompt_files": ["scene_asset_router.system.txt"]
+    },
+    "module_parameterizer": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "provider_models": {
+        "gemini": "gemini-3.1-flash-lite",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 12000,
+      "provider_env_var": "MAV_MODULE_PARAMETERIZER_PROVIDER",
+      "env_var": "MAV_MODULE_PARAMETERIZER_MODEL",
+      "prompt_files": ["module_parameterizer.system.txt"]
     },
     "v3_creative_director": {
       "provider": "zai",

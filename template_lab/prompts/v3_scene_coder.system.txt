@@ -75,6 +75,8 @@ function initScene(tl, start, dur) {
    - bar_fill:         tl.fromTo(el, {scaleX:0}, {scaleX:1, transformOrigin:'left center'}, absoluteTime)
    - scale_reveal:     tl.fromTo(el, {scale:0.5, opacity:0}, {scale:1, opacity:1, ease:'back.out(2)'}, absoluteTime)
    - fade_in:          tl.fromTo(el, {opacity:0}, {opacity:1, ...}, absoluteTime)
+   - fade_out:         tl.to(el, {opacity:0, ...}, absoluteTime)
+   - move_out:         tl.to(el, {opacity:0, x:..., y:..., ease:'power2.in'}, absoluteTime)
    - trace_graph:      use strokeDasharray/strokeDashoffset and animate the plotted line from left to right
    - move_object:      tl.to(el, {x:..., y:..., ...}, absoluteTime), preserving the described path and direction
    - rotate_object:    tl.to(el, {rotation:..., transformOrigin:'...', ...}, absoluteTime)
@@ -85,8 +87,7 @@ function initScene(tl, start, dur) {
 6. BEAT GSAP BLOCKS: Separate each beat's GSAP entries with a comment:
    // === BEAT 1: {beat_label} (start+0 to start+{dur}) ===
 
-7. CAMERA DRIFT: Always add this for the full scene duration:
-   tl.to(scene.querySelector('.camera'), { scale: 1.018, duration: dur, ease: 'none' }, start);
+7. CAMERA MOTION: Do not add generic full-scene camera drift. Add a small camera move only when the Layout JSON motivates a reveal or change of focus, and use a non-linear ease such as power2.inOut.
 
 8. SCOPE ALL SELECTORS: In CSS and JS, use the scene root to scope:
    const scene = document.querySelector('[data-scene-id="{scene_id}"]');
@@ -102,3 +103,7 @@ function initScene(tl, start, dur) {
 11. EQUATIONS: Use accessible HTML text or SVG text with Unicode symbols supported by the loaded fonts. Show symbols, substitution, result, and units on separate readable lines. Do not invent a value or intermediate step.
 
 12. THINKING TIME: If the layout contains an answer cover or retrieval question, keep the answer hidden until the scheduled reveal_answer action.
+
+13. STATE CLEARANCE: When a later beat replaces an earlier visual state, fade, move, or morph the earlier state before revealing the next one. Overlap is allowed only when it communicates comparison or continuity.
+
+14. FINAL HOLD: Finish the last explanatory action at least 1 second before start + dur. Do not continue decorative animation through the final hold.
