@@ -1,5 +1,21 @@
 # Physics Production Studio — End-to-End Operator Guide
 
+## Motion Canvas step-by-step UI
+
+Start the Studio with `./run_on_mac.command` or `python3 -m studio.server`, then open the local URL printed in the terminal. The production UI now creates only narration-driven Motion Canvas runs.
+
+1. Choose a syllabus topic and prepare its lesson packet.
+2. Set the run ID, duration, script model, voice provider, and chapter workers.
+3. Enable paid API confirmation and click **Create run**. Creation itself does not spend API credit.
+4. Click a numbered stage card or use **Run selected step** to execute exactly one stage.
+5. Open the generated artifacts and inspect the process log before continuing.
+6. At step 6, review the deterministic contact sheet and require the compile/browser report to pass.
+7. Use step 7 for human review and step 8 for approval, then click **Render MP4**.
+
+Paid stages are narration (2), voiceover (3), and chapter generation (5). Inputs (1), word timing (4), compile/browser QA (6), review (7), approval (8), and rendering an accepted run are local. Rerunning chapter generation preserves successful cached batches.
+
+Use **Regenerate from step** when an earlier artifact must be replaced. It removes the selected stage and all downstream artifacts, resets the recorded progress, and immediately starts that stage again. Use **Delete run** to remove an entire run directory—including audio, timestamps, prompts, responses, chapters, previews, validation evidence, and renders—before recreating the same run ID from step 1. Both destructive actions require an explicit UI confirmation and are disabled while a process is running.
+
 The Physics Production Studio is the manual control room for producing one high-quality IGCSE Physics lesson at a time. It combines the syllabus map, curriculum coverage registry, aggregate past-paper patterns, reusable animation assets, AI-assisted lesson generation, preview, scene repair, and MP4 rendering in one local interface.
 
 The Studio does **not** publish videos or run on a daily schedule. You choose a topic, supervise its production, approve the result, render it, upload it manually, and then update curriculum coverage.

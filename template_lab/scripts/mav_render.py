@@ -21,6 +21,8 @@ from direct_html.render_adapter import animation_mode_for_run, composition_for_r
 from mav_build_preview_v3 import build_preview_v3
 from mav_schema import LAB_ROOT, read_json, run_dir, write_json
 
+MOTION_CANVAS_MODE = "motion-canvas"
+
 
 _AUDIO_TAG_RE = re.compile(r"\n\s*<audio\b[^>]*\bid=[\"']mav-audio[\"'][^>]*>\s*</audio>", re.IGNORECASE)
 HYPERFRAMES_BIN = LAB_ROOT / "node_modules" / ".bin" / "hyperframes"
@@ -237,16 +239,26 @@ def render_mp4(
     keep_visual: bool = False,
     animation_mode: str | None = None,
 ) -> Path:
+    run_path = run_dir(run_id)
+    selected_mode = animation_mode or animation_mode_for_run(run_path)
+    if selected_mode == MOTION_CANVAS_MODE:
+        from motion_canvas.pipeline import render_video
+        result = render_video(run_path)
+        rendered = Path(result["output"])
+        output_path = (output or rendered).expanduser().resolve()
+        if output_path != rendered.resolve():
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(rendered, output_path)
+        write_json(run_path / "render_report.json", {"run_id": run_id, "animation_mode": selected_mode, "output": str(output_path), "visual_renderer": "motion-canvas"})
+        return output_path
     hyperframes_env = _hyperframes_env()
     _require_hyperframes_node(hyperframes_env)
     _require_binary("ffmpeg")
     _require_binary("ffprobe")
 
-    run_path = run_dir(run_id)
     voiceover_path = run_path / "voiceover.mp3"
     if not voiceover_path.exists():
         raise RuntimeError(f"Missing voiceover audio: {voiceover_path}")
-    selected_mode = animation_mode or animation_mode_for_run(run_path)
     if selected_mode == LEGACY_MODE:
         scene_plan_path = run_path / "scene_plan_v3.json"
         if not scene_plan_path.exists():
@@ -336,7 +348,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quality", choices=("draft", "standard", "high"), default="standard")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--keep-visual", action="store_true", help="Keep the intermediate video-only MP4.")
-    parser.add_argument("--animation-mode", choices=(DIRECT_HTML_MODE, LEGACY_MODE), help="Override the run's stored animation mode.")
+    parser.add_argument("--animation-mode", choices=(DIRECT_HTML_MODE, MOTION_CANVAS_MODE, LEGACY_MODE), help="Override the run's stored animation mode.")
     return parser.parse_args()
 
 

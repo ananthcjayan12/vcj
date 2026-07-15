@@ -1,6 +1,8 @@
 # Physics Template Lab
 
-This is the repo-local physics production pipeline. It accepts grounded educational fact packets and creates student-friendly IGCSE lesson videos through either the comparison-safe legacy route or the new integrated direct-HTML route.
+This is the repo-local physics production pipeline. It accepts grounded educational fact packets and creates student-friendly IGCSE lesson videos through the comparison-safe legacy route, integrated direct-HTML route, or narration-driven Motion Canvas route.
+
+Motion Canvas production is selected with `--animation-mode motion-canvas`. It consumes the exact voiceover and word timestamps from steps 3–4, then writes deterministic manifests, cached two-chapter generation batches, strict TSX validation evidence, and locally assembled `scenes.ts` under `runs/<run-id>/motion_canvas/`. Paid calls require `--use-model --confirm-paid-api`; accepted caches are preserved. The pinned editor scaffold is in `motion_canvas_runtime/`.
 
 Pipeline stages:
 

@@ -68,3 +68,13 @@ template_lab/runs/
 template_lab/renders/
 video_engine/topics/
 video_engine/output/
+
+# Motion Canvas installed dependencies and deterministic render artifacts
+motion_canvas_runtime/node_modules/
+motion_canvas_runtime/dist/
+motion_canvas_runtime/public/
+motion_canvas_runtime/src/generated/
+motion_canvas_runtime/runs/
+motion_canvas_runtime/.vite/
+motion_canvas_runtime/*.tsbuildinfo
+motion_canvas_runtime/src/*.meta

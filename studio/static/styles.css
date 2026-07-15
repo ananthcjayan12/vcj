@@ -86,5 +86,15 @@ h1,h2,h3,p { margin-top: 0; }.topbar h1 { margin: 0; font-size: 22px; letter-spa
 .chapter-row p { white-space: normal; }
 .chapter-row p small { margin-top: 5px; color: var(--faint); display: block; font: 7px/1.35 ui-monospace, monospace; }
 .run-settings-summary { display: block; margin-top: 7px; color: var(--faint); font-size: 8px; text-transform: capitalize; }
+.preview-image-link { min-height: 270px; padding: 14px; background: #07111f; display: grid; place-items: center; }
+.preview-frame.preview-image { width: 100%; height: auto; aspect-ratio: auto; object-fit: contain; display: block; }
+.editor-preview { min-height: 560px; aspect-ratio: 16/10; background: #07111f; }
+.preview-launch { gap: 14px; align-content: center; text-align: center; }
+.preview-launch span { max-width: 420px; line-height: 1.6; }
+.validation-evidence-link { margin-bottom: 8px; padding: 8px; border: 1px solid rgba(73,224,176,.2); border-radius: 6px; color: var(--green); background: var(--green-soft); display: block; font-size: 8px; text-decoration: none; }
+.flow-note { align-self: center; max-width: 290px; color: var(--green); font-size: 9px; line-height: 1.4; }
+.control-help { margin: 8px 0 0; color: var(--faint); font-size: 8px; line-height: 1.45; }
+.run-control-card .step-control:has(#regenerate-step) { grid-template-columns: 1fr 1fr; }
+.run-control-card .step-control:has(#regenerate-step) #regenerate-step { grid-column: 1 / -1; }
 @media (max-width: 860px) { .chapter-row { grid-template-columns: 75px minmax(0,1fr); }.chapter-row .scene-note,.chapter-row button { grid-column: 1/-1; }.chapter-preview { width: 100%; max-width: 210px; } }
 @media (max-width: 560px) { .sidebar { overflow-x:auto; }.brand span:last-child { display:none; }.nav-item b { display:none; }.topbar { min-height:75px; }.syllabus-chip { display:none; }.stat-grid,.domain-grid,.asset-grid { grid-template-columns:1fr; }.detail-grid { padding:10px; }.form-grid { grid-template-columns:1fr 1fr; }.form-grid .field:first-child { grid-column:1/-1; }.form-actions { align-items:flex-start; flex-direction:column; }.button-row { width:100%; }.button-row button { flex:1; }.asset-hero { align-items:flex-start; flex-direction:column; }.asset-toolbar { flex-direction:column; }.asset-toolbar select { min-height:37px; }.stepper { grid-template-columns: repeat(2,1fr); } }

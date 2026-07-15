@@ -19,17 +19,15 @@
         <nav class="nav-list" aria-label="Studio navigation">
           <button class="nav-item is-active" data-view="production"><span>⌁</span><b>Production</b></button>
           <button class="nav-item" data-view="curriculum"><span>◫</span><b>Curriculum</b></button>
-          <button class="nav-item" data-view="assets"><span>◇</span><b>Scene library</b></button>
           <button class="nav-item" data-view="runs"><span>↻</span><b>Runs</b><em id="run-count">0</em></button>
         </nav>
 
         <div class="sidebar-spacer"></div>
         <div class="engine-card">
           <div class="engine-status"><i></i><span>Local engine</span><b>Ready</b></div>
-          <p>Physics V3 · 1920 × 1080</p>
+          <p>Motion Canvas · 1920 × 1080</p>
           <div class="provider-dots" id="provider-dots"></div>
         </div>
-        <a class="scene-link" href="/scene-library/" target="_blank" rel="noreferrer">Open animation browser <span>↗</span></a>
       </aside>
 
       <main class="main-shell">
@@ -80,18 +78,6 @@
             <div class="panel-heading"><div><p class="eyebrow">Complete syllabus</p><h2>Topic coverage</h2></div></div>
             <div class="curriculum-table" id="curriculum-table"></div>
           </section>
-        </section>
-
-        <section class="view" id="view-assets">
-          <div class="asset-hero panel">
-            <div><p class="eyebrow">Deterministic visual system</p><h2>Physics scene library</h2><p>Reusable, validated animations for equations, diagrams, experiments, graphs, and physical models.</p></div>
-            <a class="primary-button" href="/scene-library/" target="_blank" rel="noreferrer">Launch live browser ↗</a>
-          </div>
-          <div class="asset-toolbar">
-            <label class="search-box"><span>⌕</span><input id="asset-search" type="search" placeholder="Search 35 scenes"></label>
-            <select id="asset-category"><option value="">All categories</option></select>
-          </div>
-          <div class="asset-grid" id="asset-grid"></div>
         </section>
 
         <section class="view" id="view-runs">

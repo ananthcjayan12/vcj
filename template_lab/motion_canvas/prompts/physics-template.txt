@@ -1,0 +1,14 @@
+Structural reference only. Analytic physics inside a chapter must be pure and deterministic.
+
+```ts
+interface MotionState {
+  readonly time: number;
+  readonly position: {readonly x: number; readonly y: number};
+  readonly velocity: {readonly x: number; readonly y: number};
+}
+
+function stateAt(time: number): MotionState {
+  if (!Number.isFinite(time) || time < 0) throw new RangeError('time must be finite and non-negative');
+  return {time, position: {x: 0, y: 0}, velocity: {x: 0, y: 0}};
+}
+```

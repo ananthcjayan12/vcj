@@ -20,6 +20,9 @@ from direct_html.pipeline import (
     prepare_input as prepare_direct_html_input,
     validate_and_inspect as validate_and_inspect_direct_html,
 )
+from motion_canvas.pipeline import generate as generate_motion_canvas
+from motion_canvas.pipeline import prepare as prepare_motion_canvas
+from motion_canvas.pipeline import validate_and_assemble as validate_and_assemble_motion_canvas
 from mav_audio import generate_audio, is_live_audio_provider, resolve_audio_provider
 from mav_build_preview_v3 import build_preview_v3
 from mav_costs import cost_summary_for_run
@@ -49,6 +52,7 @@ STEP_LABELS = {
     7: "build_preview",
     8: "qa_handoff",
 }
+MOTION_CANVAS_MODE = "motion-canvas"
 
 
 def _model_requested(args: argparse.Namespace) -> bool:
@@ -168,6 +172,7 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         (use_model and ((from_step <= 2 <= stop_after_step) or (from_step <= 5 <= stop_after_step)))
         or (animation_mode == DIRECT_HTML_MODE and bool(getattr(args, "auto_repair", False)) and from_step <= 6 <= stop_after_step)
         or (is_live_audio_provider(audio_provider) and from_step <= 3 <= stop_after_step)
+        or (animation_mode == MOTION_CANVAS_MODE and use_model and from_step <= 5 <= stop_after_step)
     )
     if not use_model and from_step <= 2 <= stop_after_step:
         raise RuntimeError("Script generation requires --use-model, --use-gemini, or --use-claude.")
@@ -284,6 +289,22 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         if (path / "audio_word_timestamps.json").exists():
             artifacts.append("audio_word_timestamps.json")
         return _step_summary(input_payload, path, 4, artifacts, audio_duration_seconds=timing["audio_duration_seconds"])
+
+    if animation_mode == MOTION_CANVAS_MODE:
+        if from_step <= 5:
+            manifest = prepare_motion_canvas(path, narration)
+            generation = generate_motion_canvas(path, manifest, allow_model_call=use_model, force=bool(args.force_paid_api), workers=int(os.getenv("MAV_MOTION_CANVAS_WORKERS", "2")))
+        else:
+            manifest = _read_cached_json(path / "motion_canvas" / "manifest.json", "Motion Canvas manifest")
+            generation = _read_cached_json(path / "motion_canvas" / "generation-report.json", "Motion Canvas generation report")
+        if stop_after_step == 5:
+            return _step_summary(input_payload, path, 5, ["motion_canvas/manifest.json", "motion_canvas/generation-report.json", "motion_canvas/chapters"], mode=MOTION_CANVAS_MODE, chapters=len(manifest["chapters"]))
+        validation = validate_and_assemble_motion_canvas(path, manifest)
+        if stop_after_step == 6:
+            return _step_summary(input_payload, path, 6, ["motion_canvas/robot-report.json", "motion_canvas/validation.json", "motion_canvas/preview/contact-sheet.png", "motion_canvas/scenes.ts"], mode=MOTION_CANVAS_MODE, chapters=len(manifest["chapters"]), validation=validation["status"])
+        summary = {"run_id": input_payload["run_id"], "mode": MOTION_CANVAS_MODE, "animation_mode": MOTION_CANVAS_MODE, "run_path": str(path), "audio_duration_seconds": timing["audio_duration_seconds"], "scenes": len(manifest["chapters"]), "generation": generation["status"], "validation": validation["status"], "manual_review": "required", "preview": "motion_canvas_runtime", "mp4": "not rendered"}
+        write_json(path / "generation_summary.json", summary)
+        return summary
 
     if animation_mode == DIRECT_HTML_MODE:
         _log(
@@ -510,7 +531,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--v3", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--animation-mode",
-        choices=(DIRECT_HTML_MODE, LEGACY_MODE),
+        choices=(DIRECT_HTML_MODE, MOTION_CANVAS_MODE, LEGACY_MODE),
         default=LEGACY_MODE,
         help="Visual production route. Legacy remains the default until the direct-HTML rollout gates pass.",
     )

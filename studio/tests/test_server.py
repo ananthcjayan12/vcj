@@ -9,15 +9,15 @@ from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _infer_step, _normalized_meta, _require_run_id, build_generation_command, build_server, dashboard_payload, model_map_payload, topic_detail
+from studio.server import _infer_step, _normalized_meta, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, model_map_payload, reset_run_from_step, topic_detail
 
 
 class StudioPayloadTest(unittest.TestCase):
     def test_dashboard_exposes_complete_curriculum_and_scene_catalog(self) -> None:
         payload = dashboard_payload()
         self.assertEqual(payload["summary"]["topic_count"], 58)
-        self.assertEqual(payload["summary"]["objective_count"], 328)
-        self.assertEqual(payload["summary"]["scene_count"], 35)
+        self.assertEqual(payload["summary"]["objective_count"], 324)
+        self.assertEqual(payload["summary"]["scene_count"], 41)
         self.assertEqual(payload["next_topic"]["ref"], "1.1")
 
     def test_topic_detail_uses_aggregate_assessment_evidence(self) -> None:
@@ -71,7 +71,7 @@ class StudioPayloadTest(unittest.TestCase):
 
     def test_model_map_covers_all_paid_pipeline_tasks(self) -> None:
         tasks = {item["task"] for item in model_map_payload()["tasks"]}
-        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "scene_asset_shortlister", "scene_asset_router", "module_parameterizer", "v3_creative_director", "v3_scene_coder", "direct_html_composer", "direct_html_repair", "direct_html_review"})
+        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "motion_canvas_batch"})
 
     def test_generation_summary_uses_actual_stopped_step(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -83,8 +83,8 @@ class StudioPayloadTest(unittest.TestCase):
     def test_completed_generation_summary_infers_qa_step(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run_path = Path(directory)
-            (run_path / "preview_manifest_v3.json").write_text("{}")
-            (run_path / "generation_summary.json").write_text(json.dumps({"visual_qa": "skipped"}))
+            (run_path / "motion_canvas").mkdir()
+            (run_path / "motion_canvas" / "final.mp4").write_bytes(b"video")
             self.assertEqual(_infer_step(run_path), 8)
 
     def test_existing_run_metadata_backfills_facts_and_paid_settings(self) -> None:
@@ -103,8 +103,34 @@ class StudioPayloadTest(unittest.TestCase):
             normalized = _normalized_meta(run_path, {"id": "old-run", "settings": {}})
             self.assertEqual(normalized["facts_path"], "video_engine/topics/1.1/facts.json")
             self.assertEqual(normalized["settings"]["duration"], 300)
-            self.assertEqual(normalized["settings"]["animation_mode"], "direct-html")
-            self.assertFalse(normalized["settings"]["confirm_paid_api"])
+            self.assertEqual(normalized["settings"]["animation_mode"], "motion-canvas")
+            self.assertTrue(normalized["settings"]["confirm_paid_api"])
+
+    def test_reset_removes_selected_and_downstream_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
+            run_path = Path(directory) / "reset-test"
+            (run_path / "motion_canvas" / "preview").mkdir(parents=True)
+            (run_path / "input.json").write_text("{}")
+            (run_path / "narration.json").write_text("{}")
+            (run_path / "voiceover.mp3").write_bytes(b"audio")
+            (run_path / "audio_generation.json").write_text("{}")
+            (run_path / "audio_timing.json").write_text("{}")
+            (run_path / "audio_word_timestamps.json").write_text("{}")
+            (run_path / "motion_canvas" / "manifest.json").write_text('{"chapters": [], "batches": []}')
+            (run_path / "studio_run.json").write_text(json.dumps({"id": "reset-test", "facts_path": "video_engine/topics/1.1/facts.json", "status": "completed", "current_step": 8, "settings": {}}))
+            result = reset_run_from_step("reset-test", 5)
+            self.assertFalse((run_path / "motion_canvas").exists())
+            self.assertTrue((run_path / "audio_word_timestamps.json").exists())
+            self.assertEqual(result["current_step"], 4)
+            self.assertTrue(result["settings"]["confirm_paid_api"])
+
+    def test_delete_removes_complete_run_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
+            run_path = Path(directory) / "delete-test"
+            run_path.mkdir()
+            (run_path / "studio_run.json").write_text("{}")
+            self.assertEqual(delete_run("delete-test")["status"], "deleted")
+            self.assertFalse(run_path.exists())
 
 
 class StudioHttpTest(unittest.TestCase):
@@ -129,13 +155,15 @@ class StudioHttpTest(unittest.TestCase):
     def test_model_map_api(self) -> None:
         with urllib.request.urlopen(f"{self.base}/api/model-map", timeout=5) as response:
             payload = json.load(response)
-        self.assertEqual(len(payload["tasks"]), 11)
+        self.assertEqual(len(payload["tasks"]), 4)
 
     def test_static_application(self) -> None:
         with urllib.request.urlopen(f"{self.base}/", timeout=5) as response:
             html = response.read().decode("utf-8")
         self.assertIn("MAV Physics Studio", html)
         self.assertIn("Production workspace", html)
+        self.assertNotIn("Scene library", html)
+        self.assertIn("Motion Canvas", html)
 
     def test_scene_library_is_served_from_repo(self) -> None:
         with urllib.request.urlopen(f"{self.base}/scene-library/", timeout=5) as response:

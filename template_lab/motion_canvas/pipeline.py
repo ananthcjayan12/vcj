@@ -1,0 +1,252 @@
+"""MAV-native adaptation of the isolated Motion Canvas batch robot."""
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+DEFAULT_BATCH_SIZE = 2
+DEFAULT_WORKERS = 2
+RUNTIME_ROOT = Path(__file__).resolve().parents[2] / "motion_canvas_runtime"
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _write(path: Path, value: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(value.rstrip() + "\n", encoding="utf-8")
+
+
+def _write_json(path: Path, value: Any) -> None:
+    _write(path, json.dumps(value, indent=2, ensure_ascii=False))
+
+
+def _load(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def split_chapters(words_payload: dict[str, Any], narration: dict[str, Any] | None = None, *, cutoff: float | None = None) -> list[dict[str, Any]]:
+    """Reference `_chapter_segments`, generalized from two minutes to a MAV run."""
+    words = list(words_payload.get("words") or [])
+    if not words:
+        raise RuntimeError("Timestamp file contains no words")
+    available = float(words_payload.get("audio_duration_seconds") or words[-1]["end"])
+    selected = min(float(cutoff if cutoff is not None else available), available)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    order: list[str] = []
+    for word in words:
+        paragraph_id = str(word.get("paragraph_id") or "paragraph")
+        if paragraph_id not in grouped:
+            grouped[paragraph_id] = []
+            order.append(paragraph_id)
+        grouped[paragraph_id].append(word)
+    included = [paragraph_id for paragraph_id in order if float(grouped[paragraph_id][0]["start"]) < selected]
+    chapters: list[dict[str, Any]] = []
+    for index, paragraph_id in enumerate(included):
+        start = 0.0 if index == 0 else float(grouped[paragraph_id][0]["start"])
+        next_start = float(grouped[included[index + 1]][0]["start"]) if index + 1 < len(included) else selected
+        end = min(selected, next_start)
+        if end <= start:
+            continue
+        local_words = []
+        for word in grouped[paragraph_id]:
+            word_start = float(word["start"])
+            if word_start >= end:
+                break
+            local_words.append({
+                "word": str(word["word"]),
+                "start": round(max(0.0, word_start - start), 3),
+                "end": round(min(end, float(word["end"])) - start, 3),
+            })
+        chapters.append({
+            "id": paragraph_id, "scene_id": f"chapter_{len(chapters)+1:02d}",
+            "absolute_start": round(start, 3), "absolute_end": round(end, 3),
+            "duration": round(end - start, 3),
+            "narration": " ".join(item["word"] for item in local_words), "words": local_words,
+        })
+    return chapters
+
+
+def prepare(run_path: Path, narration: dict[str, Any] | None = None, *, batch_size: int = DEFAULT_BATCH_SIZE, duration: float | None = None) -> dict[str, Any]:
+    if batch_size < 1 or batch_size > 3:
+        raise RuntimeError("Batch size must be between 1 and 3")
+    audio_path, timestamps_path = run_path / "voiceover.mp3", run_path / "audio_word_timestamps.json"
+    if not audio_path.exists() or not timestamps_path.exists():
+        raise RuntimeError("Motion Canvas requires voiceover.mp3 and audio_word_timestamps.json")
+    timing = _load(timestamps_path)
+    available = float(timing.get("audio_duration_seconds") or (timing.get("words") or [{}])[-1].get("end", 0))
+    cutoff = min(float(duration if duration is not None else available), available)
+    chapters = split_chapters(timing, narration, cutoff=cutoff)
+    batches = []
+    for offset in range(0, len(chapters), batch_size):
+        members = chapters[offset:offset + batch_size]
+        batches.append({"id": f"batch_{len(batches)+1:02d}", "chapter_ids": [item["scene_id"] for item in members], "status": "pending"})
+    root = run_path / "motion_canvas"
+    manifest = {
+        "version": "1.0", "created_at": _now(), "source_audio": str(audio_path.resolve()),
+        "source_timestamps": str(timestamps_path.resolve()), "preview_duration": cutoff,
+        "batch_size": batch_size, "chapters": chapters, "batches": batches,
+    }
+    _write_json(root / "manifest.json", manifest)
+    shutil.copy2(audio_path, root / "voiceover.mp3")
+    return manifest
+
+
+def _batch_prompt(root: Path, manifest: dict[str, Any], batch: dict[str, Any]) -> tuple[str, str]:
+    prompt_root = Path(__file__).with_name("prompts")
+    system = (prompt_root / "batch.system.txt").read_text(encoding="utf-8")
+    approved = (prompt_root / "approved-api.md").read_text(encoding="utf-8")
+    chapter_by_id = {chapter["scene_id"]: chapter for chapter in manifest["chapters"]}
+    chapters = [chapter_by_id[chapter_id] for chapter_id in batch["chapter_ids"]]
+    markers = "\n".join(f"=== {chapter['scene_id']}.tsx ===" for chapter in chapters)
+    user = (
+        "OUTPUT MARKERS\nReturn these markers in this exact order, each followed by its complete TSX file:\n"
+        f"{markers}\n\nFIXED VISUAL THEME\nCanvas 1920x1080; background #07111f; panel #0e1d31; text #eaf3ff; muted #91a8c5; "
+        "cyan #46d9ff; amber #ffc857; coral #ff6b6b; minimum important text 30px. Motion Canvas origin is the CENTER at (0,0), "
+        "visible x=-960..960 and y=-540..540; keep complete important content inside x=-860..860 and y=-440..440. Do not use browser/top-left coordinates.\n\n"
+        f"APPROVED API\n{approved}\n\nBATCH CHAPTER DATA\n{json.dumps(chapters, ensure_ascii=False, separators=(',', ':'))}\n\n"
+        "The absolute timestamps describe placement in the original voiceover. Inside each independent scene, use the supplied local word times. "
+        "The sum of scene durations is assembled locally; do not add padding or transitions outside each supplied duration."
+    )
+    _write(root / "prompts" / f"{batch['id']}.txt", f"SYSTEM\n{system}\n\nUSER\n{user}")
+    return system, user
+
+
+def parse_response(response: str, chapter_ids: list[str]) -> dict[str, str]:
+    if "```" in response:
+        raise RuntimeError("Response contains Markdown fences")
+    pattern = "|".join(re.escape(f"=== {chapter_id}.tsx ===") for chapter_id in chapter_ids)
+    matches = list(re.finditer(pattern, response))
+    if len(matches) != len(chapter_ids):
+        raise RuntimeError(f"Expected {len(chapter_ids)} chapter markers, found {len(matches)}")
+    files = {}
+    for index, match in enumerate(matches):
+        expected = f"=== {chapter_ids[index]}.tsx ==="
+        if match.group(0) != expected:
+            raise RuntimeError("Chapter markers were returned out of order")
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(response)
+        content = response[match.end():end].strip()
+        if not content or "```" in content or "from 'http" in content or 'from "http' in content:
+            raise RuntimeError(f"Unsafe or empty chapter: {chapter_ids[index]}")
+        files[f"{chapter_ids[index]}.tsx"] = content
+    return files
+
+
+def assemble(run_path: Path, manifest: dict[str, Any]) -> Path:
+    root = run_path / "motion_canvas"
+    missing = [item["scene_id"] for item in manifest["chapters"] if not (root / "chapters" / f"{item['scene_id']}.tsx").exists()]
+    if missing:
+        raise RuntimeError(f"Cannot assemble; missing chapters: {missing}")
+    imports, names = [], []
+    for chapter in manifest["chapters"]:
+        scene_id = chapter["scene_id"]; variable = scene_id.replace("_", "")
+        imports.append(f"import {variable} from './chapters/{scene_id}?scene';"); names.append(variable)
+    path = root / "scenes.ts"
+    _write(path, "\n".join(imports) + f"\n\nexport const scenes = [{', '.join(names)}];")
+    return path
+
+
+def generate(run_path: Path, manifest: dict[str, Any], *, allow_model_call: bool, force: bool = False, workers: int = DEFAULT_WORKERS, model_call: Callable[..., str | None] | None = None) -> dict[str, Any]:
+    if workers < 1 or workers > 4:
+        raise RuntimeError("Workers must be between 1 and 4")
+    root = run_path / "motion_canvas"
+    if model_call is None:
+        from mav_models import call_model_text
+        model_call = call_model_text
+    def generate_batch(batch: dict[str, Any]) -> dict[str, Any]:
+        response_path = root / "responses" / f"{batch['id']}.txt"
+        expected = [root / "chapters" / f"{chapter_id}.tsx" for chapter_id in batch["chapter_ids"]]
+        if not force and response_path.exists() and all(path.exists() for path in expected):
+            return {"id": batch["id"], "status": "cached", "chapter_ids": batch["chapter_ids"]}
+        if not allow_model_call:
+            raise RuntimeError(f"Cache miss for {batch['id']}; model call is not authorized")
+        system, user = _batch_prompt(root, manifest, batch)
+        response = model_call(task="motion_canvas_batch", system=system, user=user, max_tokens=25_000)
+        if not response:
+            raise RuntimeError("Model returned no batch response")
+        files = parse_response(response, batch["chapter_ids"])
+        _write(response_path, response)
+        for name, content in files.items(): _write(root / "chapters" / name, content)
+        return {"id": batch["id"], "status": "generated", "chapter_ids": batch["chapter_ids"]}
+    results, failures = [], []
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="motion-batch") as executor:
+        future_map = {executor.submit(generate_batch, batch): batch for batch in manifest["batches"]}
+        for future in as_completed(future_map):
+            batch = future_map[future]
+            try: results.append(future.result())
+            except Exception as exc: failures.append({"id": batch["id"], "status": "failed", "error": str(exc)})
+    by_id = {item["id"]: item for item in results + failures}
+    for batch in manifest["batches"]: batch.update(by_id.get(batch["id"], {"status": "unknown"}))
+    manifest["updated_at"] = _now(); _write_json(root / "manifest.json", manifest)
+    assembled = str(assemble(run_path, manifest)) if not failures else None
+    report = {"status": "generated" if not failures else "partial", "workers": workers,
+              "results": sorted(results, key=lambda item: item["id"]), "failures": sorted(failures, key=lambda item: item["id"]), "assembled_scenes": assembled}
+    _write_json(root / "generation-report.json", report)
+    return report
+
+
+def _sync_runtime(run_path: Path) -> None:
+    root, generated = run_path / "motion_canvas", RUNTIME_ROOT / "src" / "generated"
+    if generated.exists(): shutil.rmtree(generated)
+    shutil.copytree(root / "chapters", generated / "chapters")
+    shutil.copy2(root / "scenes.ts", generated / "scenes.ts")
+    (RUNTIME_ROOT / "public").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(root / "voiceover.mp3", RUNTIME_ROOT / "public" / "voiceover.mp3")
+
+
+def prepare_runtime_preview(run_path: Path) -> None:
+    """Install one accepted run into the fixed local editor without rendering video."""
+    manifest = _load(run_path / "motion_canvas" / "manifest.json")
+    assemble(run_path, manifest)
+    _sync_runtime(run_path)
+
+
+def _modern_node_bin() -> Path | None:
+    candidates: list[tuple[tuple[int, ...], Path]] = []
+    nvm_root = Path.home() / ".nvm" / "versions" / "node"
+    if nvm_root.exists():
+        for node in nvm_root.glob("v*/bin/node"):
+            match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", node.parents[1].name)
+            if match:
+                version = tuple(int(part) for part in match.groups())
+                if version >= (18, 0, 0): candidates.append((version, node.parent))
+    return max(candidates, default=((), None), key=lambda item: item[0])[1]
+
+
+def _npm(script: str, run_path: Path, timeout: int) -> dict[str, Any]:
+    env = os.environ.copy(); env["MAV_MOTION_RUN_ROOT"] = str((run_path / "motion_canvas").resolve())
+    node_bin = _modern_node_bin()
+    if node_bin: env["PATH"] = str(node_bin) + os.pathsep + env.get("PATH", "")
+    result = subprocess.run(["npm", "run", script], cwd=RUNTIME_ROOT, env=env, capture_output=True, text=True, timeout=timeout)
+    return {"command": f"npm run {script}", "returncode": result.returncode, "stdout": result.stdout[-12000:], "stderr": result.stderr[-12000:]}
+
+
+def validate_and_assemble(run_path: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    assemble(run_path, manifest); _sync_runtime(run_path)
+    compile_report = _npm("check", run_path, 180)
+    preview_report: dict[str, Any] = {"status": "skipped"}
+    if compile_report["returncode"] == 0:
+        command = _npm("preview-frames", run_path, 300)
+        validation_path = run_path / "motion_canvas" / "validation.json"
+        preview_report = {"command": command, "validation": _load(validation_path) if validation_path.exists() else {}}
+    passed = compile_report["returncode"] == 0 and preview_report.get("command", {}).get("returncode") == 0 and preview_report.get("validation", {}).get("status") == "passed"
+    report = {"status": "passed" if passed else "failed", "compile": compile_report, "preview": preview_report}
+    _write_json(run_path / "motion_canvas" / "robot-report.json", report)
+    if not passed: raise RuntimeError("Motion Canvas compile/preview validation failed")
+    return report
+
+
+def render_video(run_path: Path) -> dict[str, Any]:
+    manifest = _load(run_path / "motion_canvas" / "manifest.json")
+    validate_and_assemble(run_path, manifest)
+    report = _npm("render-video", run_path, 3600)
+    if report["returncode"] != 0: raise RuntimeError(report["stderr"] or report["stdout"])
+    return {"status": "rendered", "output": str(run_path / "motion_canvas" / "final.mp4"), "render": report}

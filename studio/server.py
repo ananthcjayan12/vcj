@@ -5,10 +5,13 @@ import json
 import mimetypes
 import os
 import re
+import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
 import threading
+import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -16,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
+from urllib.request import urlopen
 
 from video_engine.cli import TOPIC_ORDER, VALID_STATES
 
@@ -39,6 +43,7 @@ MODEL_MAP_PATH = TEMPLATE_LAB_ROOT / "prompts" / "prompt_model_mapping.json"
 STEP_NAMES = ("Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA")
 PAID_STEPS = {2, 3, 5}
 DIRECT_HTML_MODE = "direct-html"
+MOTION_CANVAS_MODE = "motion-canvas"
 LEGACY_MODE = "legacy-recipes"
 RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,95}$")
 TOPIC_REF_RE = re.compile(r"^\d+(?:\.\d+){1,2}$")
@@ -50,6 +55,9 @@ RENDER_QUALITIES = {"draft", "standard", "high"}
 
 _processes: dict[str, subprocess.Popen[str]] = {}
 _process_lock = threading.Lock()
+_preview_process: subprocess.Popen[str] | None = None
+_preview_run_id: str | None = None
+_preview_url: str | None = None
 
 
 def _now() -> str:
@@ -88,9 +96,12 @@ def _run_dir(run_id: str) -> Path:
 def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
     tasks = []
-    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer"}
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas chapter coder"}
+    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch"}
     for task, config in payload.get("tasks", {}).items():
+        if task not in retained_tasks:
+            continue
         provider_models = dict(config.get("provider_models") or {})
         provider_models.setdefault(str(config.get("provider")), str(config.get("model")))
         tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
@@ -270,15 +281,15 @@ def topic_detail(topic_ref: str) -> dict[str, Any]:
 
 
 def _infer_step(run_path: Path) -> int:
-    direct = (run_path / "direct_html").exists()
     markers = (
         "input.json",
         "narration.json",
         "audio_generation.json",
         "audio_timing.json",
-        "direct_html/master.html" if direct else "scene_plan_v3.json",
-        "direct_html/validation/html_validation.json" if direct else "validation/plan_validation_v3.json",
-        "preview_manifest.json" if direct else "preview_manifest_v3.json",
+        "motion_canvas/generation-report.json",
+        "motion_canvas/robot-report.json",
+        "motion_canvas/preview/contact-sheet.png",
+        "motion_canvas/final.mp4",
     )
     completed = 0
     for index, marker in enumerate(markers, 1):
@@ -287,8 +298,6 @@ def _infer_step(run_path: Path) -> int:
     summary = _read_json(run_path / "generation_summary.json", {}) or {}
     if summary.get("stopped_after_step") is not None:
         completed = max(completed, max(0, min(int(summary["stopped_after_step"]), 8)))
-    elif summary.get("visual_qa") is not None and ((run_path / "preview_manifest_v3.json").exists() or (run_path / "preview_manifest.json").exists()):
-        completed = 8
     return completed
 
 
@@ -307,7 +316,7 @@ def _synthesized_meta(run_path: Path) -> dict[str, Any]:
         "current_step": step,
         "created_at": datetime.fromtimestamp(run_path.stat().st_ctime, timezone.utc).isoformat(),
         "updated_at": datetime.fromtimestamp(run_path.stat().st_mtime, timezone.utc).isoformat(),
-        "settings": {"animation_mode": input_payload.get("animation_mode", summary.get("animation_mode", LEGACY_MODE))},
+        "settings": {"animation_mode": MOTION_CANVAS_MODE},
         "error": None,
     }
 
@@ -333,14 +342,9 @@ def _normalized_meta(run_path: Path, meta: dict[str, Any]) -> dict[str, Any]:
     settings.setdefault("model_provider", "gemini")
     settings.setdefault("audio_provider", "gemini")
     settings.setdefault("scene_concurrency", 1)
-    settings.setdefault("confirm_paid_api", False)
+    settings.setdefault("confirm_paid_api", True)
     settings.setdefault("task_models", {})
-    settings.setdefault(
-        "animation_mode",
-        input_payload.get("animation_mode")
-        or summary.get("animation_mode")
-        or (DIRECT_HTML_MODE if (run_path / "direct_html").exists() else LEGACY_MODE),
-    )
+    settings["animation_mode"] = MOTION_CANVAS_MODE
     normalized["settings"] = settings
     return normalized
 
@@ -367,7 +371,7 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
     run_path = _run_dir(run_id)
     summary = _read_json(run_path / "generation_summary.json", {}) or {}
     meta = _read_json(run_path / "studio_run.json", {}) or {}
-    animation_mode = summary.get("animation_mode") or (meta.get("settings") or {}).get("animation_mode") or (DIRECT_HTML_MODE if (run_path / "direct_html" / "master.html").exists() else LEGACY_MODE)
+    animation_mode = MOTION_CANVAS_MODE
     manifest_path = run_path / "preview_manifest.json" if animation_mode == DIRECT_HTML_MODE else run_path / "preview_manifest_v3.json"
     manifest = _read_json(manifest_path, {}) or {}
     master = manifest.get("master")
@@ -414,30 +418,26 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
                     "visual_review": review_chapters.get(chapter_id, {}),
                 }
             )
+    motion_manifest = _read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
+    motion_report = _read_json(run_path / "motion_canvas" / "generation-report.json", {}) or {}
+    batch_status = {}
+    for batch in motion_manifest.get("batches", []):
+        for scene_id in batch.get("chapter_ids", []):
+            batch_status[scene_id] = batch.get("status", "pending")
+    chapters = [{**chapter, "status": batch_status.get(chapter.get("scene_id"), "pending")} for chapter in motion_manifest.get("chapters", [])]
     files = []
     for relative in (
         "input.json", "story_skeleton.json", "narration.json", "narration.txt",
-        "narration_elevenlabs.txt", "voiceover.mp3", "audio_generation.json", "audio_timing.json",
-        "audio_word_timestamps.json",
-        "scene_plan_v3.json", "preview_manifest_v3.json", "generation_summary.json", "render_report.json",
-        "scene_routes.json", "asset_index_used.json", "asset_shortlist.json", "asset_catalog_used.json",
-        "debug/scene_asset_shortlister_request.json", "debug/scene_asset_router_request.json",
-        "debug/script_generation_debug.json", "debug/narration_model_raw.json",
-        "debug/narration_normalized.json", "debug/narration_validation.json",
-        "debug/step_02_script.json", "validation/plan_validation_v3.json",
-        "validation/v3_repair_report.json", "costs/summary.json", "costs/model_usage.json",
-        "preview_manifest.json", "preview_manifest_direct_html.json",
-        "direct_html/lesson_input_bundle.json", "direct_html/asset_manifest.json", "direct_html/physics_context.json",
-        "direct_html/lesson-data.js",
-        "direct_html/composer_prompt.txt", "direct_html/composer_response.html", "direct_html/master.html",
-        "direct_html/prompts/direct_html_design_system.txt", "direct_html/prompts/direct_html_composer.system.txt",
-        "direct_html/prompts/direct_html_repair.system.txt", "direct_html/prompts/direct_html_review.system.txt",
-        "direct_html/chapter_index.json", "direct_html/generation_manifest.json",
-        "direct_html/inspection/contact_sheet.png", "direct_html/validation/html_validation.json",
-        "direct_html/validation/layout_validation.json", "direct_html/validation/timeline_validation.json",
-        "direct_html/validation/design_system_validation.json", "direct_html/validation/final_direct_html_report.json",
-        "direct_html/validation/visual_review.json",
-        "direct_html/costs/summary.json", "direct_html/costs/model_usage.json",
+        "narration_elevenlabs.txt", "voiceover.mp3", "audio_generation.json",
+        "audio_timing.json", "audio_word_timestamps.json", "generation_summary.json",
+        "render_report.json", "debug/script_generation_debug.json",
+        "debug/narration_model_raw.json", "debug/narration_normalized.json",
+        "debug/narration_validation.json", "debug/step_02_script.json",
+        "costs/summary.json", "costs/model_usage.json",
+        "motion_canvas/manifest.json", "motion_canvas/generation-report.json",
+        "motion_canvas/scenes.ts", "motion_canvas/validation.json",
+        "motion_canvas/robot-report.json", "motion_canvas/preview/contact-sheet.png",
+        "motion_canvas/final.mp4",
     ):
         if (run_path / relative).exists():
             files.append(relative)
@@ -446,15 +446,16 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "animation_mode": animation_mode,
         "scenes": scenes,
         "chapters": chapters,
-        "preview_url": f"/artifacts/runs/{run_id}/{master}" if master else None,
-        "mp4_url": f"/artifacts/runs/{run_id}/{Path(output).relative_to(run_path)}" if output and Path(output).is_relative_to(run_path) else None,
+        "preview_url": _preview_url if _preview_run_id == run_id and _preview_process and _preview_process.poll() is None else None,
+        "validation_preview_url": f"/artifacts/runs/{run_id}/motion_canvas/preview/contact-sheet.png" if (run_path / "motion_canvas" / "preview" / "contact-sheet.png").exists() else None,
+        "mp4_url": f"/artifacts/runs/{run_id}/motion_canvas/final.mp4" if (run_path / "motion_canvas" / "final.mp4").exists() else (f"/artifacts/runs/{run_id}/{Path(output).relative_to(run_path)}" if output and Path(output).is_relative_to(run_path) else None),
         "summary": summary,
-        "validation": direct_validation if animation_mode == DIRECT_HTML_MODE else (_read_json(run_path / "validation" / "plan_validation_v3.json", {}) or {}),
+        "validation": _read_json(run_path / "motion_canvas" / "robot-report.json", {}) or {},
         "cost_summary": _read_json(run_path / "costs" / "summary.json", {}) or {},
         "usage_records": (_read_json(run_path / "costs" / "model_usage.json", {}) or {}).get("records", []),
-        "direct_html_cost_summary": _read_json(run_path / "direct_html" / "costs" / "summary.json", {}) or {},
-        "routing_summary": scenes_payload.get("routing_summary", {}),
-        "asset_shortlist": _read_json(run_path / "asset_shortlist.json", {}) or {},
+        "direct_html_cost_summary": {},
+        "routing_summary": {},
+        "asset_shortlist": {},
     }
 
 
@@ -505,9 +506,7 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
     if not (1 <= from_step <= stop_after_step <= 8):
         raise ValueError("Pipeline steps must satisfy 1 <= from <= stop <= 8")
     settings = {**meta.get("settings", {}), **request.get("settings", {})}
-    animation_mode = str(settings.get("animation_mode", LEGACY_MODE))
-    if animation_mode not in {DIRECT_HTML_MODE, LEGACY_MODE}:
-        raise ValueError("Unsupported animation mode")
+    animation_mode = MOTION_CANVAS_MODE
     paid = _paid_range(from_step, stop_after_step) or (animation_mode == DIRECT_HTML_MODE and from_step <= 6 <= stop_after_step)
     confirmed = bool(request.get("confirm_paid_api", settings.get("confirm_paid_api", False)))
     if paid and not confirmed:
@@ -570,6 +569,7 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         env["MAV_SCENE_REGEN_INSTRUCTION" if scene_id else "MAV_STEP_REGEN_INSTRUCTION"] = instruction
     concurrency = int(settings.get("scene_concurrency", 1))
     env["MAV_V3_SCENE_CONCURRENCY"] = str(max(1, min(concurrency, 8)))
+    env["MAV_MOTION_CANVAS_WORKERS"] = str(max(1, min(concurrency, 4)))
     return command, env
 
 
@@ -639,15 +639,13 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
     run_path = _run_dir(run_id)
     if run_path.exists() and any(run_path.iterdir()):
         raise FileExistsError(f"Run already exists: {run_id}")
-    animation_mode = str(payload.get("animation_mode", LEGACY_MODE))
-    if animation_mode not in {DIRECT_HTML_MODE, LEGACY_MODE}:
-        raise ValueError("Unsupported animation mode")
+    animation_mode = MOTION_CANVAS_MODE
     settings = {
         "duration": max(30, min(float(payload.get("duration", 480)), 1800)),
         "model_provider": payload.get("model_provider", "gemini"),
         "audio_provider": payload.get("audio_provider", "gemini"),
         "scene_concurrency": max(1, min(int(payload.get("scene_concurrency", 1)), 8)),
-        "confirm_paid_api": bool(payload.get("confirm_paid_api", False)),
+        "confirm_paid_api": bool(payload.get("confirm_paid_api", True)),
         "task_models": _validate_task_models(payload.get("task_models")),
         "animation_mode": animation_mode,
     }
@@ -701,9 +699,62 @@ def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         "--quality", quality,
         "--fps", str(fps),
         "--workers", str(workers),
-        "--animation-mode", str((meta.get("settings") or {}).get("animation_mode", LEGACY_MODE)),
+        "--animation-mode", MOTION_CANVAS_MODE,
     ]
     return _start_process(run_id, command, os.environ.copy(), mode="render", target_step=8)
+
+
+def start_motion_preview(run_id: str) -> dict[str, Any]:
+    global _preview_process, _preview_run_id, _preview_url
+    run_path = _run_dir(run_id)
+    report = _read_json(run_path / "motion_canvas" / "robot-report.json", {}) or {}
+    if report.get("status") != "passed":
+        raise RuntimeError("Complete step 6 successfully before starting the video preview")
+    if str(TEMPLATE_LAB_ROOT) not in sys.path:
+        sys.path.insert(0, str(TEMPLATE_LAB_ROOT))
+    from motion_canvas.pipeline import RUNTIME_ROOT, _modern_node_bin, prepare_runtime_preview
+
+    with _process_lock:
+        if _preview_process and _preview_process.poll() is None:
+            if _preview_run_id == run_id and _preview_url:
+                return {"status": "running", "url": _preview_url}
+            _preview_process.terminate()
+            try:
+                _preview_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                _preview_process.kill()
+        prepare_runtime_preview(run_path)
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = int(probe.getsockname()[1])
+        env = os.environ.copy()
+        node_bin = _modern_node_bin()
+        if node_bin:
+            env["PATH"] = str(node_bin) + os.pathsep + env.get("PATH", "")
+        log_path = run_path / "motion_canvas" / "preview-server.log"
+        with log_path.open("a", encoding="utf-8") as log_handle:
+            _preview_process = subprocess.Popen(
+                ["npm", "run", "serve", "--", "--port", str(port)],
+                cwd=RUNTIME_ROOT,
+                env=env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        _preview_run_id = run_id
+        _preview_url = f"http://127.0.0.1:{port}/"
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if _preview_process.poll() is not None:
+            tail = log_path.read_text(encoding="utf-8", errors="replace")[-2000:]
+            raise RuntimeError(f"Motion Canvas preview failed to start:\n{tail}")
+        try:
+            with urlopen(_preview_url, timeout=1) as response:  # noqa: S310 - fixed localhost URL
+                if response.status == 200:
+                    return {"status": "running", "url": _preview_url}
+        except OSError:
+            time.sleep(0.25)
+    raise RuntimeError(f"Motion Canvas preview did not become ready. See {log_path}")
 
 
 def repair_chapter_run(run_id: str, chapter_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -737,6 +788,65 @@ def stop_run(run_id: str) -> dict[str, Any]:
     meta.update({"status": "stopped", "error": None})
     _append_log(run_id, "Stop requested")
     return _save_meta(meta)
+
+
+def delete_run(run_id: str) -> dict[str, Any]:
+    run_id = _require_run_id(run_id)
+    run_path = _run_dir(run_id)
+    if not run_path.exists():
+        raise FileNotFoundError(run_id)
+    with _process_lock:
+        process = _processes.get(run_id)
+        if process and process.poll() is None:
+            raise RuntimeError("Stop the active process before deleting this run")
+        _processes.pop(run_id, None)
+    shutil.rmtree(run_path)
+    return {"status": "deleted", "run_id": run_id}
+
+
+def reset_run_from_step(run_id: str, step: int) -> dict[str, Any]:
+    if step not in range(1, 9):
+        raise ValueError("Reset step must be between 1 and 8")
+    run_path = _run_dir(run_id)
+    meta = _load_meta(run_id)
+    with _process_lock:
+        process = _processes.get(run_id)
+        if process and process.poll() is None:
+            raise RuntimeError("Stop the active process before regenerating from a step")
+
+    def remove(relative: str) -> None:
+        path = run_path / relative
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink(missing_ok=True)
+
+    if step <= 1:
+        for child in run_path.iterdir():
+            if child.name not in {"studio_run.json", "studio.log"}:
+                remove(child.name)
+    else:
+        if step <= 2:
+            for relative in ("story_skeleton.json", "narration.json", "narration.txt", "narration_elevenlabs.txt"):
+                remove(relative)
+        if step <= 3:
+            for relative in ("voiceover.mp3", "audio_generation.json", "audio_alignment.json"):
+                remove(relative)
+        if step <= 4:
+            for relative in ("audio_timing.json", "audio_word_timestamps.json"):
+                remove(relative)
+        if step <= 5:
+            remove("motion_canvas")
+        elif step <= 6:
+            for relative in ("motion_canvas/validation.json", "motion_canvas/robot-report.json", "motion_canvas/preview", "motion_canvas/frames", "motion_canvas/final.mp4"):
+                remove(relative)
+        if step <= 8:
+            for relative in ("generation_summary.json", "render_report.json"):
+                remove(relative)
+        remove("debug")
+    meta.update({"status": "paused", "current_step": step - 1, "error": None, "settings": {**meta.get("settings", {}), "confirm_paid_api": True, "animation_mode": MOTION_CANVAS_MODE}})
+    _append_log(run_id, f"Reset from step {step}; downstream artifacts removed")
+    return run_detail(_save_meta(meta)["id"])
 
 
 def update_topic_status(topic_ref: str, status: str) -> dict[str, Any]:
@@ -862,6 +972,9 @@ class StudioHandler(BaseHTTPRequestHandler):
             match = re.fullmatch(r"/api/runs/([^/]+)/execute", path)
             if match:
                 return self._json({"run": execute_run(match.group(1), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/reset", path)
+            if match:
+                return self._json({"run": reset_run_from_step(match.group(1), int(body.get("step", 1)))})
             match = re.fullmatch(r"/api/runs/([^/]+)/models", path)
             if match:
                 return self._json({"run": update_run_models(match.group(1), body)})
@@ -875,9 +988,23 @@ class StudioHandler(BaseHTTPRequestHandler):
             match = re.fullmatch(r"/api/runs/([^/]+)/render", path)
             if match:
                 return self._json({"run": render_run(match.group(1), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/preview", path)
+            if match:
+                result = start_motion_preview(match.group(1))
+                return self._json({"preview": result, "run": run_detail(match.group(1))}, 202)
             match = re.fullmatch(r"/api/runs/([^/]+)/stop", path)
             if match:
                 return self._json({"run": stop_run(match.group(1))})
+            raise FileNotFoundError(path)
+        except Exception as exc:  # noqa: BLE001
+            self._error(exc)
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        try:
+            path = urlparse(self.path).path
+            match = re.fullmatch(r"/api/runs/([^/]+)", path)
+            if match:
+                return self._json(delete_run(match.group(1)))
             raise FileNotFoundError(path)
         except Exception as exc:  # noqa: BLE001
             self._error(exc)

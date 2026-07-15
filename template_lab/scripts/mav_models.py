@@ -621,7 +621,7 @@ def _call_moonshot_text(
     user: str,
 ) -> str:
     data = _call_moonshot(resolved, system=system, user=user, json_mode=False)
-    return data["choices"][0]["message"]["content"].strip()
+    return _moonshot_response_text(data, resolved.task)
 
 
 def _call_moonshot_json(
@@ -631,8 +631,21 @@ def _call_moonshot_json(
     user: str,
 ) -> dict[str, Any]:
     data = _call_moonshot(resolved, system=system, user=user, json_mode=True)
-    text = data["choices"][0]["message"]["content"].strip()
+    text = _moonshot_response_text(data, resolved.task)
     return _extract_json(text, resolved.task, "moonshot", None)
+
+
+def _moonshot_response_text(data: dict[str, Any], task: str) -> str:
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError(f"Moonshot {task} call returned no choices")
+    finish_reason = choices[0].get("finish_reason")
+    if finish_reason not in {None, "stop"}:
+        raise RuntimeError(f"Moonshot {task} call stopped with {finish_reason}; refusing incomplete output")
+    text = str((choices[0].get("message") or {}).get("content") or "").strip()
+    if not text:
+        raise RuntimeError(f"Moonshot {task} call returned no text")
+    return text
 
 
 def _gemini_response_text(response: Any) -> str:

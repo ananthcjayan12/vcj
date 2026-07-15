@@ -1,6 +1,5 @@
 const state = {
   dashboard: null,
-  assets: [],
   runs: [],
   selectedTopicRef: null,
   topicDetail: null,
@@ -17,9 +16,9 @@ const percent = (value, total) => total ? Math.round((Number(value) / Number(tot
 const formatNumber = value => Number(value || 0).toLocaleString();
 const formatUsd = value => { const number = Number(value || 0); return number >= 1 ? `$${number.toFixed(2)}` : `$${number.toFixed(4)}`; };
 const activeStatuses = new Set(["running", "rendering"]);
-const legacySteps = ["Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA"];
-const directSteps = ["Inputs", "Script", "Audio", "Timing", "Compose", "Inspect / Repair", "Preview", "QA"];
-const stepsForRun = run => (run?.settings?.animation_mode === "direct-html" || run?.artifacts?.animation_mode === "direct-html") ? directSteps : legacySteps;
+const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Chapters", "Compile & QA", "Review", "Approval"];
+const stepsForRun = () => motionCanvasSteps;
+const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch"]);
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -85,7 +84,7 @@ function artifactUrl(runId, path) {
 
 function selectedTaskModels(run) {
   const overrides = run.settings?.task_models || {};
-  return Object.fromEntries((run.model_map?.tasks || []).map(task => {
+  return Object.fromEntries((run.model_map?.tasks || []).filter(task => visibleModelTasks.has(task.task)).map(task => {
     if (overrides[task.task]) return [task.task, overrides[task.task]];
     let provider = task.provider;
     if (["script_structure", "script_writing"].includes(task.task)) {
@@ -102,7 +101,7 @@ function selectedTaskModels(run) {
 
 function modelMapMarkup(run, working) {
   const selected = selectedTaskModels(run);
-  return `<section class="model-map-panel"><div class="model-map-heading"><div><p class="eyebrow">Prompt routing</p><h3>Models by pipeline task</h3></div><button class="secondary-button" id="save-model-map" ${working ? "disabled" : ""}>Save model map</button></div><div class="model-map-list">${(run.model_map?.tasks || []).map(task => {
+  return `<section class="model-map-panel"><div class="model-map-heading"><div><p class="eyebrow">Prompt routing</p><h3>Models used by Motion Canvas production</h3></div><button class="secondary-button" id="save-model-map" ${working ? "disabled" : ""}>Save model map</button></div><div class="model-map-list">${(run.model_map?.tasks || []).filter(task => visibleModelTasks.has(task.task)).map(task => {
     const current = selected[task.task];
     const providers = Object.keys(task.provider_models || {});
     const prompts = task.prompt_files?.length ? task.prompt_files.join(" · ") : "Voice synthesis (no text prompt file)";
@@ -124,17 +123,15 @@ function collectTaskModels() {
 async function boot() {
   clearError();
   try {
-    const [dashboard, assetsPayload, runsPayload] = await Promise.all([
-      request("/api/dashboard"), request("/api/assets"), request("/api/runs")
+    const [dashboard, runsPayload] = await Promise.all([
+      request("/api/dashboard"), request("/api/runs")
     ]);
     state.dashboard = dashboard;
-    state.assets = assetsPayload.scenes || [];
     state.runs = runsPayload.runs || [];
     state.selectedTopicRef = state.selectedTopicRef || dashboard.next_topic?.ref || dashboard.topics?.[0]?.ref;
     renderChrome();
     renderDashboard();
     renderCurriculum();
-    renderAssets();
     renderRuns();
     if (state.selectedTopicRef) await selectTopic(state.selectedTopicRef, false);
     if (state.activeRunId) await selectRun(state.activeRunId, false);
@@ -154,8 +151,8 @@ function renderDashboard() {
   $("#summary-stats").innerHTML = [
     statCard("Syllabus coverage", `${summary.covered_objectives}/${summary.objective_count}`, `${percent(summary.covered_objectives, summary.objective_count)}% objectives covered`, true),
     statCard("Completed topics", `${summary.complete_topics}/${summary.topic_count}`, "Prerequisite-aware order"),
-    statCard("Animation scenes", summary.scene_count, "Validated reusable modules"),
-    statCard("Published videos", summary.video_count, "Manual publishing registry")
+    statCard("Motion Canvas", "3.17.2", "Pinned deterministic renderer"),
+    statCard("Published videos", summary.video_count, "Approved lesson outputs")
   ].join("");
   $("#topic-count").textContent = `${summary.topic_count} topics`;
   renderTopicList();
@@ -232,15 +229,14 @@ function renderTopicDetail() {
         <label class="field"><span>Duration</span><select id="duration-input"><option value="300">5 minutes</option><option value="480" selected>8 minutes</option><option value="600">10 minutes</option><option value="720">12 minutes</option></select></label>
         <label class="field"><span>Script model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><option value="configured">Configured</option></select></label>
         <label class="field"><span>Voice</span><select id="audio-provider"><option value="gemini">Gemini TTS</option><option value="elevenlabs">ElevenLabs</option></select></label>
-        <label class="field"><span>Animation</span><select id="animation-mode"><option value="legacy-recipes">Legacy recipes · current default</option><option value="direct-html">Direct HTML · modern science</option></select></label>
-        <label class="field"><span>Scene workers</span><select id="scene-concurrency"><option>1</option><option>2</option><option>4</option></select></label>
+        <label class="field"><span>Chapter workers</span><select id="scene-concurrency"><option>1</option><option selected>2</option><option>4</option></select></label>
       </div>
       <div class="form-actions">
-        <label class="paid-check"><input type="checkbox" id="paid-confirm"> I confirm this run may call paid model and voice APIs</label>
+        <label class="paid-check"><input type="checkbox" id="paid-confirm" checked disabled> Paid model and voice APIs authorized for this run</label>
         <div class="button-row">
           <button class="secondary-button" id="prepare-topic-button">${facts ? "Rebuild packet" : "Prepare lesson packet"}</button>
           <button class="secondary-button" id="create-run-button">Create run</button>
-          <button class="primary-button" id="generate-run-button">Generate full lesson</button>
+          <span class="flow-note">Create the run, then execute and verify one numbered step at a time below.</span>
         </div>
       </div>
     </div>`;
@@ -257,13 +253,13 @@ function renderPipeline() {
   const artifacts = run.artifacts || {};
   const completed = Number(run.current_step || 0);
   const steps = stepsForRun(run);
-  const direct = artifacts.animation_mode === "direct-html" || run.settings?.animation_mode === "direct-html";
   root.innerHTML = `
     <div class="run-header">
-      <div><p class="eyebrow">Active production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><span class="run-id">${escapeHtml(run.id)} · ${direct ? "DIRECT HTML" : "LEGACY RECIPES"}</span><small class="run-settings-summary">${Number(run.settings?.duration || 480) / 60} min · script ${escapeHtml(run.settings?.model_provider || "configured")} · voice ${escapeHtml(run.settings?.audio_provider || "configured")} · paid confirmation ${run.settings?.confirm_paid_api ? "enabled" : "required"}</small></div>
+      <div><p class="eyebrow">Active Motion Canvas production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><span class="run-id">${escapeHtml(run.id)} · NARRATION-DRIVEN CHAPTERS</span><small class="run-settings-summary">${Number(run.settings?.duration || 480) / 60} min · script ${escapeHtml(run.settings?.model_provider || "configured")} · voice ${escapeHtml(run.settings?.audio_provider || "configured")} · paid confirmation ${run.settings?.confirm_paid_api ? "enabled" : "required"}</small></div>
       <div class="run-header-actions">
         <button class="secondary-button" id="run-refresh">Refresh</button>
         <button class="danger-button" id="run-stop" ${working ? "" : "disabled"}>Stop</button>
+        <button class="danger-button" id="run-delete" ${working ? "disabled" : ""}>Delete run</button>
         <button class="secondary-button" id="run-next" ${working || completed >= 8 ? "disabled" : ""}>Run next</button>
         <button class="primary-button" id="run-all" ${working ? "disabled" : ""}>Run to QA</button>
         <button class="secondary-button" id="render-button" ${working || completed < 7 ? "disabled" : ""}>Render MP4</button>
@@ -274,19 +270,17 @@ function renderPipeline() {
       return `<button class="step${completed >= number ? " is-done" : ""}${working && completed + 1 === number ? " is-current" : ""}" data-step="${number}" ${working ? "disabled" : ""}><span>${completed >= number ? "✓" : number}</span><b>${name}</b></button>`;
     }).join("")}</div>
     <div class="run-workspace">
-      <div class="preview-shell"><div class="preview-toolbar"><span>${direct ? "MODERN SCIENCE · DIRECT HTML" : "V3 COMPOSITION PREVIEW"}</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank">OPEN ↗</a>` : "WAITING FOR STEP 7"}</div>${artifacts.preview_url ? `<iframe class="preview-frame" src="${escapeHtml(artifacts.preview_url)}" title="Video preview"></iframe>` : `<div class="preview-placeholder">Preview becomes available after step 7.</div>`}</div>
+      <div class="preview-shell"><div class="preview-toolbar"><span>MOTION CANVAS · VIDEO + SYNCHRONIZED VOICEOVER</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank" rel="noreferrer">OPEN PLAYER ↗</a>` : "LOCAL EDITOR PREVIEW"}</div>${artifacts.preview_url ? `<iframe class="preview-frame editor-preview" src="${escapeHtml(artifacts.preview_url)}" title="Motion Canvas lesson preview" allow="autoplay"></iframe>` : `<div class="preview-placeholder preview-launch"><span>Start the local Motion Canvas player to review animation and voiceover before rendering.</span><button class="primary-button" id="start-preview" ${working || completed < 6 ? "disabled" : ""}>Start video preview</button></div>`}</div>
       <div class="run-side">
-        <div class="run-control-card"><h3>Resume a specific stage</h3><div class="step-control"><select id="step-select">${steps.map((name,index) => `<option value="${index+1}">${index+1}. ${name}</option>`).join("")}</select><button class="secondary-button" id="run-step" ${working ? "disabled" : ""}>Run selected step</button></div><label class="paid-check" style="margin-top:9px"><input type="checkbox" id="run-paid-confirm" ${run.settings?.confirm_paid_api ? "checked" : ""}> Confirm paid APIs when required</label></div>
-        <div class="run-control-card"><h3>Generated artifacts</h3><div class="artifact-list">${artifacts.files?.length ? artifacts.files.map(path => `<a href="${artifactUrl(run.id, path)}" target="_blank" title="${escapeHtml(path)}"><span>${escapeHtml(artifactLabel(path))}</span><small>${escapeHtml(path)}</small><b>OPEN ↗</b></a>`).join("") : `<p class="artifact-empty">Artifacts appear after each completed stage.</p>`}</div></div>
+        <div class="run-control-card"><h3>Run or regenerate a stage</h3><div class="step-control"><select id="step-select">${steps.map((name,index) => `<option value="${index+1}">${index+1}. ${name}</option>`).join("")}</select><button class="secondary-button" id="run-step" ${working ? "disabled" : ""}>Run selected step</button><button class="danger-button" id="regenerate-step" ${working ? "disabled" : ""}>Regenerate from step</button></div><label class="paid-check" style="margin-top:9px"><input type="checkbox" id="run-paid-confirm" checked disabled> Paid model and voice APIs authorized</label><p class="control-help">Regenerate removes the selected stage and every downstream artifact before starting that stage again.</p></div>
+        <div class="run-control-card"><h3>Generated artifacts</h3>${artifacts.validation_preview_url ? `<a class="validation-evidence-link" href="${escapeHtml(artifacts.validation_preview_url)}" target="_blank" rel="noreferrer">Open deterministic contact sheet ↗</a>` : ""}<div class="artifact-list">${artifacts.files?.length ? artifacts.files.map(path => `<a href="${artifactUrl(run.id, path)}" target="_blank" title="${escapeHtml(path)}"><span>${escapeHtml(artifactLabel(path))}</span><small>${escapeHtml(path)}</small><b>OPEN ↗</b></a>`).join("") : `<p class="artifact-empty">Artifacts appear after each completed stage.</p>`}</div></div>
         <pre class="log-box" id="run-log">Loading logs…</pre>
         ${artifacts.mp4_url ? `<a class="primary-button" href="${escapeHtml(artifacts.mp4_url)}" target="_blank">Open rendered MP4 ↗</a>` : ""}
         ${run.error ? `<div class="alert">${escapeHtml(run.error)}</div>` : ""}
       </div>
     </div>
     <div class="run-intelligence">${modelMapMarkup(run, working)}${costMarkup(artifacts)}</div>
-    ${artifacts.asset_shortlist?.selected_modules ? `<section class="shortlist-panel"><div><p class="eyebrow">Lesson asset shortlist · ${artifacts.asset_shortlist.selected_modules.length} of ${Number(artifacts.asset_shortlist.registry_scene_count || 35)}</p><h3>Only these modules continue to detailed routing</h3><p>${escapeHtml(artifacts.asset_shortlist.reason || "")}</p></div><div class="shortlist-chips">${artifacts.asset_shortlist.selected_modules.map(name => `<span>${escapeHtml(name)}</span>`).join("") || `<span>Custom scenes only</span>`}</div></section>` : ""}
-    ${artifacts.chapters?.length ? `<div class="panel-heading compact"><div><p class="eyebrow">Integrated lesson · browser-inspected chapters</p><h2>Review and repair individual chapters</h2></div><span class="count-chip">${artifacts.chapters.length} chapters</span></div><div class="scene-list">${artifacts.chapters.map(chapter => { const findings = chapter.findings || []; const scores = chapter.visual_review?.scores || {}; const scoreText = Object.keys(scores).length ? `Review ${(Object.values(scores).map(Number).reduce((a,b)=>a+b,0) / Object.keys(scores).length).toFixed(1)}/5` : "Visual review pending"; return `<article class="scene-row chapter-row"><strong>${escapeHtml(chapter.chapter_id)}<br><small>${Number(chapter.duration || 0).toFixed(1)}s</small><span class="route-mode recipe">${escapeHtml(chapter.status || "generated")}</span></strong>${chapter.screenshots?.peak ? `<a href="${escapeHtml(chapter.screenshots.peak)}" target="_blank"><img class="chapter-preview" src="${escapeHtml(chapter.screenshots.peak)}" alt="${escapeHtml(chapter.chapter_id)} peak frame"></a>` : ""}<p><b>${escapeHtml((chapter.objective_ids || []).join(", "))}</b>${escapeHtml((chapter.paragraph_ids || []).join(" · ") || "Integrated visual chapter")}<small>${escapeHtml(scoreText)} · ${findings.length ? escapeHtml(findings.map(item => item.code).join(", ")) : "No design-system findings"}</small></p><input class="scene-note" data-chapter-note="${escapeHtml(chapter.chapter_id)}" placeholder="Focused visual repair instruction"><button class="secondary-button chapter-repair" data-chapter="${escapeHtml(chapter.chapter_id)}" ${working ? "disabled" : ""}>Repair chapter</button></article>`; }).join("")}</div>` : ""}
-    ${artifacts.scenes?.length ? `<div class="panel-heading compact"><div><p class="eyebrow">Scene routing · ${Number(artifacts.routing_summary?.module || 0)} modules · ${Number(artifacts.routing_summary?.custom || 0)} custom</p><h2>Review and regenerate individual scenes</h2></div><span class="count-chip">${artifacts.scenes.length} scenes</span></div><div class="scene-list">${artifacts.scenes.map(scene => `<article class="scene-row"><strong>${escapeHtml(scene.id)}<br><small>${Number(scene.duration || 0).toFixed(1)}s</small><span class="route-mode ${escapeHtml(scene.renderer)}">${escapeHtml(scene.module || scene.route || "custom")}</span></strong><p><b>${escapeHtml(scene.routing?.reason || "")}</b>${escapeHtml(scene.narration_text || scene.beat_label || "Scene")}</p><input class="scene-note" data-scene-note="${escapeHtml(scene.id)}" placeholder="Direction for rerouting or regeneration"><button class="secondary-button scene-regenerate" data-scene="${escapeHtml(scene.id)}" ${working ? "disabled" : ""}>Regenerate</button></article>`).join("")}</div>` : ""}`;
+    ${artifacts.chapters?.length ? `<div class="panel-heading compact"><div><p class="eyebrow">Timestamp-derived production manifest</p><h2>Motion Canvas chapters</h2></div><span class="count-chip">${artifacts.chapters.length} chapters</span></div><div class="scene-list">${artifacts.chapters.map(chapter => `<article class="scene-row"><strong>${escapeHtml(chapter.scene_id)}<br><small>${Number(chapter.duration || 0).toFixed(1)}s</small><span class="route-mode module">${escapeHtml(chapter.status || "pending")}</span></strong><p>${escapeHtml(chapter.narration || "Timestamped chapter")}</p></article>`).join("")}</div>` : ""}`;
   loadLogs(run.id);
   managePolling();
 }
@@ -344,16 +338,6 @@ function renderCurriculum() {
   $("#curriculum-table").innerHTML = state.dashboard.topics.map(topic => `<article class="curriculum-row"><strong>${escapeHtml(topic.ref)}</strong><div><strong>${escapeHtml(topic.title)}</strong><small>${escapeHtml(topic.domain_title)}</small></div><div><span class="mini-progress"><i style="width:${percent(topic.covered,topic.total)}%"></i></span><small>${topic.covered}/${topic.total} covered</small></div><select class="status-select topic-status-select" data-status-topic="${escapeHtml(topic.ref)}"><option value="">Set status…</option>${["planned","scripted","rendered","reviewed","covered","needs_revision"].map(status => `<option value="${status}">${status.replaceAll("_"," ")}</option>`).join("")}</select></article>`).join("");
 }
 
-function renderAssets() {
-  const categorySelect = $("#asset-category");
-  const selectedCategory = categorySelect.value;
-  const categories = [...new Set(state.assets.map(asset => asset.category))].sort();
-  categorySelect.innerHTML = `<option value="">All categories</option>${categories.map(category => `<option value="${escapeHtml(category)}" ${category === selectedCategory ? "selected" : ""}>${escapeHtml(category)}</option>`).join("")}`;
-  const query = ($("#asset-search")?.value || "").trim().toLowerCase();
-  const assets = state.assets.filter(asset => (!categorySelect.value || asset.category === categorySelect.value) && `${asset.scene} ${asset.description} ${asset.category}`.toLowerCase().includes(query));
-  $("#asset-grid").innerHTML = assets.map(asset => `<article class="asset-card"><span class="asset-icon">${asset.category === "mathematics" ? "∑" : asset.category === "graphs" ? "⌁" : asset.category === "electricity" ? "⚡" : "◇"}</span><h3>${escapeHtml(asset.scene)}</h3><p>${escapeHtml(asset.description)}</p><footer><span>${escapeHtml(asset.category)}</span><span>${asset.parameter_schema ? "schema ready" : "registered"}</span></footer></article>`).join("") || `<div class="loading-card">No matching scenes.</div>`;
-}
-
 function renderRuns() {
   $("#runs-table").innerHTML = state.runs.map(run => `<article class="run-row-table"><div><strong>${escapeHtml(run.topic)}</strong><small>${escapeHtml(run.id)}</small></div>${statusPill(run.status)}<span>Step ${run.current_step || 0}/8</span><span>${formatDate(run.updated_at)}</span><button class="secondary-button run-open" data-run="${escapeHtml(run.id)}">Open</button></article>`).join("") || `<div class="loading-card">No production runs yet.</div>`;
 }
@@ -368,7 +352,7 @@ function switchViewTo(view) {
   state.view = view;
   $$(".nav-item").forEach(item => item.classList.toggle("is-active", item.dataset.view === view));
   $$(".view").forEach(item => item.classList.toggle("is-active", item.id === `view-${view}`));
-  const titles = { production: ["Manual lesson engine", "Production workspace"], curriculum: ["Coverage control", "Curriculum map"], assets: ["Visual vocabulary", "Scene library"], runs: ["Production history", "Runs and outputs"] };
+  const titles = { production: ["Motion Canvas lesson engine", "Production workspace"], curriculum: ["Coverage control", "Curriculum map"], runs: ["Production history", "Runs and outputs"] };
   $("#view-eyebrow").textContent = titles[view][0]; $("#view-title").textContent = titles[view][1];
   history.replaceState(null, "", `#${view}`);
 }
@@ -380,7 +364,7 @@ function productionPayload(execute) {
     duration: Number($("#duration-input").value),
     model_provider: $("#model-provider").value,
     audio_provider: $("#audio-provider").value,
-    animation_mode: $("#animation-mode").value,
+    animation_mode: "motion-canvas",
     scene_concurrency: Number($("#scene-concurrency").value),
     confirm_paid_api: $("#paid-confirm").checked,
     execute
@@ -409,6 +393,7 @@ async function createProductionRun(button, execute) {
 
 async function executeActive(payload, message) {
   if (!state.activeRunId) return;
+  payload.confirm_paid_api = $("#run-paid-confirm")?.checked ?? true;
   clearError();
   try {
     const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/execute`, { method: "POST", body: JSON.stringify(payload) });
@@ -434,7 +419,6 @@ document.addEventListener("click", async event => {
   if (event.target.closest("#runs-refresh")) return refreshRuns();
   if (event.target.closest("#prepare-topic-button")) return prepareTopic(event.target.closest("button"));
   if (event.target.closest("#create-run-button")) return createProductionRun(event.target.closest("button"), false);
-  if (event.target.closest("#generate-run-button")) return createProductionRun(event.target.closest("button"), true);
   if (event.target.closest("#run-refresh")) return selectRun(state.activeRunId, false);
   if (event.target.closest("#save-model-map")) {
     try {
@@ -447,9 +431,24 @@ document.addEventListener("click", async event => {
     try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/stop`, { method: "POST", body: "{}" }); state.activeRun = response.run; renderPipeline(); toast("Stop requested."); } catch (error) { showError(error); }
     return;
   }
+  if (event.target.closest("#run-delete")) {
+    if (!window.confirm(`Delete run ${state.activeRunId} and all of its generated assets? This cannot be undone.`)) return;
+    try {
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}`, { method: "DELETE" });
+      state.activeRun = null; state.activeRunId = null; renderPipeline(); await refreshRuns();
+      if (state.selectedTopicRef) await selectTopic(state.selectedTopicRef, true, false);
+      toast("Run and generated assets deleted.");
+    } catch (error) { showError(error); }
+    return;
+  }
   if (event.target.closest("#run-next")) {
     const next = Math.min(8, Number(state.activeRun.current_step || 0) + 1);
     return executeActive({ from_step: next, stop_after_step: next, confirm_paid_api: $("#run-paid-confirm")?.checked, task_models: collectTaskModels() }, `Step ${next} started.`);
+  }
+  const stepButton = event.target.closest(".step[data-step]");
+  if (stepButton) {
+    const selected = Number(stepButton.dataset.step);
+    return executeActive({ from_step: selected, stop_after_step: selected, confirm_paid_api: $("#run-paid-confirm")?.checked, task_models: collectTaskModels() }, `Step ${selected} started.`);
   }
   if (event.target.closest("#run-all")) {
     const next = Math.max(1, Number(state.activeRun.current_step || 0) + 1);
@@ -457,34 +456,36 @@ document.addEventListener("click", async event => {
   }
   if (event.target.closest("#run-step")) {
     const selected = Number($("#step-select").value);
-    return executeActive({ from_step: selected, stop_after_step: selected, confirm_paid_api: $("#run-paid-confirm")?.checked, force_paid_api: [2,3,5].includes(selected), task_models: collectTaskModels() }, `Step ${selected} started.`);
+    return executeActive({ from_step: selected, stop_after_step: selected, confirm_paid_api: $("#run-paid-confirm")?.checked, task_models: collectTaskModels() }, `Step ${selected} started.`);
+  }
+  if (event.target.closest("#regenerate-step")) {
+    const selected = Number($("#step-select").value);
+    if (!window.confirm(`Regenerate from step ${selected}? The selected stage and every later artifact will be removed.`)) return;
+    try {
+      const reset = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/reset`, { method: "POST", body: JSON.stringify({ step: selected }) });
+      state.activeRun = reset.run; renderPipeline();
+      return executeActive({ from_step: selected, stop_after_step: selected, task_models: collectTaskModels() }, `Step ${selected} regeneration started.`);
+    } catch (error) { showError(error); }
+    return;
   }
   if (event.target.closest("#render-button")) {
     try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/render`, { method: "POST", body: JSON.stringify({ quality: "high", fps: 30, workers: 1 }) }); state.activeRun = response.run; renderPipeline(); toast("High-quality MP4 render started."); } catch (error) { showError(error); }
     return;
   }
-  const sceneButton = event.target.closest(".scene-regenerate");
-  if (sceneButton) {
-    const sceneId = sceneButton.dataset.scene;
-    const note = $(`[data-scene-note="${sceneId}"]`)?.value || "";
-    if (!$("#run-paid-confirm")?.checked) return showError(new Error("Confirm paid APIs before regenerating a scene."));
-    try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/scenes/${encodeURIComponent(sceneId)}/regenerate`, { method: "POST", body: JSON.stringify({ confirm_paid_api: true, custom_instruction: note, task_models: collectTaskModels() }) }); state.activeRun = response.run; renderPipeline(); toast(`${sceneId} regeneration started.`); } catch (error) { showError(error); }
-  }
-  const chapterButton = event.target.closest(".chapter-repair");
-  if (chapterButton) {
-    const chapterId = chapterButton.dataset.chapter;
-    const note = $(`[data-chapter-note="${chapterId}"]`)?.value || "";
-    if (!$("#run-paid-confirm")?.checked) return showError(new Error("Confirm paid APIs before repairing a chapter."));
-    try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/chapters/${encodeURIComponent(chapterId)}/repair`, { method: "POST", body: JSON.stringify({ confirm_paid_api: true, custom_instruction: note, task_models: collectTaskModels() }) }); state.activeRun = response.run; renderPipeline(); toast(`${chapterId} repair started.`); } catch (error) { showError(error); }
+  if (event.target.closest("#start-preview")) {
+    const button = event.target.closest("button"); setBusy(button, true, "Starting player…");
+    try {
+      const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/preview`, { method: "POST", body: "{}" });
+      state.activeRun = response.run; renderPipeline(); toast("Motion Canvas video preview started. Press play in the embedded player.");
+    } catch (error) { showError(error); setBusy(button, false); }
+    return;
   }
 });
 
 document.addEventListener("input", event => {
   if (event.target.id === "topic-search") renderTopicList();
-  if (event.target.id === "asset-search") renderAssets();
 });
 document.addEventListener("change", event => {
-  if (event.target.id === "asset-category") renderAssets();
   if (event.target.classList.contains("topic-status-select")) updateCoverage(event.target);
   if (event.target.classList.contains("task-provider")) {
     const row = event.target.closest("[data-model-task]");
@@ -494,5 +495,5 @@ document.addEventListener("change", event => {
 });
 
 const initialView = location.hash.replace("#", "");
-if (["production", "curriculum", "assets", "runs"].includes(initialView)) switchViewTo(initialView);
+if (["production", "curriculum", "runs"].includes(initialView)) switchViewTo(initialView);
 boot();
