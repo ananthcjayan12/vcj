@@ -1,0 +1,22 @@
+<!doctype html>
+<html data-composition-id="direct_html_master" data-width="1920" data-height="1080" data-duration="6">
+<head><meta charset="utf-8"><link rel="stylesheet" href="./runtime/motion-core.css"><style>
+#stage{background:var(--science-bg-deep)} .card.panel text{font-size:18px;fill:#777777}.decorative-particle{fill:var(--science-red)}
+</style><script src="./runtime/gsap.min.js"></script><script src="./runtime/motion-core.js"></script><script src="./runtime/browser-probe.js"></script></head>
+<body><div id="viewport" data-composition-id="direct_html_master" data-width="1920" data-height="1080" data-duration="6"><svg id="stage" viewBox="0 0 1920 1080"><g id="camera"><g id="background-layer"></g><g id="world-layer">
+<!-- BEGIN CHAPTER chapter_01 -->
+<g data-chapter-id="chapter_01" data-start="0" data-end="6">
+  <g class="card panel" id="card-one" data-visual-object="card-one"><text x="120" y="180" data-qa="important">Tiny low contrast label</text></g>
+  <g class="card panel" id="card-two" data-visual-object="card-two"><text x="120" y="280">Second card</text></g>
+  <g class="card panel" id="card-three" data-visual-object="card-three"><text x="120" y="380">Third card</text></g>
+  <circle class="decorative-particle" data-decoration="particle" data-visual-object="particle-1" cx="1200" cy="200" r="18"/>
+  <circle class="decorative-particle" data-visual-object="particle-2" cx="1300" cy="280" r="18"/>
+  <circle fill="var(--science-cyan)" data-visual-object="cyan" cx="1400" cy="360" r="25"/>
+  <circle fill="var(--science-yellow)" data-visual-object="yellow" cx="1500" cy="440" r="25"/>
+  <circle fill="var(--science-green)" data-visual-object="green" cx="1600" cy="520" r="25"/>
+  <text x="120" y="540" font-size="28" fill="var(--science-text)" data-visual-object="text-wall">This deliberately long text wall repeats an explanation instead of visualising it and keeps adding words so that the state becomes difficult to scan, difficult to remember, and difficult to connect to the scientific objects. It describes causes, observations, models, calculations, conclusions, alternatives, reminders, caveats, instructions, definitions, examples, and summaries all at once. A learner would have to read this entire paragraph while listening to narration, even though the platform should use a focused diagram, direct labels, measured motion, and a concise result. More redundant wording is included here solely to exercise the text-heavy-state detector in the browser inspection fixture and verify that an invalid composition cannot pass the modern science-platform quality gate.</text>
+</g>
+<script>DirectHTML.registerChapter({ id: "chapter_01", start: 0, end: 6, build: function (chapter) { const tl = chapter.tl; tl.to("#particle-1", { x: 300, y: 160, duration: 5, ease: "none" }, 0); tl.set({}, {}, 6); } });</script>
+<!-- END CHAPTER chapter_01 -->
+</g><g id="diagram-layer"></g><g id="annotation-layer"></g><g id="overlay-layer"></g></g></svg><div id="html-overlay-layer"></div></div>
+<script>DirectHTML.boot({ videoId:"deliberate-failures",duration:6,chapters:[],objectiveIds:[],generatedBy:"fixture",version:"1.0",timelineId:"direct_html_master"});</script></body></html>

@@ -26,6 +26,22 @@ REGISTRY_DIR = ENGINE_ROOT / "registry"
 TOPICS_DIR = ENGINE_ROOT / "topics"
 COVERAGE_PATH = CURRICULUM_DIR / "coverage_registry.json"
 
+DIRECT_HTML_MODE = "direct-html"
+LEGACY_MODE = "legacy-recipes"
+GENERATION_STAGE_MAP = {
+    "inputs": 1,
+    "script": 2,
+    "audio": 3,
+    "timing": 4,
+    "direct-html-input": 5,
+    "direct-html-compose": 5,
+    "scenes": 5,
+    "direct-html-inspect": 6,
+    "direct-html-repair": 6,
+    "validate": 6,
+    "preview": 7,
+}
+
 VALID_STATES = (
     "uncovered",
     "planned",
@@ -518,6 +534,8 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001
         checks.append(("animation scenes", False, str(exc), True))
     checks.append(("Template Lab", (TEMPLATE_LAB_ROOT / "scripts" / "mav_generate.py").exists(), "repo-local", True))
+    checks.append(("direct-HTML runtime", (REPO_ROOT / "physics_animation_engine" / "direct_html" / "motion-core.js").exists(), "repo-local", True))
+    checks.append(("direct-HTML prompts", (TEMPLATE_LAB_ROOT / "prompts" / "direct_html_composer.system.txt").exists(), "repo-local", True))
     checks.append(("physics template", (TEMPLATE_LAB_ROOT / "templates" / "physics" / "config.json").exists(), "repo-local", True))
     checks.append(
         (
@@ -568,6 +586,158 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _template_import_paths() -> None:
+    for path in (TEMPLATE_LAB_ROOT, TEMPLATE_LAB_ROOT / "scripts"):
+        if str(path) not in sys.path:
+            sys.path.insert(0, str(path))
+
+
+def _require_cli_run_id(run_id: str) -> str:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,95}", run_id):
+        raise ValueError("Run ID must use lowercase letters, numbers, dots, underscores, or hyphens")
+    return run_id
+
+
+def _run_path(run_id: str) -> Path:
+    return TEMPLATE_LAB_ROOT / "runs" / _require_cli_run_id(run_id)
+
+
+def _stage_number(value: str | int) -> int:
+    text = str(value).strip().lower()
+    if text.isdigit() and 1 <= int(text) <= 7:
+        return int(text)
+    if text == "render":
+        return 8
+    if text not in GENERATION_STAGE_MAP:
+        raise ValueError(f"Unknown pipeline stage: {value}")
+    return GENERATION_STAGE_MAP[text]
+
+
+def _facts_path_for_run(run_id: str, explicit: Path | None, topic_ref: str | None) -> Path:
+    if explicit:
+        return explicit.expanduser().resolve()
+    run_path = _run_path(run_id)
+    studio = _read_json(run_path / "studio_run.json") if (run_path / "studio_run.json").exists() else {}
+    stored = studio.get("facts_path") if isinstance(studio, dict) else None
+    if stored:
+        return (REPO_ROOT / stored).resolve()
+    cached = _read_json(run_path / "input.json") if (run_path / "input.json").exists() else {}
+    ref = topic_ref or cached.get("topic_ref")
+    if ref:
+        return TOPICS_DIR / str(ref) / "facts.json"
+    raise RuntimeError("Pass --facts or --topic-ref when the run has no stored facts path")
+
+
+def cmd_generate_video(args: argparse.Namespace) -> int:
+    from_step = _stage_number(args.from_step)
+    stop_after = _stage_number(args.stop_after_step)
+    if from_step == 8 or stop_after == 8:
+        if from_step != 8 or stop_after != 8:
+            raise ValueError("render must be run as a standalone stage")
+        return cmd_render_html(args)
+    if from_step > stop_after:
+        raise ValueError("--from-step must not come after --stop-after-step")
+    facts = _facts_path_for_run(args.run_id, args.facts, args.topic_ref)
+    command = [
+        sys.executable,
+        str(TEMPLATE_LAB_ROOT / "scripts" / "mav_generate.py"),
+        "--run-id", args.run_id,
+        "--facts", str(facts),
+        "--animation-mode", args.animation_mode,
+        "--from-step", str(from_step),
+        "--stop-after-step", str(stop_after),
+        "--model-provider", args.model_provider,
+        "--audio-provider", args.audio_provider,
+    ]
+    auto_repair = args.animation_mode == DIRECT_HTML_MODE and from_step <= 6 <= stop_after
+    paid = any(from_step <= step <= stop_after for step in (2, 3, 5)) or auto_repair
+    if paid:
+        if not args.confirm_paid_api:
+            raise RuntimeError("This stage range may call paid model/audio APIs; pass --confirm-paid-api")
+        command.extend(["--use-model", "--confirm-paid-api"])
+    if auto_repair:
+        command.append("--auto-repair")
+    if args.force_paid_api:
+        command.append("--force-paid-api")
+    if args.skip_browser_inspection:
+        command.append("--skip-browser-inspection")
+    return subprocess.run(command, cwd=REPO_ROOT).returncode
+
+
+def _load_direct_context(run_id: str) -> tuple[Path, dict[str, Any]]:
+    _template_import_paths()
+    from direct_html.pipeline import load_prepared
+
+    path = _run_path(run_id)
+    return path, load_prepared(path)
+
+
+def cmd_compose_html(args: argparse.Namespace) -> int:
+    if not args.confirm_paid_api:
+        raise RuntimeError("Direct-HTML composition may call a paid coding model; pass --confirm-paid-api")
+    _template_import_paths()
+    from direct_html.pipeline import compose, prepare_input
+
+    path = _run_path(args.run_id)
+    prepared = prepare_input(path, _read_json(path / "input.json"), _read_json(path / "narration.json"), _read_json(path / "audio_timing.json"))
+    result = compose(path, prepared, force=args.force_paid_api)
+    print(result["master"])
+    return 0
+
+
+def cmd_inspect_html(args: argparse.Namespace) -> int:
+    _template_import_paths()
+    from direct_html.pipeline import validate_and_inspect
+
+    path, prepared = _load_direct_context(args.run_id)
+    result = validate_and_inspect(path, prepared, browser=True)
+    print(json.dumps(result, indent=2, default=str))
+    return 0 if result["inspection"].get("status") == "passed" else 1
+
+
+def cmd_repair_html(args: argparse.Namespace) -> int:
+    if not args.confirm_paid_api:
+        raise RuntimeError("Chapter repair may call a paid coding model; pass --confirm-paid-api")
+    _template_import_paths()
+    from direct_html.repair_loop import repair_chapter
+
+    path, prepared = _load_direct_context(args.run_id)
+    report_path = path / "direct_html" / "validation" / "final_direct_html_report.json"
+    report = _read_json(report_path) if report_path.exists() else {}
+    findings = []
+    for chapter in (report.get("browser") or {}).get("chapters", []):
+        if chapter.get("chapter_id") == args.chapter:
+            findings.append(chapter)
+    result = repair_chapter(path, args.chapter, findings, prepared["bundle"], prepared["physics_context"], instruction=args.instruction or "")
+    print(result["master"])
+    return 0
+
+
+def cmd_preview_html(args: argparse.Namespace) -> int:
+    _template_import_paths()
+    from direct_html.pipeline import build_preview_manifest
+    from mav_preview import preview_url
+
+    build_preview_manifest(_run_path(args.run_id))
+    print(preview_url(args.run_id, args.port))
+    return 0
+
+
+def cmd_render_html(args: argparse.Namespace) -> int:
+    _template_import_paths()
+    from mav_render import render_mp4
+
+    output = render_mp4(
+        args.run_id,
+        fps=getattr(args, "fps", 30),
+        quality=getattr(args, "quality", "standard"),
+        workers=getattr(args, "workers", 1),
+        animation_mode=DIRECT_HTML_MODE,
+    )
+    print(output)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Control curriculum coverage and prepare manual IGCSE Physics video runs.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -599,6 +769,52 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor_parser = subparsers.add_parser("doctor", help="Check local sources and full-render dependencies.")
     doctor_parser.set_defaults(func=cmd_doctor)
+
+    generate_parser = subparsers.add_parser("generate-video", help="Generate or resume a video run using the selected animation route.")
+    generate_parser.add_argument("run_id")
+    generate_parser.add_argument("--topic-ref", choices=TOPIC_ORDER)
+    generate_parser.add_argument("--facts", type=Path)
+    generate_parser.add_argument("--animation-mode", choices=(DIRECT_HTML_MODE, LEGACY_MODE), default=LEGACY_MODE)
+    generate_parser.add_argument("--from-step", default="1")
+    generate_parser.add_argument("--stop-after-step", default="7")
+    generate_parser.add_argument("--model-provider", choices=("configured", "gemini", "anthropic", "zai", "moonshot"), default="configured")
+    generate_parser.add_argument("--audio-provider", choices=("auto", "gemini", "elevenlabs"), default="auto")
+    generate_parser.add_argument("--confirm-paid-api", action="store_true")
+    generate_parser.add_argument("--force-paid-api", action="store_true")
+    generate_parser.add_argument("--skip-browser-inspection", action="store_true")
+    generate_parser.add_argument("--fps", type=int, default=30)
+    generate_parser.add_argument("--quality", choices=("draft", "standard", "high"), default="standard")
+    generate_parser.add_argument("--workers", type=int, default=1)
+    generate_parser.set_defaults(func=cmd_generate_video)
+
+    compose_parser = subparsers.add_parser("compose-html", help="Compose or reuse one full-lesson direct-HTML application.")
+    compose_parser.add_argument("run_id")
+    compose_parser.add_argument("--confirm-paid-api", action="store_true")
+    compose_parser.add_argument("--force-paid-api", action="store_true")
+    compose_parser.set_defaults(func=cmd_compose_html)
+
+    inspect_parser = subparsers.add_parser("inspect-html", help="Validate direct HTML in Chromium and capture chapter QA artifacts.")
+    inspect_parser.add_argument("run_id")
+    inspect_parser.set_defaults(func=cmd_inspect_html)
+
+    repair_parser = subparsers.add_parser("repair-html", help="Repair one comment-delimited direct-HTML chapter.")
+    repair_parser.add_argument("run_id")
+    repair_parser.add_argument("--chapter", required=True)
+    repair_parser.add_argument("--instruction")
+    repair_parser.add_argument("--confirm-paid-api", action="store_true")
+    repair_parser.set_defaults(func=cmd_repair_html)
+
+    preview_parser = subparsers.add_parser("preview-html", help="Print the local preview URL for a direct-HTML run.")
+    preview_parser.add_argument("run_id")
+    preview_parser.add_argument("--port", type=int, default=8766)
+    preview_parser.set_defaults(func=cmd_preview_html)
+
+    render_parser = subparsers.add_parser("render-html", help="Render an approved direct-HTML run through HyperFrames and FFmpeg.")
+    render_parser.add_argument("run_id")
+    render_parser.add_argument("--fps", type=int, default=30, choices=(24, 25, 30, 50, 60))
+    render_parser.add_argument("--quality", choices=("draft", "standard", "high"), default="standard")
+    render_parser.add_argument("--workers", type=int, default=1)
+    render_parser.set_defaults(func=cmd_render_html)
     return parser
 
 

@@ -88,3 +88,5 @@ python3 -m video_engine.cli prepare-topic 1.1
 ```
 
 Read [`END_TO_END_README.md`](END_TO_END_README.md) for installation and the complete generation, preview, render, review, and coverage workflow. For a stage-by-stage account of scene selection, recipe compilation, slowdown diagnosis, and low-engagement repair, see [`SCENE_GENERATION_PIPELINE_README.md`](SCENE_GENERATION_PIPELINE_README.md). Publication remains manual.
+
+The video pipeline also includes a comparison-gated `direct-html` animation mode. It composes one continuous modern science-platform lesson, inspects chapter frames in Chromium, supports atomic chapter repair, and renders through the existing HyperFrames/FFmpeg path. See [`template_lab/README.md`](template_lab/README.md) for commands. The legacy route remains the default until the documented rollout gates pass.

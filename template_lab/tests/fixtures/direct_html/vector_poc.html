@@ -1,0 +1,111 @@
+<!doctype html>
+<html data-composition-id="direct_html_master" data-width="1920" data-height="1080" data-duration="46.64">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Vector Addition — Direct HTML</title>
+  <link rel="stylesheet" href="./runtime/motion-core.css">
+  <style>
+    #stage { background: radial-gradient(circle at 38% 42%, var(--science-surface), var(--science-bg-deep) 68%); }
+    #lab-grid { opacity: .18; }
+    #vector-title { font: 750 42px/1 var(--font-ui); fill: var(--science-text); letter-spacing: -.02em; }
+    .axis-label { font: 650 30px/1 var(--font-ui); fill: var(--science-muted); }
+    .vector-label { font: 750 34px/1 var(--font-data); fill: var(--science-text); }
+    #equation-surface { fill: var(--science-light); }
+    #equation, #result { font-family: var(--font-data); fill: var(--science-ink); }
+    #equation { font-size: 46px; }
+    #result { font-size: 76px; font-weight: 700; }
+    #robot-body { fill: var(--science-surface-soft); stroke: var(--science-cyan); stroke-width: 7; }
+    #robot-eye { fill: var(--science-text); }
+    .wheel { fill: var(--science-bg-deep); stroke: var(--science-muted); stroke-width: 5; }
+  </style>
+  <script src="./runtime/gsap.min.js"></script>
+  <script src="./runtime/phrase-timing.js"></script>
+  <script src="./runtime/physics-helpers.js"></script>
+  <script src="./runtime/asset-loader.js"></script>
+  <script src="./runtime/motion-core.js"></script>
+  <script src="./runtime/browser-probe.js"></script>
+</head>
+<body>
+  <div id="viewport" data-composition-id="direct_html_master" data-width="1920" data-height="1080" data-duration="46.64">
+    <svg id="stage" viewBox="0 0 1920 1080" role="img" aria-label="Interactive vector addition simulation">
+      <defs>
+        <pattern id="grid-pattern" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M 80 0 L 0 0 0 80" fill="none" stroke="var(--science-cyan)" stroke-width="2"/></pattern>
+        <marker id="blue-arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="var(--science-blue)"/></marker>
+        <marker id="cyan-arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="var(--science-cyan)"/></marker>
+        <marker id="green-arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="var(--science-green)"/></marker>
+      </defs>
+      <g id="camera">
+        <g id="background-layer"><rect id="lab-grid" width="1920" height="1080" fill="url(#grid-pattern)"/></g>
+        <g id="world-layer">
+          <!-- BEGIN CHAPTER chapter_01 -->
+          <g data-chapter-id="chapter_01" data-start="0" data-end="46.64" data-paragraph-ids="paragraph_09 paragraph_10" data-objective-ids="1_1_S07">
+            <text id="vector-title" x="120" y="160" data-qa="important">Two forces. One path.</text>
+            <g id="robot" data-visual-object="robot" data-qa="important" data-claim-id="1_1_S07">
+              <rect id="robot-body" x="338" y="680" width="164" height="112" rx="28"/>
+              <circle id="robot-eye" cx="420" cy="726" r="18"/>
+              <circle class="wheel" cx="372" cy="808" r="28"/><circle class="wheel" cx="468" cy="808" r="28"/>
+            </g>
+            <g id="north-vector" data-visual-object="north-vector" data-qa="important" data-claim-id="1_1_S07">
+              <path id="north-path" d="M420 750 L420 390" fill="none" stroke="var(--science-blue)" stroke-width="12" marker-end="url(#blue-arrow)"/>
+              <text class="vector-label" x="455" y="555">3 N north</text>
+            </g>
+            <g id="east-vector" data-visual-object="east-vector" data-qa="important" data-claim-id="1_1_S07">
+              <path id="east-path" d="M420 390 L900 390" fill="none" stroke="var(--science-cyan)" stroke-width="12" marker-end="url(#cyan-arrow)"/>
+              <text class="vector-label" x="610" y="350">4 N east</text>
+            </g>
+            <g id="resultant-vector" data-visual-object="resultant-vector" data-qa="important" data-claim-id="1_1_S07">
+              <path id="resultant-path" d="M420 750 L900 390" fill="none" stroke="var(--science-green)" stroke-width="14" marker-end="url(#green-arrow)"/>
+              <text class="vector-label" x="675" y="610" fill="var(--science-green)">resultant</text>
+            </g>
+            <g id="equation-panel" data-visual-object="equation" data-claim-id="1_1_S07">
+              <rect id="equation-surface" x="1120" y="260" width="650" height="500" rx="42"/>
+              <text id="equation" x="1185" y="385" data-qa="important">R = √(3² + 4²)</text>
+              <text id="equation-step" x="1185" y="485" font-family="var(--font-data)" font-size="46" fill="var(--science-ink)" data-qa="important">R = √25</text>
+              <text id="result" x="1185" y="620" data-qa="important" data-physics-key="resultant_force_n" data-value="5" data-unit="N">R = 5 N</text>
+            </g>
+          </g>
+          <script>
+            DirectHTML.registerChapter({ id: "chapter_01", start: 0, end: 46.64, paragraphIds: ["paragraph_09", "paragraph_10"], objectiveIds: ["1_1_S07"], build: function (chapter) {
+              const tl = chapter.tl;
+              const root = chapter.root;
+              const core = chapter.core;
+              const title = root.querySelector("#vector-title");
+              const robot = root.querySelector("#robot");
+              const north = root.querySelector("#north-vector");
+              const east = root.querySelector("#east-vector");
+              const resultant = root.querySelector("#resultant-vector");
+              const equation = root.querySelector("#equation-panel");
+              tl.fromTo(title, { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: .5, ease: "power2.out" }, 0);
+              tl.fromTo(robot, { opacity: 0, scale: .8 }, { opacity: 1, scale: 1, duration: .6, ease: "power2.out" }, 3.5);
+              const northDraw = core.drawPath(root.querySelector("#north-path"), { duration: 1.1 });
+              tl.fromTo(north, { opacity: 0 }, { opacity: 1, duration: .4 }, 7.5).to(northDraw.targets, northDraw.vars, 8);
+              tl.to(robot, { y: -55, duration: .7, ease: "power2.inOut" }, 11.5);
+              const eastDraw = core.drawPath(root.querySelector("#east-path"), { duration: 1.1 });
+              tl.fromTo(east, { opacity: 0 }, { opacity: 1, duration: .4 }, 15).to(eastDraw.targets, eastDraw.vars, 15.5);
+              tl.to(robot, { x: 65, duration: .7, ease: "power2.inOut" }, 19);
+              const resultDraw = core.drawPath(root.querySelector("#resultant-path"), { duration: 1.2 });
+              tl.fromTo(resultant, { opacity: 0 }, { opacity: 1, duration: .4 }, 22.5).to(resultDraw.targets, resultDraw.vars, 23);
+              tl.to([north, east], { opacity: .38, duration: .5 }, 27);
+              tl.fromTo(equation, { opacity: 0, x: 50 }, { opacity: 1, x: 0, duration: .65, ease: "power2.out" }, 30.5);
+              tl.fromTo(root.querySelector("#equation-step"), { opacity: 0 }, { opacity: 1, duration: .45 }, 35);
+              tl.fromTo(root.querySelector("#result"), { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: .55 }, 39);
+              tl.to(robot, { x: 480, y: -360, duration: 1.3, ease: "power2.inOut" }, 43.5);
+            } });
+          </script>
+          <!-- END CHAPTER chapter_01 -->
+        </g>
+        <g id="diagram-layer"></g><g id="annotation-layer"></g><g id="overlay-layer"></g>
+      </g>
+    </svg>
+    <div id="html-overlay-layer"></div>
+    <audio id="lesson-audio" src="../voiceover.mp3" preload="auto"></audio>
+  </div>
+  <script>
+    window.lessonTiming = { words: [] };
+    window.lessonPhysics = { values: { resultant_force_n: 5 } };
+    window.lessonAssets = { assets: [] };
+    DirectHTML.boot({ videoId: "vector-poc", duration: 46.64, chapters: [], objectiveIds: ["1_1_S07"], generatedBy: "hand-authored-fixture", version: "1.0", timelineId: "direct_html_master" });
+  </script>
+</body>
+</html>

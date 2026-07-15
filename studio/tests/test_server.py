@@ -5,10 +5,11 @@ import tempfile
 import threading
 import unittest
 import urllib.request
+from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _infer_step, _require_run_id, build_generation_command, build_server, dashboard_payload, model_map_payload, topic_detail
+from studio.server import _infer_step, _normalized_meta, _require_run_id, build_generation_command, build_server, dashboard_payload, model_map_payload, topic_detail
 
 
 class StudioPayloadTest(unittest.TestCase):
@@ -51,9 +52,26 @@ class StudioPayloadTest(unittest.TestCase):
         self.assertEqual(env["MAV_SCRIPT_WRITING_PROVIDER"], "anthropic")
         self.assertEqual(env["MAV_SCRIPT_WRITING_MODEL"], "claude-opus-4-8")
 
+    def test_script_provider_does_not_override_direct_composer(self) -> None:
+        meta = {
+            "id": "physics-1-1-command-test",
+            "facts_path": "video_engine/topics/1.1/facts.json",
+            "settings": {"duration": 480, "model_provider": "anthropic", "audio_provider": "gemini"},
+        }
+        with patch.dict("os.environ", {}, clear=True):
+            command, env = build_generation_command(
+                meta,
+                {"from_step": 2, "stop_after_step": 5, "confirm_paid_api": True},
+            )
+        provider_index = command.index("--model-provider")
+        self.assertEqual(command[provider_index + 1], "configured")
+        self.assertEqual(env["MAV_SCRIPT_STRUCTURE_PROVIDER"], "anthropic")
+        self.assertEqual(env["MAV_SCRIPT_WRITING_PROVIDER"], "anthropic")
+        self.assertNotIn("MAV_DIRECT_HTML_COMPOSER_PROVIDER", env)
+
     def test_model_map_covers_all_paid_pipeline_tasks(self) -> None:
         tasks = {item["task"] for item in model_map_payload()["tasks"]}
-        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "scene_asset_shortlister", "scene_asset_router", "module_parameterizer", "v3_creative_director", "v3_scene_coder"})
+        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "scene_asset_shortlister", "scene_asset_router", "module_parameterizer", "v3_creative_director", "v3_scene_coder", "direct_html_composer", "direct_html_repair", "direct_html_review"})
 
     def test_generation_summary_uses_actual_stopped_step(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -68,6 +86,25 @@ class StudioPayloadTest(unittest.TestCase):
             (run_path / "preview_manifest_v3.json").write_text("{}")
             (run_path / "generation_summary.json").write_text(json.dumps({"visual_qa": "skipped"}))
             self.assertEqual(_infer_step(run_path), 8)
+
+    def test_existing_run_metadata_backfills_facts_and_paid_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_path = Path(directory)
+            (run_path / "input.json").write_text(
+                json.dumps(
+                    {
+                        "topic_ref": "1.1",
+                        "topic": "1.1 Physical quantities and measurement techniques",
+                        "target_duration_seconds": 300,
+                        "animation_mode": "direct-html",
+                    }
+                )
+            )
+            normalized = _normalized_meta(run_path, {"id": "old-run", "settings": {}})
+            self.assertEqual(normalized["facts_path"], "video_engine/topics/1.1/facts.json")
+            self.assertEqual(normalized["settings"]["duration"], 300)
+            self.assertEqual(normalized["settings"]["animation_mode"], "direct-html")
+            self.assertFalse(normalized["settings"]["confirm_paid_api"])
 
 
 class StudioHttpTest(unittest.TestCase):
@@ -92,7 +129,7 @@ class StudioHttpTest(unittest.TestCase):
     def test_model_map_api(self) -> None:
         with urllib.request.urlopen(f"{self.base}/api/model-map", timeout=5) as response:
             payload = json.load(response)
-        self.assertEqual(len(payload["tasks"]), 8)
+        self.assertEqual(len(payload["tasks"]), 11)
 
     def test_static_application(self) -> None:
         with urllib.request.urlopen(f"{self.base}/", timeout=5) as response:

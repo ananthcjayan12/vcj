@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "description": "The seven active model tasks in the Physics V3 lesson pipeline.",
+  "description": "Model tasks used by the legacy V3 and direct-HTML lesson pipelines.",
   "tasks": {
     "script_structure": {
       "provider": "gemini",
@@ -86,6 +86,46 @@
       "provider_env_var": "MAV_V3_SCENE_CODER_PROVIDER",
       "env_var": "MAV_V3_SCENE_CODER_MODEL",
       "prompt_files": ["v3_scene_coder.system.txt"]
+    },
+    "direct_html_composer": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {
+        "moonshot": "kimi-k2.7-code",
+        "gemini": "gemini-3.5-flash",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 64000,
+      "timeout_seconds": 1800,
+      "provider_env_var": "MAV_DIRECT_HTML_COMPOSER_PROVIDER",
+      "env_var": "MAV_DIRECT_HTML_COMPOSER_MODEL",
+      "prompt_files": ["direct_html_composer.system.txt", "direct_html_design_system.txt"]
+    },
+    "direct_html_repair": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {
+        "moonshot": "kimi-k2.7-code",
+        "gemini": "gemini-3.5-flash",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 24000,
+      "timeout_seconds": 1200,
+      "provider_env_var": "MAV_DIRECT_HTML_REPAIR_PROVIDER",
+      "env_var": "MAV_DIRECT_HTML_REPAIR_MODEL",
+      "prompt_files": ["direct_html_repair.system.txt", "direct_html_design_system.txt"]
+    },
+    "direct_html_review": {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash",
+      "provider_models": {
+        "gemini": "gemini-3.5-flash",
+        "anthropic": "claude-sonnet-5"
+      },
+      "max_tokens": 8000,
+      "provider_env_var": "MAV_DIRECT_HTML_REVIEW_PROVIDER",
+      "env_var": "MAV_DIRECT_HTML_REVIEW_MODEL",
+      "prompt_files": ["direct_html_review.system.txt", "direct_html_design_system.txt"]
     }
   }
 }

@@ -18,9 +18,11 @@ def parse_args() -> argparse.Namespace:
 
 def preview_url(run_id: str, port: int) -> str:
     path = run_dir(run_id)
-    manifest_path = path / "preview_manifest_v3.json"
+    manifest_path = path / "preview_manifest.json"
     if not manifest_path.exists():
-        raise RuntimeError(f"Missing Physics V3 preview manifest: {manifest_path}")
+        manifest_path = path / "preview_manifest_v3.json"
+    if not manifest_path.exists():
+        raise RuntimeError(f"Missing preview manifest for run: {path}")
     manifest = read_json(manifest_path)
     return f"http://127.0.0.1:{port}/runs/{path.name}/{manifest['master']}"
 

@@ -17,7 +17,9 @@ const percent = (value, total) => total ? Math.round((Number(value) / Number(tot
 const formatNumber = value => Number(value || 0).toLocaleString();
 const formatUsd = value => { const number = Number(value || 0); return number >= 1 ? `$${number.toFixed(2)}` : `$${number.toFixed(4)}`; };
 const activeStatuses = new Set(["running", "rendering"]);
-const steps = ["Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA"];
+const legacySteps = ["Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA"];
+const directSteps = ["Inputs", "Script", "Audio", "Timing", "Compose", "Inspect / Repair", "Preview", "QA"];
+const stepsForRun = run => (run?.settings?.animation_mode === "direct-html" || run?.artifacts?.animation_mode === "direct-html") ? directSteps : legacySteps;
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -83,7 +85,19 @@ function artifactUrl(runId, path) {
 
 function selectedTaskModels(run) {
   const overrides = run.settings?.task_models || {};
-  return Object.fromEntries((run.model_map?.tasks || []).map(task => [task.task, overrides[task.task] || { provider: task.provider, model: task.model }]));
+  return Object.fromEntries((run.model_map?.tasks || []).map(task => {
+    if (overrides[task.task]) return [task.task, overrides[task.task]];
+    let provider = task.provider;
+    if (["script_structure", "script_writing"].includes(task.task)) {
+      const requested = run.settings?.model_provider;
+      if (requested && requested !== "configured" && task.provider_models?.[requested]) provider = requested;
+    }
+    if (task.task === "audio_generation") {
+      const requested = run.settings?.audio_provider;
+      if (requested && task.provider_models?.[requested]) provider = requested;
+    }
+    return [task.task, { provider, model: task.provider_models?.[provider] || task.model }];
+  }));
 }
 
 function modelMapMarkup(run, working) {
@@ -160,7 +174,7 @@ function renderTopicList() {
   }).join("") || `<div class="loading-card">No matching topic.</div>`;
 }
 
-async function selectTopic(topicRef, rerenderList = true) {
+async function selectTopic(topicRef, rerenderList = true, syncActiveRun = true) {
   state.selectedTopicRef = topicRef;
   if (rerenderList) renderTopicList();
   $("#topic-detail").innerHTML = `<div class="loading-card">Loading ${escapeHtml(topicRef)}…</div>`;
@@ -168,7 +182,16 @@ async function selectTopic(topicRef, rerenderList = true) {
     state.topicDetail = await request(`/api/topics/${encodeURIComponent(topicRef)}`);
     renderTopicDetail();
     const topicRuns = state.topicDetail.runs || [];
-    if (!state.activeRunId && topicRuns[0]) await selectRun(topicRuns[0].id, false);
+    if (syncActiveRun && state.activeRun?.topic_ref !== topicRef) {
+      if (topicRuns[0]) {
+        await selectRun(topicRuns[0].id, false);
+      } else {
+        state.activeRunId = null;
+        state.activeRun = null;
+        managePolling();
+        renderPipeline();
+      }
+    }
   } catch (error) { showError(error); }
 }
 
@@ -203,11 +226,13 @@ function renderTopicDetail() {
       </section>
     </div>
     <div class="production-form">
+      <p class="model-map-note">These settings apply to the next new run. To change an existing run, use its active-run controls and model map below.</p>
       <div class="form-grid">
         <label class="field"><span>Run ID</span><input id="run-id-input" value="${escapeHtml(runDefault)}"></label>
         <label class="field"><span>Duration</span><select id="duration-input"><option value="300">5 minutes</option><option value="480" selected>8 minutes</option><option value="600">10 minutes</option><option value="720">12 minutes</option></select></label>
         <label class="field"><span>Script model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><option value="configured">Configured</option></select></label>
         <label class="field"><span>Voice</span><select id="audio-provider"><option value="gemini">Gemini TTS</option><option value="elevenlabs">ElevenLabs</option></select></label>
+        <label class="field"><span>Animation</span><select id="animation-mode"><option value="legacy-recipes">Legacy recipes · current default</option><option value="direct-html">Direct HTML · modern science</option></select></label>
         <label class="field"><span>Scene workers</span><select id="scene-concurrency"><option>1</option><option>2</option><option>4</option></select></label>
       </div>
       <div class="form-actions">
@@ -231,9 +256,11 @@ function renderPipeline() {
   const working = activeStatuses.has(run.status) || run.process_active;
   const artifacts = run.artifacts || {};
   const completed = Number(run.current_step || 0);
+  const steps = stepsForRun(run);
+  const direct = artifacts.animation_mode === "direct-html" || run.settings?.animation_mode === "direct-html";
   root.innerHTML = `
     <div class="run-header">
-      <div><p class="eyebrow">Active production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><span class="run-id">${escapeHtml(run.id)}</span></div>
+      <div><p class="eyebrow">Active production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><span class="run-id">${escapeHtml(run.id)} · ${direct ? "DIRECT HTML" : "LEGACY RECIPES"}</span><small class="run-settings-summary">${Number(run.settings?.duration || 480) / 60} min · script ${escapeHtml(run.settings?.model_provider || "configured")} · voice ${escapeHtml(run.settings?.audio_provider || "configured")} · paid confirmation ${run.settings?.confirm_paid_api ? "enabled" : "required"}</small></div>
       <div class="run-header-actions">
         <button class="secondary-button" id="run-refresh">Refresh</button>
         <button class="danger-button" id="run-stop" ${working ? "" : "disabled"}>Stop</button>
@@ -247,7 +274,7 @@ function renderPipeline() {
       return `<button class="step${completed >= number ? " is-done" : ""}${working && completed + 1 === number ? " is-current" : ""}" data-step="${number}" ${working ? "disabled" : ""}><span>${completed >= number ? "✓" : number}</span><b>${name}</b></button>`;
     }).join("")}</div>
     <div class="run-workspace">
-      <div class="preview-shell"><div class="preview-toolbar"><span>V3 COMPOSITION PREVIEW</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank">OPEN ↗</a>` : "WAITING FOR STEP 7"}</div>${artifacts.preview_url ? `<iframe class="preview-frame" src="${escapeHtml(artifacts.preview_url)}" title="Video preview"></iframe>` : `<div class="preview-placeholder">Preview becomes available after step 7.</div>`}</div>
+      <div class="preview-shell"><div class="preview-toolbar"><span>${direct ? "MODERN SCIENCE · DIRECT HTML" : "V3 COMPOSITION PREVIEW"}</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank">OPEN ↗</a>` : "WAITING FOR STEP 7"}</div>${artifacts.preview_url ? `<iframe class="preview-frame" src="${escapeHtml(artifacts.preview_url)}" title="Video preview"></iframe>` : `<div class="preview-placeholder">Preview becomes available after step 7.</div>`}</div>
       <div class="run-side">
         <div class="run-control-card"><h3>Resume a specific stage</h3><div class="step-control"><select id="step-select">${steps.map((name,index) => `<option value="${index+1}">${index+1}. ${name}</option>`).join("")}</select><button class="secondary-button" id="run-step" ${working ? "disabled" : ""}>Run selected step</button></div><label class="paid-check" style="margin-top:9px"><input type="checkbox" id="run-paid-confirm" ${run.settings?.confirm_paid_api ? "checked" : ""}> Confirm paid APIs when required</label></div>
         <div class="run-control-card"><h3>Generated artifacts</h3><div class="artifact-list">${artifacts.files?.length ? artifacts.files.map(path => `<a href="${artifactUrl(run.id, path)}" target="_blank" title="${escapeHtml(path)}"><span>${escapeHtml(artifactLabel(path))}</span><small>${escapeHtml(path)}</small><b>OPEN ↗</b></a>`).join("") : `<p class="artifact-empty">Artifacts appear after each completed stage.</p>`}</div></div>
@@ -258,6 +285,7 @@ function renderPipeline() {
     </div>
     <div class="run-intelligence">${modelMapMarkup(run, working)}${costMarkup(artifacts)}</div>
     ${artifacts.asset_shortlist?.selected_modules ? `<section class="shortlist-panel"><div><p class="eyebrow">Lesson asset shortlist · ${artifacts.asset_shortlist.selected_modules.length} of ${Number(artifacts.asset_shortlist.registry_scene_count || 35)}</p><h3>Only these modules continue to detailed routing</h3><p>${escapeHtml(artifacts.asset_shortlist.reason || "")}</p></div><div class="shortlist-chips">${artifacts.asset_shortlist.selected_modules.map(name => `<span>${escapeHtml(name)}</span>`).join("") || `<span>Custom scenes only</span>`}</div></section>` : ""}
+    ${artifacts.chapters?.length ? `<div class="panel-heading compact"><div><p class="eyebrow">Integrated lesson · browser-inspected chapters</p><h2>Review and repair individual chapters</h2></div><span class="count-chip">${artifacts.chapters.length} chapters</span></div><div class="scene-list">${artifacts.chapters.map(chapter => { const findings = chapter.findings || []; const scores = chapter.visual_review?.scores || {}; const scoreText = Object.keys(scores).length ? `Review ${(Object.values(scores).map(Number).reduce((a,b)=>a+b,0) / Object.keys(scores).length).toFixed(1)}/5` : "Visual review pending"; return `<article class="scene-row chapter-row"><strong>${escapeHtml(chapter.chapter_id)}<br><small>${Number(chapter.duration || 0).toFixed(1)}s</small><span class="route-mode recipe">${escapeHtml(chapter.status || "generated")}</span></strong>${chapter.screenshots?.peak ? `<a href="${escapeHtml(chapter.screenshots.peak)}" target="_blank"><img class="chapter-preview" src="${escapeHtml(chapter.screenshots.peak)}" alt="${escapeHtml(chapter.chapter_id)} peak frame"></a>` : ""}<p><b>${escapeHtml((chapter.objective_ids || []).join(", "))}</b>${escapeHtml((chapter.paragraph_ids || []).join(" · ") || "Integrated visual chapter")}<small>${escapeHtml(scoreText)} · ${findings.length ? escapeHtml(findings.map(item => item.code).join(", ")) : "No design-system findings"}</small></p><input class="scene-note" data-chapter-note="${escapeHtml(chapter.chapter_id)}" placeholder="Focused visual repair instruction"><button class="secondary-button chapter-repair" data-chapter="${escapeHtml(chapter.chapter_id)}" ${working ? "disabled" : ""}>Repair chapter</button></article>`; }).join("")}</div>` : ""}
     ${artifacts.scenes?.length ? `<div class="panel-heading compact"><div><p class="eyebrow">Scene routing · ${Number(artifacts.routing_summary?.module || 0)} modules · ${Number(artifacts.routing_summary?.custom || 0)} custom</p><h2>Review and regenerate individual scenes</h2></div><span class="count-chip">${artifacts.scenes.length} scenes</span></div><div class="scene-list">${artifacts.scenes.map(scene => `<article class="scene-row"><strong>${escapeHtml(scene.id)}<br><small>${Number(scene.duration || 0).toFixed(1)}s</small><span class="route-mode ${escapeHtml(scene.renderer)}">${escapeHtml(scene.module || scene.route || "custom")}</span></strong><p><b>${escapeHtml(scene.routing?.reason || "")}</b>${escapeHtml(scene.narration_text || scene.beat_label || "Scene")}</p><input class="scene-note" data-scene-note="${escapeHtml(scene.id)}" placeholder="Direction for rerouting or regeneration"><button class="secondary-button scene-regenerate" data-scene="${escapeHtml(scene.id)}" ${working ? "disabled" : ""}>Regenerate</button></article>`).join("")}</div>` : ""}`;
   loadLogs(run.id);
   managePolling();
@@ -272,7 +300,7 @@ async function selectRun(runId, switchView = true) {
     renderPipeline();
     if (switchView) {
       switchViewTo("production");
-      if (state.activeRun.topic_ref && state.selectedTopicRef !== state.activeRun.topic_ref) await selectTopic(state.activeRun.topic_ref);
+      if (state.activeRun.topic_ref && state.selectedTopicRef !== state.activeRun.topic_ref) await selectTopic(state.activeRun.topic_ref, true, false);
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     }
   } catch (error) { showError(error); }
@@ -352,6 +380,7 @@ function productionPayload(execute) {
     duration: Number($("#duration-input").value),
     model_provider: $("#model-provider").value,
     audio_provider: $("#audio-provider").value,
+    animation_mode: $("#animation-mode").value,
     scene_concurrency: Number($("#scene-concurrency").value),
     confirm_paid_api: $("#paid-confirm").checked,
     execute
@@ -440,6 +469,13 @@ document.addEventListener("click", async event => {
     const note = $(`[data-scene-note="${sceneId}"]`)?.value || "";
     if (!$("#run-paid-confirm")?.checked) return showError(new Error("Confirm paid APIs before regenerating a scene."));
     try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/scenes/${encodeURIComponent(sceneId)}/regenerate`, { method: "POST", body: JSON.stringify({ confirm_paid_api: true, custom_instruction: note, task_models: collectTaskModels() }) }); state.activeRun = response.run; renderPipeline(); toast(`${sceneId} regeneration started.`); } catch (error) { showError(error); }
+  }
+  const chapterButton = event.target.closest(".chapter-repair");
+  if (chapterButton) {
+    const chapterId = chapterButton.dataset.chapter;
+    const note = $(`[data-chapter-note="${chapterId}"]`)?.value || "";
+    if (!$("#run-paid-confirm")?.checked) return showError(new Error("Confirm paid APIs before repairing a chapter."));
+    try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/chapters/${encodeURIComponent(chapterId)}/repair`, { method: "POST", body: JSON.stringify({ confirm_paid_api: true, custom_instruction: note, task_models: collectTaskModels() }) }); state.activeRun = response.run; renderPipeline(); toast(`${chapterId} repair started.`); } catch (error) { showError(error); }
   }
 });
 

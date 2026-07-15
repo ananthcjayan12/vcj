@@ -1,0 +1,12 @@
+<!doctype html>
+<html data-composition-id="direct_html_master" data-width="1920" data-height="1080" data-duration="12">
+<head><meta charset="utf-8"><link rel="stylesheet" href="./runtime/motion-core.css"><style>
+#stage { background: var(--science-light); } #camera text { fill: var(--science-ink); font-family: var(--font-ui); } #prompt { font-size: 38px; } #working { font: 500 64px/1 var(--font-data); } #answer { font: 700 86px/1 var(--font-data); fill: var(--science-green); }
+</style><script src="./runtime/gsap.min.js"></script><script src="./runtime/motion-core.js"></script><script src="./runtime/browser-probe.js"></script></head>
+<body><div id="viewport" data-composition-id="direct_html_master" data-width="1920" data-height="1080" data-duration="12"><svg id="stage" viewBox="0 0 1920 1080"><g id="camera"><g id="background-layer"></g><g id="world-layer">
+<!-- BEGIN CHAPTER chapter_01 -->
+<g data-chapter-id="chapter_01" data-start="0" data-end="12"><text id="prompt" x="220" y="230" data-visual-object="prompt" data-qa="important">What does the gradient measure?</text><text id="working" x="220" y="480" data-visual-object="equation" data-qa="important">gradient = Δv ÷ Δt</text><text id="answer" x="220" y="690" data-visual-object="answer" data-qa="important">acceleration</text></g>
+<script>DirectHTML.registerChapter({ id: "chapter_01", start: 0, end: 12, build: function (chapter) { const tl = chapter.tl; const root = chapter.root; tl.fromTo(root.querySelector("#prompt"), { opacity: 0 }, { opacity: 1, duration: .5 }, .2); tl.fromTo(root.querySelector("#working"), { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .6 }, 4); tl.fromTo(root.querySelector("#answer"), { opacity: 0 }, { opacity: 1, duration: .5 }, 9); } });</script>
+<!-- END CHAPTER chapter_01 -->
+</g><g id="diagram-layer"></g><g id="annotation-layer"></g><g id="overlay-layer"></g></g></svg><div id="html-overlay-layer"></div></div>
+<script>DirectHTML.boot({ videoId: "light-equation", duration: 12, chapters: [], objectiveIds: [], generatedBy: "fixture", version: "1.0", timelineId: "direct_html_master" });</script></body></html>

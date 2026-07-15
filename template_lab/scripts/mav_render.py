@@ -9,6 +9,15 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import sys
+
+TEMPLATE_LAB_ROOT = Path(__file__).resolve().parents[1]
+if str(TEMPLATE_LAB_ROOT) not in sys.path:
+    sys.path.insert(0, str(TEMPLATE_LAB_ROOT))
+
+from direct_html.constants import DIRECT_HTML_MODE, LEGACY_MODE
+from direct_html.pipeline import build_preview_manifest as build_direct_html_preview_manifest
+from direct_html.render_adapter import animation_mode_for_run, composition_for_run, write_render_copy
 from mav_build_preview_v3 import build_preview_v3
 from mav_schema import LAB_ROOT, read_json, run_dir, write_json
 
@@ -125,14 +134,7 @@ def _probe_media(path: Path) -> dict[str, Any]:
 
 def _write_hyperframes_composition(composition_path: Path) -> Path:
     """Create a render-only composition that lets FFmpeg own audio muxing."""
-    html = composition_path.read_text(encoding="utf-8")
-    render_html, replacements = _AUDIO_TAG_RE.subn("", html, count=1)
-    if replacements != 1:
-        raise RuntimeError(f"Expected exactly one mav-audio tag in {composition_path}")
-
-    render_path = composition_path.with_name(f"{composition_path.stem}.hyperframes.html")
-    render_path.write_text(render_html, encoding="utf-8")
-    return render_path
+    return write_render_copy(composition_path)
 
 
 def _hyperframes_env() -> dict[str, str]:
@@ -233,6 +235,7 @@ def render_mp4(
     quality: str = "standard",
     workers: int = 1,
     keep_visual: bool = False,
+    animation_mode: str | None = None,
 ) -> Path:
     hyperframes_env = _hyperframes_env()
     _require_hyperframes_node(hyperframes_env)
@@ -243,15 +246,15 @@ def render_mp4(
     voiceover_path = run_path / "voiceover.mp3"
     if not voiceover_path.exists():
         raise RuntimeError(f"Missing voiceover audio: {voiceover_path}")
-    scene_plan_path = run_path / "scene_plan_v3.json"
-    if not scene_plan_path.exists():
-        raise RuntimeError(f"Missing Physics V3 scene plan: {scene_plan_path}")
-    build_preview_v3(run_path)
-    composition_version = "v3"
-
-    composition_path = run_path / "compositions" / f"master_{composition_version}.html"
-    if not composition_path.exists():
-        raise RuntimeError(f"Missing preview composition: {composition_path}")
+    selected_mode = animation_mode or animation_mode_for_run(run_path)
+    if selected_mode == LEGACY_MODE:
+        scene_plan_path = run_path / "scene_plan_v3.json"
+        if not scene_plan_path.exists():
+            raise RuntimeError(f"Missing Physics V3 scene plan: {scene_plan_path}")
+        build_preview_v3(run_path)
+    else:
+        build_direct_html_preview_manifest(run_path)
+    composition_path, composition_version = composition_for_run(run_path, selected_mode)
 
     renders_dir = run_path / "renders"
     renders_dir.mkdir(parents=True, exist_ok=True)
@@ -301,6 +304,7 @@ def render_mp4(
     report = {
         "run_id": run_id,
         "composition_version": composition_version,
+        "animation_mode": selected_mode,
         "composition": str(composition_path),
         "output": str(output_path),
         "visual_renderer": "hyperframes",
@@ -332,6 +336,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quality", choices=("draft", "standard", "high"), default="standard")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--keep-visual", action="store_true", help="Keep the intermediate video-only MP4.")
+    parser.add_argument("--animation-mode", choices=(DIRECT_HTML_MODE, LEGACY_MODE), help="Override the run's stored animation mode.")
     return parser.parse_args()
 
 
@@ -345,6 +350,7 @@ def main() -> int:
             quality=args.quality,
             workers=args.workers,
             keep_visual=args.keep_visual,
+            animation_mode=args.animation_mode,
         )
     except Exception as exc:
         print(f"MAV render failed: {exc}")

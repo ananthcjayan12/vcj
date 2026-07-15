@@ -38,9 +38,12 @@ MODEL_MAP_PATH = TEMPLATE_LAB_ROOT / "prompts" / "prompt_model_mapping.json"
 
 STEP_NAMES = ("Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA")
 PAID_STEPS = {2, 3, 5}
+DIRECT_HTML_MODE = "direct-html"
+LEGACY_MODE = "legacy-recipes"
 RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,95}$")
 TOPIC_REF_RE = re.compile(r"^\d+(?:\.\d+){1,2}$")
 SCENE_ID_RE = re.compile(r"^scene_\d{2,3}$")
+CHAPTER_ID_RE = re.compile(r"^chapter_\d{2,3}$")
 MODEL_PROVIDERS = {"configured", "gemini", "anthropic"}
 AUDIO_PROVIDERS = {"gemini", "elevenlabs"}
 RENDER_QUALITIES = {"draft", "standard", "high"}
@@ -85,8 +88,8 @@ def _run_dir(run_id: str) -> Path:
 def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
     tasks = []
-    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder"}
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer"}
     for task, config in payload.get("tasks", {}).items():
         provider_models = dict(config.get("provider_models") or {})
         provider_models.setdefault(str(config.get("provider")), str(config.get("model")))
@@ -267,14 +270,15 @@ def topic_detail(topic_ref: str) -> dict[str, Any]:
 
 
 def _infer_step(run_path: Path) -> int:
+    direct = (run_path / "direct_html").exists()
     markers = (
         "input.json",
         "narration.json",
         "audio_generation.json",
         "audio_timing.json",
-        "scene_plan_v3.json",
-        "validation/plan_validation_v3.json",
-        "preview_manifest_v3.json",
+        "direct_html/master.html" if direct else "scene_plan_v3.json",
+        "direct_html/validation/html_validation.json" if direct else "validation/plan_validation_v3.json",
+        "preview_manifest.json" if direct else "preview_manifest_v3.json",
     )
     completed = 0
     for index, marker in enumerate(markers, 1):
@@ -283,7 +287,7 @@ def _infer_step(run_path: Path) -> int:
     summary = _read_json(run_path / "generation_summary.json", {}) or {}
     if summary.get("stopped_after_step") is not None:
         completed = max(completed, max(0, min(int(summary["stopped_after_step"]), 8)))
-    elif summary.get("visual_qa") is not None and (run_path / "preview_manifest_v3.json").exists():
+    elif summary.get("visual_qa") is not None and ((run_path / "preview_manifest_v3.json").exists() or (run_path / "preview_manifest.json").exists()):
         completed = 8
     return completed
 
@@ -303,16 +307,54 @@ def _synthesized_meta(run_path: Path) -> dict[str, Any]:
         "current_step": step,
         "created_at": datetime.fromtimestamp(run_path.stat().st_ctime, timezone.utc).isoformat(),
         "updated_at": datetime.fromtimestamp(run_path.stat().st_mtime, timezone.utc).isoformat(),
-        "settings": {},
+        "settings": {"animation_mode": input_payload.get("animation_mode", summary.get("animation_mode", LEGACY_MODE))},
         "error": None,
     }
+
+
+def _normalized_meta(run_path: Path, meta: dict[str, Any]) -> dict[str, Any]:
+    """Backfill fields needed to resume runs created before the Studio schema."""
+    normalized = dict(meta)
+    input_payload = _read_json(run_path / "input.json", {}) or {}
+    summary = _read_json(run_path / "generation_summary.json", {}) or {}
+    topic_ref = str(normalized.get("topic_ref") or input_payload.get("topic_ref") or "").strip()
+    if topic_ref:
+        normalized["topic_ref"] = topic_ref
+    normalized.setdefault("topic", input_payload.get("topic") or summary.get("topic") or run_path.name)
+    normalized.setdefault("objective_ids", input_payload.get("objective_ids", []))
+    if not normalized.get("facts_path") and TOPIC_REF_RE.fullmatch(topic_ref):
+        facts_path = TOPICS_ROOT / topic_ref / "facts.json"
+        if facts_path.exists():
+            normalized["facts_path"] = str(facts_path.relative_to(REPO_ROOT))
+
+    existing_settings = normalized.get("settings") if isinstance(normalized.get("settings"), dict) else {}
+    settings = dict(existing_settings)
+    settings.setdefault("duration", float(input_payload.get("target_duration_seconds") or 480))
+    settings.setdefault("model_provider", "gemini")
+    settings.setdefault("audio_provider", "gemini")
+    settings.setdefault("scene_concurrency", 1)
+    settings.setdefault("confirm_paid_api", False)
+    settings.setdefault("task_models", {})
+    settings.setdefault(
+        "animation_mode",
+        input_payload.get("animation_mode")
+        or summary.get("animation_mode")
+        or (DIRECT_HTML_MODE if (run_path / "direct_html").exists() else LEGACY_MODE),
+    )
+    normalized["settings"] = settings
+    return normalized
 
 
 def _load_meta(run_id: str) -> dict[str, Any]:
     run_path = _run_dir(run_id)
     if not run_path.exists():
         raise FileNotFoundError(run_id)
-    return _read_json(_meta_path(run_id)) or _synthesized_meta(run_path)
+    stored = _read_json(_meta_path(run_id))
+    meta = stored or _synthesized_meta(run_path)
+    normalized = _normalized_meta(run_path, meta)
+    if stored is not None and normalized != stored:
+        _write_json(_meta_path(run_id), normalized)
+    return normalized
 
 
 def _save_meta(meta: dict[str, Any]) -> dict[str, Any]:
@@ -323,7 +365,11 @@ def _save_meta(meta: dict[str, Any]) -> dict[str, Any]:
 
 def _artifact_snapshot(run_id: str) -> dict[str, Any]:
     run_path = _run_dir(run_id)
-    manifest = _read_json(run_path / "preview_manifest_v3.json", {}) or {}
+    summary = _read_json(run_path / "generation_summary.json", {}) or {}
+    meta = _read_json(run_path / "studio_run.json", {}) or {}
+    animation_mode = summary.get("animation_mode") or (meta.get("settings") or {}).get("animation_mode") or (DIRECT_HTML_MODE if (run_path / "direct_html" / "master.html").exists() else LEGACY_MODE)
+    manifest_path = run_path / "preview_manifest.json" if animation_mode == DIRECT_HTML_MODE else run_path / "preview_manifest_v3.json"
+    manifest = _read_json(manifest_path, {}) or {}
     master = manifest.get("master")
     render_report = _read_json(run_path / "render_report.json", {}) or {}
     output = render_report.get("output")
@@ -342,6 +388,32 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         }
         for scene in scenes_payload.get("scenes", [])
     ]
+    chapters_payload = _read_json(run_path / "direct_html" / "chapter_index.json", {}) or {}
+    direct_validation = _read_json(run_path / "direct_html" / "validation" / "final_direct_html_report.json", {}) or {}
+    visual_review = _read_json(run_path / "direct_html" / "validation" / "visual_review.json", {}) or {}
+    browser_metrics = {item.get("chapter_id"): item for item in (direct_validation.get("browser") or {}).get("chapters", [])}
+    design_findings: dict[str, list[dict[str, Any]]] = {}
+    for finding in (direct_validation.get("design_system") or {}).get("findings", []):
+        design_findings.setdefault(str(finding.get("chapter_id", "")), []).append(finding)
+    review_chapters = {item.get("chapter_id"): item for item in visual_review.get("chapters", [])}
+    chapters = []
+    if animation_mode == DIRECT_HTML_MODE:
+        for chapter in chapters_payload.get("chapters", []):
+            chapter_id = str(chapter.get("chapter_id", ""))
+            screenshots = {}
+            for label in ("start", "peak", "end"):
+                relative = f"direct_html/inspection/{chapter_id}/{label}.png"
+                if (run_path / relative).exists():
+                    screenshots[label] = f"/artifacts/runs/{run_id}/{relative}"
+            chapters.append(
+                {
+                    **chapter,
+                    "screenshots": screenshots,
+                    "metrics": browser_metrics.get(chapter_id, {}),
+                    "findings": design_findings.get(chapter_id, []),
+                    "visual_review": review_chapters.get(chapter_id, {}),
+                }
+            )
     files = []
     for relative in (
         "input.json", "story_skeleton.json", "narration.json", "narration.txt",
@@ -354,18 +426,33 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "debug/narration_normalized.json", "debug/narration_validation.json",
         "debug/step_02_script.json", "validation/plan_validation_v3.json",
         "validation/v3_repair_report.json", "costs/summary.json", "costs/model_usage.json",
+        "preview_manifest.json", "preview_manifest_direct_html.json",
+        "direct_html/lesson_input_bundle.json", "direct_html/asset_manifest.json", "direct_html/physics_context.json",
+        "direct_html/lesson-data.js",
+        "direct_html/composer_prompt.txt", "direct_html/composer_response.html", "direct_html/master.html",
+        "direct_html/prompts/direct_html_design_system.txt", "direct_html/prompts/direct_html_composer.system.txt",
+        "direct_html/prompts/direct_html_repair.system.txt", "direct_html/prompts/direct_html_review.system.txt",
+        "direct_html/chapter_index.json", "direct_html/generation_manifest.json",
+        "direct_html/inspection/contact_sheet.png", "direct_html/validation/html_validation.json",
+        "direct_html/validation/layout_validation.json", "direct_html/validation/timeline_validation.json",
+        "direct_html/validation/design_system_validation.json", "direct_html/validation/final_direct_html_report.json",
+        "direct_html/validation/visual_review.json",
+        "direct_html/costs/summary.json", "direct_html/costs/model_usage.json",
     ):
         if (run_path / relative).exists():
             files.append(relative)
     return {
         "files": files,
+        "animation_mode": animation_mode,
         "scenes": scenes,
+        "chapters": chapters,
         "preview_url": f"/artifacts/runs/{run_id}/{master}" if master else None,
         "mp4_url": f"/artifacts/runs/{run_id}/{Path(output).relative_to(run_path)}" if output and Path(output).is_relative_to(run_path) else None,
-        "summary": _read_json(run_path / "generation_summary.json", {}) or {},
-        "validation": _read_json(run_path / "validation" / "plan_validation_v3.json", {}) or {},
+        "summary": summary,
+        "validation": direct_validation if animation_mode == DIRECT_HTML_MODE else (_read_json(run_path / "validation" / "plan_validation_v3.json", {}) or {}),
         "cost_summary": _read_json(run_path / "costs" / "summary.json", {}) or {},
         "usage_records": (_read_json(run_path / "costs" / "model_usage.json", {}) or {}).get("records", []),
+        "direct_html_cost_summary": _read_json(run_path / "direct_html" / "costs" / "summary.json", {}) or {},
         "routing_summary": scenes_payload.get("routing_summary", {}),
         "asset_shortlist": _read_json(run_path / "asset_shortlist.json", {}) or {},
     }
@@ -418,7 +505,10 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
     if not (1 <= from_step <= stop_after_step <= 8):
         raise ValueError("Pipeline steps must satisfy 1 <= from <= stop <= 8")
     settings = {**meta.get("settings", {}), **request.get("settings", {})}
-    paid = _paid_range(from_step, stop_after_step)
+    animation_mode = str(settings.get("animation_mode", LEGACY_MODE))
+    if animation_mode not in {DIRECT_HTML_MODE, LEGACY_MODE}:
+        raise ValueError("Unsupported animation mode")
+    paid = _paid_range(from_step, stop_after_step) or (animation_mode == DIRECT_HTML_MODE and from_step <= 6 <= stop_after_step)
     confirmed = bool(request.get("confirm_paid_api", settings.get("confirm_paid_api", False)))
     if paid and not confirmed:
         raise PermissionError("Steps 2, 3, and 5 require explicit paid-API confirmation")
@@ -441,13 +531,16 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         "--run-id", meta["id"],
         "--facts", str(facts_path),
         "--duration", str(float(settings.get("duration", 480))),
-        "--model-provider", provider,
+        "--model-provider", "configured",
         "--audio-provider", audio_provider,
+        "--animation-mode", animation_mode,
         "--from-step", str(from_step),
         "--stop-after-step", str(stop_after_step),
     ]
     if paid:
         command.extend(["--use-model", "--confirm-paid-api"])
+    if animation_mode == DIRECT_HTML_MODE and from_step <= 6 <= stop_after_step:
+        command.append("--auto-repair")
     if request.get("force_paid_api"):
         command.append("--force-paid-api")
     scene_id = request.get("target_scene_id")
@@ -456,6 +549,15 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
             raise ValueError("Invalid scene ID")
         command.extend(["--v3-scene-id", str(scene_id)])
     env = os.environ.copy()
+    if provider != "configured":
+        catalog = {item["task"]: item for item in model_map_payload()["tasks"]}
+        for script_task in ("script_structure", "script_writing"):
+            task_config = catalog[script_task]
+            if provider not in task_config["provider_models"]:
+                raise ValueError(f"{provider} is not available for {script_task}")
+            prefix = f"MAV_{script_task.upper()}"
+            env[f"{prefix}_PROVIDER"] = provider
+            env[f"{prefix}_MODEL"] = task_config["provider_models"][provider]
     for task, selection in task_models.items():
         if task == "audio_generation":
             env["GEMINI_TTS_MODEL" if selection["provider"] == "gemini" else "ELEVENLABS_MODEL_ID"] = selection["model"]
@@ -537,6 +639,9 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
     run_path = _run_dir(run_id)
     if run_path.exists() and any(run_path.iterdir()):
         raise FileExistsError(f"Run already exists: {run_id}")
+    animation_mode = str(payload.get("animation_mode", LEGACY_MODE))
+    if animation_mode not in {DIRECT_HTML_MODE, LEGACY_MODE}:
+        raise ValueError("Unsupported animation mode")
     settings = {
         "duration": max(30, min(float(payload.get("duration", 480)), 1800)),
         "model_provider": payload.get("model_provider", "gemini"),
@@ -544,6 +649,7 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
         "scene_concurrency": max(1, min(int(payload.get("scene_concurrency", 1)), 8)),
         "confirm_paid_api": bool(payload.get("confirm_paid_api", False)),
         "task_models": _validate_task_models(payload.get("task_models")),
+        "animation_mode": animation_mode,
     }
     meta = {
         "id": run_id,
@@ -568,15 +674,21 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
 
 def execute_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     meta = _load_meta(run_id)
+    settings_changed = False
     if "task_models" in payload:
         meta.setdefault("settings", {})["task_models"] = _validate_task_models(payload.get("task_models"))
+        settings_changed = True
+    if "confirm_paid_api" in payload:
+        meta.setdefault("settings", {})["confirm_paid_api"] = bool(payload.get("confirm_paid_api"))
+        settings_changed = True
+    if settings_changed:
         _save_meta(meta)
     command, env = build_generation_command(meta, payload)
     return _start_process(run_id, command, env, mode="generation", target_step=int(payload.get("stop_after_step", 8)))
 
 
 def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    _load_meta(run_id)
+    meta = _load_meta(run_id)
     quality = str(payload.get("quality", "standard"))
     fps = int(payload.get("fps", 30))
     workers = int(payload.get("workers", 1))
@@ -589,8 +701,31 @@ def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         "--quality", quality,
         "--fps", str(fps),
         "--workers", str(workers),
+        "--animation-mode", str((meta.get("settings") or {}).get("animation_mode", LEGACY_MODE)),
     ]
     return _start_process(run_id, command, os.environ.copy(), mode="render", target_step=8)
+
+
+def repair_chapter_run(run_id: str, chapter_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    meta = _load_meta(run_id)
+    if not CHAPTER_ID_RE.fullmatch(chapter_id):
+        raise ValueError("Invalid chapter ID")
+    if (meta.get("settings") or {}).get("animation_mode") != DIRECT_HTML_MODE:
+        raise ValueError("Chapter repair is available only for direct-HTML runs")
+    if not payload.get("confirm_paid_api"):
+        raise PermissionError("Chapter repair requires explicit paid-API confirmation")
+    command = [sys.executable, "-m", "video_engine.cli", "repair-html", run_id, "--chapter", chapter_id, "--confirm-paid-api"]
+    instruction = str(payload.get("custom_instruction", "")).strip()
+    if instruction:
+        command.extend(["--instruction", instruction])
+    env = os.environ.copy()
+    for task, selection in _validate_task_models(payload.get("task_models", (meta.get("settings") or {}).get("task_models", {}))).items():
+        if task == "audio_generation":
+            continue
+        prefix = f"MAV_{task.upper()}"
+        env[f"{prefix}_PROVIDER"] = selection["provider"]
+        env[f"{prefix}_MODEL"] = selection["model"]
+    return _start_process(run_id, command, env, mode="chapter repair", target_step=6)
 
 
 def stop_run(run_id: str) -> dict[str, Any]:
@@ -734,6 +869,9 @@ class StudioHandler(BaseHTTPRequestHandler):
             if match:
                 body.update({"from_step": 5, "stop_after_step": 8, "target_scene_id": match.group(2), "force_paid_api": True})
                 return self._json({"run": execute_run(match.group(1), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/chapters/([^/]+)/repair", path)
+            if match:
+                return self._json({"run": repair_chapter_run(match.group(1), match.group(2), body)}, 202)
             match = re.fullmatch(r"/api/runs/([^/]+)/render", path)
             if match:
                 return self._json({"run": render_run(match.group(1), body)}, 202)

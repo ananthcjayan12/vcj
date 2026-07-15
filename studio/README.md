@@ -200,6 +200,8 @@ Set the production fields:
 
 Duration is a target, not an exact promise. Narration length, audio timing, and scene timing determine the final runtime.
 
+For **Animation**, choose **Direct HTML · modern science** to compose one continuous simulation-style lesson. Direct runs expose Compose, Inspect/Repair, chapter screenshots, browser findings, optional review scores, and chapter-specific repair instructions. Choose **Legacy recipes** for the frozen comparison baseline. Both the Studio and command-line defaults remain legacy until the direct-HTML rollout gates pass, so select Direct HTML explicitly for a supervised trial.
+
 ### Step 4 — Choose Create run or Generate full lesson
 
 There are two useful paths:
@@ -228,8 +230,8 @@ The production panel tracks:
 2. **Script** — creates the concept-first lesson structure and narration. This is a paid model stage.
 3. **Audio** — generates the voiceover using the selected provider. This is a paid voice stage.
 4. **Timing** — aligns narration with word and scene timing using local processing.
-5. **Scenes** — plans and generates the V3 animated scenes. This is a paid model stage.
-6. **Validate** — checks scene structure, grounding, timing, and composition requirements.
+5. **Compose** for Direct HTML, or **Scenes** for Legacy — generates the integrated HTML lesson or the V3 scene plan. This is a paid model stage.
+6. **Inspect/Repair** for Direct HTML, or **Validate** for Legacy — runs contract/browser checks and may perform paid automatic chapter repairs for direct runs.
 7. **Preview** — builds the browser-playable master composition.
 8. **QA** — runs final automated quality checks and prepares the run for human review.
 
@@ -243,7 +245,7 @@ The log panel updates while a job is running. Use **Refresh** if the view looks 
 - **Stop** — requests termination of the active subprocess.
 - **Refresh** — reloads run state and artifacts.
 
-Stages 2, 3, and 5 require the **Confirm paid APIs when required** checkbox. Rerunning one of these stages can spend money again. Local stages can normally be repeated without a model call.
+Stages 2, 3, and 5 require the **Confirm paid APIs when required** checkbox. Direct-HTML stage 6 can also spend money when measured failures trigger automatic chapter repair. Local inspection itself does not call a model.
 
 If a stage fails, read the final lines in the log, fix the reported issue, select that stage, and run it again. You normally do not need to recreate the whole run.
 

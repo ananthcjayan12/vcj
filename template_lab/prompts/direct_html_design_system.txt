@@ -1,0 +1,75 @@
+DIRECT-HTML MODERN SCIENCE PLATFORM DESIGN SYSTEM
+=================================================
+
+IDENTITY
+You are designing for a premium digital science teaching platform. The stage should feel like an interactive scientific simulation with precise diagrams and instrument-like readouts. It must not look like a paper notebook, presentation deck, documentary lower-third package, or SaaS dashboard.
+
+TOKENS — USE THESE CSS VARIABLES ONLY
+  --science-bg-deep       #07131F
+  --science-bg            #0E2234
+  --science-surface       #153047
+  --science-surface-soft  #1C3A52
+  --science-light         #F5F8FC
+  --science-ink           #102033
+  --science-text          #F4F8FC
+  --science-muted         #9FB2C7
+  --science-cyan          #35C6F4
+  --science-blue          #648BFF
+  --science-green         #43D6A0
+  --science-yellow        #F5C451
+  --science-orange        #FF8A5B
+  --science-red           #FF6577
+
+SEMANTIC COLOR
+- Cyan: waves, fields, flows, rays, and active paths.
+- Blue: measurements, vectors, reference geometry, and neutral quantities.
+- Green: correct results, completed transfers, and confirmed relationships.
+- Yellow: the quantity or location currently under discussion.
+- Orange: heat, caution, resistance, and transitional emphasis.
+- Red: errors, opposing direction, hazards, and incorrect alternatives.
+- Use no more than two bright accents in one composition state.
+
+TYPOGRAPHY
+- Teaching/interface text: var(--font-ui), the bundled Inter variable font.
+- Readings/data: var(--font-data), the bundled IBM Plex Mono font.
+- Mathematics: the bundled KaTeX runtime and fonts.
+- Important labels are at least 30 px; secondary labels are at least 26 px.
+- Primary numerical results are normally 56–96 px.
+- Headlines are normally eight words or fewer. Do not put narration paragraphs on screen.
+
+COMPOSITION
+- Canvas: 1920×1080 with a 100 px safe margin.
+- Phenomena and diagrams occupy roughly 60–75% of the stage.
+- Use direct labels attached to the relevant object, ray, vector, graph, or apparatus.
+- Permit at most one temporary explanation surface at a time.
+- Use dark stages for phenomena, particles, fields, forces, waves, circuits, motion, and space.
+- Use light surfaces selectively for equation work, comparisons, retrieval, and synthesis.
+- Maintain one dominant focal point and generous negative space.
+- Use grids, scales, trails, glow, and depth only when they encode scientific meaning.
+- Tag major objects with data-visual-object and important content with data-qa="important".
+- Tag factual visuals with data-claim-id and numerical displays with data-physics-key, data-value, and data-unit where applicable.
+
+MOTION
+- Teaching sequence: phenomenon → observation → model → mathematics → transfer.
+- Prefer construction, tracing, comparison, transformation, measurement, and causal motion.
+- Reuse and transform objects instead of clearing the stage between paragraphs.
+- Standard transitions: 0.3–0.6 s. Scientific construction: 0.6–1.2 s. Motivated camera moves: 1.0–1.8 s.
+- Default easing: power2.out and power2.inOut.
+- Bounce or elastic easing is allowed only when it represents real physical behaviour.
+- Add a meaningful visual change every 5–12 seconds.
+- Complete an important reveal at least 1.5 seconds before its reading hold ends.
+
+FORBIDDEN VISUAL LANGUAGE
+- No paper, wood, grain, vignette, notebook, serif headline, stamp, paper-drop, or flash-transition identity.
+- No repeated title cards or “heading plus three boxes” layouts.
+- No generic decorative particles or glows.
+- No stock-dashboard charts, ornamental progress bars, unrelated controls, or glass panels everywhere.
+- No completed information-dense diagram at the start of a chapter.
+- No text used as a substitute for a scientific visual explanation.
+- No remote fonts, images, scripts, styles, libraries, or network requests.
+
+SCIENTIFIC INTEGRITY
+- Preserve direction, relative magnitude, geometry, polarity, connectivity, ray direction, graph axes, scale, units, and stated values.
+- Show cause before formal labels and equations whenever the narration permits.
+- Do not reveal retrieval answers before the supplied reveal time.
+- Never copy or closely imitate a past-paper diagram or question.

@@ -16,6 +16,7 @@ from mav_costs import record_model_usage
 PROMPT_MODEL_MAPPING_PATH = LAB_ROOT / "prompts" / "prompt_model_mapping.json"
 DEFAULT_MODEL_MAX_TOKENS = 64000
 GEMINI_TIMEOUT_MILLISECONDS = 600_000
+DEFAULT_MODEL_TIMEOUT_SECONDS = 600
 ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 MOONSHOT_CHAT_COMPLETIONS_URL = "https://api.moonshot.ai/v1/chat/completions"
 SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot"}
@@ -170,6 +171,18 @@ def model_config_for_task(task: str, *, requested_max_tokens: int | None = None)
         model=_model_for_task(task, provider),
         max_tokens=_max_tokens_for_task(task, provider, requested_max_tokens),
     )
+
+
+def model_timeout_seconds(resolved: ResolvedModelConfig) -> int:
+    task_env = f"MAV_{resolved.task.upper()}_TIMEOUT_SECONDS"
+    provider_env = f"MAV_{resolved.provider.upper()}_TIMEOUT_SECONDS"
+    for env_var in (task_env, "MAV_MODEL_TIMEOUT_SECONDS", provider_env):
+        if os.getenv(env_var):
+            return _positive_int(os.environ[env_var], env_var)
+    configured = configured_models().get(resolved.task, {}).get("timeout_seconds")
+    if configured:
+        return _positive_int(configured, f"timeout_seconds for {resolved.task}")
+    return DEFAULT_MODEL_TIMEOUT_SECONDS
 
 
 def _api_key_for_provider(provider: str) -> str | None:
@@ -328,12 +341,15 @@ def _call_anthropic_json(
         },
         method="POST",
     )
+    timeout_seconds = model_timeout_seconds(resolved)
     try:
-        with urllib.request.urlopen(request, timeout=600) as response:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Anthropic {resolved.task} call failed with HTTP {exc.code}: {detail}") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(f"Anthropic {resolved.task} call timed out after {timeout_seconds} seconds") from exc
 
     stop_reason = data.get("stop_reason")
     if stop_reason in {"max_tokens", "refusal"}:
@@ -375,12 +391,15 @@ def _call_anthropic_text(
         },
         method="POST",
     )
+    timeout_seconds = model_timeout_seconds(resolved)
     try:
-        with urllib.request.urlopen(request, timeout=600) as response:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Anthropic {resolved.task} call failed with HTTP {exc.code}: {detail}") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(f"Anthropic {resolved.task} call timed out after {timeout_seconds} seconds") from exc
 
     stop_reason = data.get("stop_reason")
     if stop_reason in {"max_tokens", "refusal"}:
@@ -499,12 +518,15 @@ def _call_zai(
         },
         method="POST",
     )
+    timeout_seconds = model_timeout_seconds(resolved)
     try:
-        with urllib.request.urlopen(request, timeout=600) as response:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Z.AI {resolved.task} call failed with HTTP {exc.code}: {detail}") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(f"Z.AI {resolved.task} call timed out after {timeout_seconds} seconds") from exc
     _log_zai_usage(resolved.task, data)
     record_model_usage(
         task=resolved.task,
@@ -566,12 +588,15 @@ def _call_moonshot(
         },
         method="POST",
     )
+    timeout_seconds = model_timeout_seconds(resolved)
     try:
-        with urllib.request.urlopen(request, timeout=600) as response:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Moonshot {resolved.task} call failed with HTTP {exc.code}: {detail}") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(f"Moonshot {resolved.task} call timed out after {timeout_seconds} seconds") from exc
     usage = data.get("usage", {})
     print(
         f"Moonshot {resolved.task} usage: prompt={usage.get('prompt_tokens', '?')} "
@@ -697,7 +722,7 @@ def _call_gemini_json(
     from google import genai
     from google.genai import types
 
-    http_options = types.HttpOptions(timeout=GEMINI_TIMEOUT_MILLISECONDS)
+    http_options = types.HttpOptions(timeout=model_timeout_seconds(resolved) * 1000)
     config_payload: dict[str, Any] = {
         "system_instruction": system,
         "response_mime_type": "application/json",
@@ -769,7 +794,7 @@ def _call_gemini_text(
     from google import genai
     from google.genai import types
 
-    http_options = types.HttpOptions(timeout=GEMINI_TIMEOUT_MILLISECONDS)
+    http_options = types.HttpOptions(timeout=model_timeout_seconds(resolved) * 1000)
     config_payload: dict[str, Any] = {
         "system_instruction": system,
         "max_output_tokens": resolved.max_tokens,

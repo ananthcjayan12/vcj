@@ -10,11 +10,23 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import mav_models
-from mav_models import ResolvedModelConfig, _call_gemini_json, _gemini_compatible_json_schema
+from mav_models import ResolvedModelConfig, _call_gemini_json, _gemini_compatible_json_schema, model_timeout_seconds
 from mav_plan_v3 import _parameter_output_schema, _route_output_schema
 
 
 class GeminiSchemaCompatibilityTest(unittest.TestCase):
+    def test_direct_html_timeout_is_longer_and_task_override_wins(self) -> None:
+        resolved = ResolvedModelConfig(
+            task="direct_html_composer",
+            provider="moonshot",
+            model="kimi-k2.7-code",
+            max_tokens=48000,
+        )
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(model_timeout_seconds(resolved), 1800)
+        with patch.dict("os.environ", {"MAV_DIRECT_HTML_COMPOSER_TIMEOUT_SECONDS": "2400"}, clear=True):
+            self.assertEqual(model_timeout_seconds(resolved), 2400)
+
     def test_router_schema_drops_large_repeated_enums_but_keeps_small_classifications(self) -> None:
         modules = [f"Scene_{index:02d}" for index in range(35)]
         schema = _gemini_compatible_json_schema(_route_output_schema(["scene_01"], modules))

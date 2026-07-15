@@ -8,6 +8,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+TEMPLATE_LAB_ROOT = Path(__file__).resolve().parents[1]
+if str(TEMPLATE_LAB_ROOT) not in sys.path:
+    sys.path.insert(0, str(TEMPLATE_LAB_ROOT))
+
+from direct_html.constants import DIRECT_HTML_MODE, LEGACY_MODE
+from direct_html.pipeline import (
+    build_preview_manifest as build_direct_html_preview_manifest,
+    compose as compose_direct_html,
+    load_prepared as load_direct_html_prepared,
+    prepare_input as prepare_direct_html_input,
+    validate_and_inspect as validate_and_inspect_direct_html,
+)
 from mav_audio import generate_audio, is_live_audio_provider, resolve_audio_provider
 from mav_build_preview_v3 import build_preview_v3
 from mav_costs import cost_summary_for_run
@@ -35,6 +47,7 @@ STEP_LABELS = {
     5: "scene_plan",
     6: "validate_repair",
     7: "build_preview",
+    8: "qa_handoff",
 }
 
 
@@ -91,7 +104,9 @@ def build_input(args: argparse.Namespace) -> dict[str, Any]:
         "tone": args.tone or pipeline_inputs.get("tone") or "patient, precise IGCSE Physics teacher",
         "target_duration_seconds": float(args.duration),
         "facts": pipeline_inputs["facts"],
+        "physics_context": pipeline_inputs.get("physics_context", {}),
         "narrative_mode": pipeline_inputs.get("narrative_mode") or "concept_mastery",
+        "animation_mode": getattr(args, "animation_mode", LEGACY_MODE),
     }
 
 
@@ -126,7 +141,7 @@ def _step_summary(
         "status": "stopped",
         "stopped_after_step": step,
         "stopped_after": STEP_LABELS[step],
-        "next_step": step + 1 if step < 7 else None,
+        "next_step": step + 1 if step < 8 else None,
         "artifacts": artifacts,
     }
     summary.update(extra)
@@ -145,11 +160,13 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
     path = run_dir(initial_payload["run_id"])
     model_provider = _configure_model_provider(args)
     audio_provider = _configure_audio_provider(args)
+    animation_mode = getattr(args, "animation_mode", LEGACY_MODE)
     use_model = _model_requested(args)
     if stop_after_step < from_step:
         raise RuntimeError("--stop-after-step must be greater than or equal to --from-step")
     paid_requested = (
         (use_model and ((from_step <= 2 <= stop_after_step) or (from_step <= 5 <= stop_after_step)))
+        or (animation_mode == DIRECT_HTML_MODE and bool(getattr(args, "auto_repair", False)) and from_step <= 6 <= stop_after_step)
         or (is_live_audio_provider(audio_provider) and from_step <= 3 <= stop_after_step)
     )
     if not use_model and from_step <= 2 <= stop_after_step:
@@ -175,6 +192,9 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
             if not input_payload.get(key) and initial_payload.get(key):
                 input_payload[key] = initial_payload[key]
                 metadata_updated = True
+        if input_payload.get("animation_mode") != animation_mode:
+            input_payload["animation_mode"] = animation_mode
+            metadata_updated = True
         if getattr(args, "template_id", "") and input_payload.get("template_id") != args.template_id:
             input_payload["template_id"] = args.template_id
             metadata_updated = True
@@ -264,6 +284,103 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         if (path / "audio_word_timestamps.json").exists():
             artifacts.append("audio_word_timestamps.json")
         return _step_summary(input_payload, path, 4, artifacts, audio_duration_seconds=timing["audio_duration_seconds"])
+
+    if animation_mode == DIRECT_HTML_MODE:
+        _log(
+            f"direct-HTML mode run={input_payload['run_id']} from_step={from_step} "
+            f"stop_after_step={stop_after_step}; narration/audio/timing remain shared with legacy mode"
+        )
+        if from_step <= 5:
+            _log("step 5: building full-lesson input bundle and composing one integrated HTML application")
+            prepared = prepare_direct_html_input(path, input_payload, narration, timing)
+            composition = compose_direct_html(
+                path,
+                prepared,
+                force=bool(args.force_paid_api),
+                allow_model_call=use_model,
+            )
+        else:
+            _log("step 5: loading cached direct-HTML input bundle and master.html")
+            prepared = load_direct_html_prepared(path)
+            master_path = path / "direct_html" / "master.html"
+            if not master_path.exists():
+                raise RuntimeError(f"Cannot resume direct HTML: missing {master_path}")
+            composition = {"status": "cached", "master": master_path}
+        chapter_index = read_json(path / "direct_html" / "chapter_index.json")
+        if stop_after_step == 5:
+            return _step_summary(
+                input_payload,
+                path,
+                5,
+                [
+                    "direct_html/lesson_input_bundle.json",
+                    "direct_html/asset_manifest.json",
+                    "direct_html/physics_context.json",
+                    "direct_html/composer_prompt.txt",
+                    "direct_html/composer_response.html",
+                    "direct_html/master.html",
+                    "direct_html/chapter_index.json",
+                    "direct_html/generation_manifest.json",
+                ],
+                mode=DIRECT_HTML_MODE,
+                chapters=chapter_index.get("chapter_count", 0),
+                composition_status=composition.get("status"),
+            )
+
+        if from_step <= 6:
+            _log("step 6: validating contract and inspecting real Chromium frames")
+            direct_validation = validate_and_inspect_direct_html(
+                path,
+                prepared,
+                browser=not bool(getattr(args, "skip_browser_inspection", False)),
+                auto_repair=bool(getattr(args, "auto_repair", False)),
+            )
+        else:
+            direct_validation = {
+                "static": read_json(path / "direct_html" / "validation" / "html_validation.json"),
+                "inspection": read_json(path / "direct_html" / "validation" / "final_direct_html_report.json")
+                if (path / "direct_html" / "validation" / "final_direct_html_report.json").exists()
+                else {"status": "not_run"},
+            }
+        if stop_after_step == 6:
+            return _step_summary(
+                input_payload,
+                path,
+                6,
+                [
+                    "direct_html/validation/html_validation.json",
+                    "direct_html/validation/layout_validation.json",
+                    "direct_html/validation/timeline_validation.json",
+                    "direct_html/validation/design_system_validation.json",
+                    "direct_html/validation/final_direct_html_report.json",
+                ],
+                mode=DIRECT_HTML_MODE,
+                chapters=chapter_index.get("chapter_count", 0),
+                direct_html_validation=direct_validation.get("inspection", {}).get("status", direct_validation.get("static", {}).get("status")),
+            )
+
+        if from_step <= 7:
+            manifest_payload = build_direct_html_preview_manifest(path)
+        else:
+            manifest_payload = _read_cached_json(path / "preview_manifest.json", "direct-HTML preview manifest")
+        inspection_status = direct_validation.get("inspection", {}).get("status", "not_run")
+        summary = {
+            "run_id": input_payload["run_id"],
+            "mode": DIRECT_HTML_MODE,
+            "animation_mode": DIRECT_HTML_MODE,
+            "run_path": str(path),
+            "audio_duration_seconds": timing["audio_duration_seconds"],
+            "chapters": chapter_index.get("chapter_count", 0),
+            "direct_html_validation": inspection_status,
+            "manual_review": "required",
+            "preview": str(path / manifest_payload["master"]),
+            "mp4": "not rendered",
+        }
+        cost_summary = cost_summary_for_run(path)
+        if cost_summary:
+            summary["cost_summary"] = cost_summary
+        write_json(path / "generation_summary.json", summary)
+        return summary
 
     v3_scene_id = getattr(args, "v3_scene_id", None)
     _log(
@@ -357,6 +474,7 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
     summary = {
         "run_id": input_payload["run_id"],
         "mode": "v3_generative",
+        "animation_mode": LEGACY_MODE,
         "run_path": str(path),
         "audio_duration_seconds": timing["audio_duration_seconds"],
         "scenes": v3_plan["scene_count"],
@@ -390,6 +508,12 @@ def parse_args() -> argparse.Namespace:
         help="Override the script provider. Scene providers use their task-specific environment settings.",
     )
     parser.add_argument("--v3", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--animation-mode",
+        choices=(DIRECT_HTML_MODE, LEGACY_MODE),
+        default=LEGACY_MODE,
+        help="Visual production route. Legacy remains the default until the direct-HTML rollout gates pass.",
+    )
     parser.add_argument("--v3-scene-id", help="Regenerate or rebuild around one V3 scene id, for example scene_02")
     parser.add_argument("--use-gemini-tts", action="store_true", help="Use Gemini TTS for voiceover audio. This is also the default audio provider.")
     parser.add_argument("--use-elevenlabs", action="store_true", help="Use live ElevenLabs timed TTS for voiceover audio.")
@@ -401,18 +525,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--confirm-paid-api", action="store_true", help="Required for any command that may call paid external APIs")
     parser.add_argument("--force-paid-api", action="store_true", help="Allow deleting paid run caches or refreshing paid API artifacts")
+    parser.add_argument("--skip-browser-inspection", action="store_true", help="Run static direct-HTML validation without launching Chromium (test/debug only).")
+    parser.add_argument("--auto-repair", action="store_true", help="Use the paid repair model for up to two measured repair attempts per failing direct-HTML chapter.")
     parser.add_argument(
         "--from-step",
         type=int,
         default=1,
-        choices=range(1, 8),
+        choices=range(1, 9),
         help="Resume from step N (1=inputs, 2=script, 3=audio, 4=timing, 5=plan, 6=technical validation, 7=build)",
     )
     parser.add_argument(
         "--stop-after-step",
         type=int,
         default=7,
-        choices=range(1, 8),
+        choices=range(1, 9),
         help="Stop after step N for one-step-at-a-time debugging.",
     )
     return parser.parse_args()

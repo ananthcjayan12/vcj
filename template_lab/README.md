@@ -1,6 +1,6 @@
 # Physics Template Lab
 
-This is the repo-local Physics V3 production pipeline. It accepts grounded educational fact packets and creates student-friendly IGCSE lesson videos using the approved physics visual identity.
+This is the repo-local physics production pipeline. It accepts grounded educational fact packets and creates student-friendly IGCSE lesson videos through either the comparison-safe legacy route or the new integrated direct-HTML route.
 
 Pipeline stages:
 
@@ -8,10 +8,8 @@ Pipeline stages:
 2. generate a duration-aware teaching sequence and narration;
 3. create voiceover audio;
 4. align narration with local Whisper;
-5. select a grounded typed recipe locally from the narration beat's objective IDs
-   and compile it into reusable DOM/SVG/GSAP workbenches; uncovered objectives fail
-   clearly unless the legacy model fallback is explicitly enabled;
-6. validate and repair scene artifacts;
+5. dispatch the visual route: compose one full-lesson modern-science HTML application, or run the frozen legacy recipe/V3 generator;
+6. validate the runtime contract and inspect chapter frames in Chromium, with bounded chapter repair for direct HTML;
 7. build a browser preview;
 8. review the preview manually, then render an MP4 with pinned HyperFrames plus FFmpeg.
 
@@ -31,10 +29,21 @@ python3 -m video_engine.cli doctor
 
 Generated artifacts go to `template_lab/runs/<run-id>/` and are intentionally ignored by Git.
 
+## Direct-HTML route
+
+The direct route keeps stages 1–4 shared, then stores its complete bundle, prompts, HTML versions, chapter index, screenshots, validation, and repair records under `runs/<run-id>/direct_html/`. Legacy output is never substituted after a direct-HTML failure.
+
+```bash
+python3 -m video_engine.cli generate-video RUN_ID --topic-ref 1.1 --animation-mode direct-html --confirm-paid-api
+python3 -m video_engine.cli compose-html RUN_ID --confirm-paid-api
+python3 -m video_engine.cli inspect-html RUN_ID
+python3 -m video_engine.cli repair-html RUN_ID --chapter chapter_04 --instruction "Clarify the measurement" --confirm-paid-api
+python3 -m video_engine.cli preview-html RUN_ID
+python3 -m video_engine.cli render-html RUN_ID
+```
+
+`legacy-recipes` remains the CLI default until the two-topic comparison, scientific review, 9/10 first-pass reliability gate, and modern-platform score gate have been completed. Composition, repair, voice, and optional multimodal review calls require explicit paid-API confirmation; inspection, preview, validation, and rendering existing HTML are local.
+
 ## Why prompts remain
 
-Prompts still support story structure, narration, and the explicitly optional legacy
-fallback. Covered objectives do not use scene shortlisting, routing,
-parameterization, direction, or coding models. Their diagrams and timing come from
-validated local recipes in `assets/objective_visual_recipes.json`. See
-`prompts/README.md` for the remaining model tasks.
+Prompts support story structure, narration, the integrated direct-HTML composer and repairer, and the explicitly optional legacy fallback. The direct route uses one coding-model call for the full visual lesson, with one bounded global contract repair only when needed. See `prompts/README.md` for model-task routing.
