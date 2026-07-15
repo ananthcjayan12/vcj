@@ -23,3 +23,8 @@ Rules:
 - Use only Motion Canvas imports demonstrated by the supplied approved API.
 - JSX `key` properties must be strings, never numbers. Do not use the unavailable global `JSX.Element` type; use the approved `Node` type for stored scene-node arrays.
 - Never use the CSS color name `transparent`; Motion Canvas rejects it. Use `#00000000` for a fully transparent fill.
+- Build all primary writing with the approved presentation components. Never manually lay out prose or tables with raw `Txt`, `Rect`, coordinates, or arbitrary font sizes.
+- Raw `Txt` may be used only for diagram labels of six words or fewer.
+- Treat narration as audio content. On-screen display copy must be concise and satisfy the presentation component limits.
+- If comparison content exceeds four rows, show successive table pages at narration cues. Never compress, overflow, or reduce type below the design-system size.
+- Import `CUES` from the chapter's adjacent `./chapter_NN.cues` module and use those named word times for every semantic reveal. Do not transcribe timestamp numbers into TSX or invent semantic timing literals.

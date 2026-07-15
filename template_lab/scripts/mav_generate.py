@@ -213,6 +213,14 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         if use_model and (path / "narration.json").exists() and not args.force_paid_api:
             narration = read_json(path / "narration.json")
             script_source = "cached_narration_json"
+        elif use_model and (path / "debug" / "narration_normalized.json").exists() and not args.force_paid_api:
+            recovered = read_json(path / "debug" / "narration_normalized.json")
+            if validate_narration(recovered, input_payload):
+                narration = generate_narration(input_payload, use_model=use_model)
+                script_source = "model_generation"
+            else:
+                narration = recovered
+                script_source = "recovered_valid_model_output"
         else:
             narration = generate_narration(input_payload, use_model=use_model)
             script_source = "model_generation"

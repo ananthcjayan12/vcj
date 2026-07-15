@@ -16,7 +16,7 @@ from mav_schema import narration_bounds, normalize_text, run_dir, spoken_word_co
 
 
 def _script_structure_schema(target_duration: float = 50.0) -> dict[str, Any]:
-    bounds = narration_bounds(target_duration)
+    del target_duration
     beat = {
         "type": "object",
         "properties": {
@@ -41,8 +41,6 @@ def _script_structure_schema(target_duration: float = 50.0) -> dict[str, Any]:
         "properties": {
             "beats": {
                 "type": "array",
-                "minItems": bounds["min_paragraphs"],
-                "maxItems": bounds["max_paragraphs"],
                 "items": beat,
             }
         },
@@ -51,7 +49,7 @@ def _script_structure_schema(target_duration: float = 50.0) -> dict[str, Any]:
 
 
 def _script_writing_schema(target_duration: float = 50.0) -> dict[str, Any]:
-    bounds = narration_bounds(target_duration)
+    del target_duration
     paragraph = {
         "type": "object",
         "properties": {
@@ -70,8 +68,6 @@ def _script_writing_schema(target_duration: float = 50.0) -> dict[str, Any]:
             "spoken_word_count": {"type": "number"},
             "paragraphs": {
                 "type": "array",
-                "minItems": bounds["min_paragraphs"],
-                "maxItems": bounds["max_paragraphs"],
                 "items": paragraph,
             },
             "elevenlabs_narration": {"type": "string"},

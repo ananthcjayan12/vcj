@@ -190,17 +190,9 @@ def validate_run_input(payload: dict[str, Any]) -> list[Violation]:
 
 def validate_narration(narration: dict[str, Any], input_payload: dict[str, Any]) -> list[Violation]:
     violations = check_forbidden_keys(narration)
-    bounds = narration_bounds(float(input_payload.get("target_duration_seconds", TARGET_DURATION_SECONDS)))
     paragraphs = narration.get("paragraphs")
-    if not isinstance(paragraphs, list) or not bounds["min_paragraphs"] <= len(paragraphs) <= bounds["max_paragraphs"]:
-        violations.append(
-            Violation(
-                "NARRATION_PARAGRAPH_COUNT",
-                "Narration paragraph count "
-                f"must be {bounds['min_paragraphs']}-{bounds['max_paragraphs']} for the target duration",
-                field="paragraphs",
-            )
-        )
+    if not isinstance(paragraphs, list) or not paragraphs:
+        violations.append(Violation("NARRATION_PARAGRAPHS", "Narration must contain at least one paragraph", field="paragraphs"))
         paragraphs = paragraphs if isinstance(paragraphs, list) else []
     ids: set[str] = set()
     allowed_facts = facts_by_id(input_payload)
@@ -218,15 +210,8 @@ def validate_narration(narration: dict[str, Any], input_payload: dict[str, Any])
             fact_root = str(claim_id).split(".", 1)[0]
             if claim_id not in allowed_facts and fact_root not in allowed_facts:
                 violations.append(Violation("UNKNOWN_CLAIM_ID", f"{paragraph_id} references unknown fact {claim_id}", field=paragraph_id))
-    count = spoken_word_count(" ".join(plain_parts))
-    if not bounds["min_words"] <= count <= bounds["max_words"]:
-        violations.append(
-            Violation(
-                "NARRATION_WORD_COUNT",
-                f"Spoken word count {count} is outside {bounds['min_words']}-{bounds['max_words']}",
-                field="spoken_word_count",
-            )
-        )
+    # Word and paragraph targets guide the writing prompt but never reject a
+    # usable script. The generated chapter audio establishes actual duration.
     relative_phrases = date_relative_phrases(" ".join([str(narration.get("title", "")), *plain_parts]))
     if relative_phrases:
         phrases = ", ".join(relative_phrases)

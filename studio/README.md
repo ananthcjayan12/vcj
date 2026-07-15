@@ -432,8 +432,14 @@ input.json                              grounded generation input
 story_skeleton.json                     lesson structure
 narration.json                          final narration and beats
 voiceover.mp3                           generated narration audio
+voiceover.wav                           lossless assembled chapter master
+audio_chunks/manifest.json              authoritative chapter audio boundaries
+audio_chunks/<paragraph_id>/audio.wav   independently cached chapter TTS
+audio_chunks/<paragraph_id>/quality.json deterministic PCM quality measurements
 audio_timing.json                       timed narration segments
 audio_word_timestamps.json              word-level alignment
+motion_canvas/chapters/*.cues.ts         deterministic chapter-local timing constants
+motion_canvas_runtime/src/presentation.tsx fixed typography/table/card components
 scene_plan_v3.json                      planned V3 scenes
 v3_scenes/                              generated scene code
 compositions/master_v3.html             browser preview

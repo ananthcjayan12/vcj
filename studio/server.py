@@ -39,6 +39,8 @@ COVERAGE_PATH = CURRICULUM_ROOT / "coverage_registry.json"
 ASSETS_PATH = REGISTRY_ROOT / "animation_assets.json"
 VIDEOS_PATH = REGISTRY_ROOT / "videos.json"
 MODEL_MAP_PATH = TEMPLATE_LAB_ROOT / "prompts" / "prompt_model_mapping.json"
+PROJECT_PYTHON = REPO_ROOT / ".venv" / "bin" / "python3"
+PYTHON_EXECUTABLE = str(PROJECT_PYTHON if PROJECT_PYTHON.exists() else Path(sys.executable))
 
 STEP_NAMES = ("Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA")
 PAID_STEPS = {2, 3, 5}
@@ -486,7 +488,7 @@ def list_runs() -> list[dict[str, Any]]:
 
 def _prepare_topic(topic_ref: str, force: bool = False) -> dict[str, Any]:
     topic_ref = _require_topic_ref(topic_ref)
-    command = [sys.executable, "-m", "video_engine.cli", "prepare-topic", topic_ref]
+    command = [PYTHON_EXECUTABLE, "-m", "video_engine.cli", "prepare-topic", topic_ref]
     facts_path = TOPICS_ROOT / topic_ref / "facts.json"
     if force or facts_path.exists():
         command.append("--force")
@@ -516,6 +518,15 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         facts_path = REPO_ROOT / facts_path
     if not facts_path.exists():
         raise FileNotFoundError(facts_path)
+    if from_step >= 6:
+        motion_root = _run_dir(str(meta["id"])) / "motion_canvas"
+        manifest = _read_json(motion_root / "manifest.json", {}) or {}
+        required = [str(item.get("scene_id")) for item in manifest.get("chapters", []) if item.get("scene_id")]
+        missing = [chapter_id for chapter_id in required if not (motion_root / "chapters" / f"{chapter_id}.tsx").exists()]
+        generation = _read_json(motion_root / "generation-report.json", {}) or {}
+        if not required or missing or generation.get("status") != "generated":
+            detail = f" Missing: {', '.join(missing)}." if missing else ""
+            raise RuntimeError(f"Complete all Motion Canvas chapters before starting step 6.{detail} Resume from step 5.")
     task_models = _validate_task_models(request.get("task_models", settings.get("task_models", {})))
     audio_selection = task_models.get("audio_generation", {})
     provider = str(settings.get("model_provider", "gemini"))
@@ -525,7 +536,7 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
     if audio_provider not in AUDIO_PROVIDERS:
         raise ValueError("Unsupported audio provider")
     command = [
-        sys.executable,
+        PYTHON_EXECUTABLE,
         str(TEMPLATE_LAB_ROOT / "scripts" / "mav_generate.py"),
         "--run-id", meta["id"],
         "--facts", str(facts_path),
@@ -569,7 +580,9 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         env["MAV_SCENE_REGEN_INSTRUCTION" if scene_id else "MAV_STEP_REGEN_INSTRUCTION"] = instruction
     concurrency = int(settings.get("scene_concurrency", 1))
     env["MAV_V3_SCENE_CONCURRENCY"] = str(max(1, min(concurrency, 8)))
-    env["MAV_MOTION_CANVAS_WORKERS"] = str(max(1, min(concurrency, 4)))
+    # Moonshot currently permits three organization-wide concurrent requests.
+    # Keep one slot free for targeted repairs and unrelated activity.
+    env["MAV_MOTION_CANVAS_WORKERS"] = str(max(1, min(concurrency, 2)))
     return command, env
 
 
@@ -605,9 +618,18 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
             if latest.get("status") == "stopped":
                 return
             if return_code == 0:
-                latest["status"] = "rendered" if mode == "render" else "completed"
-                latest["current_step"] = max(int(latest.get("current_step", 0)), target_step)
-                _append_log(run_id, f"{mode.title()} completed")
+                generation_report = _read_json(_run_dir(run_id) / "motion_canvas" / "generation-report.json", {}) or {}
+                if mode == "generation" and target_step == 5 and generation_report.get("status") == "partial":
+                    failures = generation_report.get("failures") or []
+                    latest["status"] = "partial"
+                    latest["current_step"] = min(int(latest.get("current_step", 0)), 4)
+                    latest["error"] = f"Motion Canvas chapters are partial ({len(failures)} batch failures). Resume step 5."
+                    _append_log(run_id, latest["error"])
+                else:
+                    latest["status"] = "rendered" if mode == "render" else "completed"
+                    latest["current_step"] = max(int(latest.get("current_step", 0)), target_step)
+                    latest["error"] = None
+                    _append_log(run_id, f"{mode.title()} completed")
             else:
                 latest["status"] = "failed"
                 latest["error"] = f"{mode.title()} exited with code {return_code}"
@@ -693,7 +715,7 @@ def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     if quality not in RENDER_QUALITIES or fps not in {24, 25, 30, 50, 60} or not 1 <= workers <= 8:
         raise ValueError("Invalid render settings")
     command = [
-        sys.executable,
+        PYTHON_EXECUTABLE,
         str(TEMPLATE_LAB_ROOT / "scripts" / "mav_render.py"),
         "--run-id", run_id,
         "--quality", quality,
@@ -765,7 +787,7 @@ def repair_chapter_run(run_id: str, chapter_id: str, payload: dict[str, Any]) ->
         raise ValueError("Chapter repair is available only for direct-HTML runs")
     if not payload.get("confirm_paid_api"):
         raise PermissionError("Chapter repair requires explicit paid-API confirmation")
-    command = [sys.executable, "-m", "video_engine.cli", "repair-html", run_id, "--chapter", chapter_id, "--confirm-paid-api"]
+    command = [PYTHON_EXECUTABLE, "-m", "video_engine.cli", "repair-html", run_id, "--chapter", chapter_id, "--confirm-paid-api"]
     instruction = str(payload.get("custom_instruction", "")).strip()
     if instruction:
         command.extend(["--instruction", instruction])
@@ -830,7 +852,7 @@ def reset_run_from_step(run_id: str, step: int) -> dict[str, Any]:
             for relative in ("story_skeleton.json", "narration.json", "narration.txt", "narration_elevenlabs.txt"):
                 remove(relative)
         if step <= 3:
-            for relative in ("voiceover.mp3", "audio_generation.json", "audio_alignment.json"):
+            for relative in ("voiceover.mp3", "voiceover.wav", "audio_generation.json", "audio_alignment.json", "audio_chunks"):
                 remove(relative)
         if step <= 4:
             for relative in ("audio_timing.json", "audio_word_timestamps.json"):
@@ -854,7 +876,7 @@ def update_topic_status(topic_ref: str, status: str) -> dict[str, Any]:
     if status not in VALID_STATES:
         raise ValueError("Invalid coverage status")
     result = subprocess.run(
-        [sys.executable, "-m", "video_engine.cli", "set-status", "--topic", topic_ref, "--status", status],
+        [PYTHON_EXECUTABLE, "-m", "video_engine.cli", "set-status", "--topic", topic_ref, "--status", status],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

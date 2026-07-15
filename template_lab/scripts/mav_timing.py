@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -215,8 +216,86 @@ def _transcribe_audio_with_whisper(audio_path: Path) -> list[dict[str, Any]]:
     return _extract_whisper_words(transcription)
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _derive_chapter_timing(run_path: Path, narration: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+    paragraphs = {str(item["id"]): item for item in narration["paragraphs"]}
+    global_words: list[dict[str, Any]] = []
+    timed_paragraphs: list[dict[str, Any]] = []
+    voiceover = run_path / "voiceover.mp3"
+    voiceover_hash = _sha256(voiceover)
+    cached_words_path = run_path / "audio_word_timestamps.json"
+    cached_timing_path = run_path / "audio_timing.json"
+    cached_words = read_json(cached_words_path) if cached_words_path.exists() else {}
+    cached_timing = read_json(cached_timing_path) if cached_timing_path.exists() else {}
+    reuse_alignment = cached_words.get("source") == "chapter_whisper_word_timestamps" and cached_words.get("voiceover_sha256") == voiceover_hash
+    cached_by_chapter: dict[str, list[dict[str, Any]]] = {}
+    if reuse_alignment:
+        for word in cached_words.get("words") or []:
+            cached_by_chapter.setdefault(str(word.get("paragraph_id")), []).append(word)
+    cached_paragraphs = {str(item.get("id")): item for item in cached_timing.get("paragraphs") or []}
+    for chapter in manifest.get("chapters") or []:
+        chapter_id = str(chapter["id"])
+        paragraph = paragraphs.get(chapter_id)
+        if paragraph is None:
+            raise RuntimeError(f"Audio chapter {chapter_id} does not match narration")
+        audio_path = run_path / str(chapter["path"])
+        speech_duration = float(chapter["speech_duration"])
+        absolute_start = float(chapter["absolute_start"])
+        absolute_end = float(chapter["absolute_end"])
+        if reuse_alignment and cached_by_chapter.get(chapter_id):
+            chapter_words = cached_by_chapter[chapter_id]
+            match_score = float(cached_paragraphs.get(chapter_id, {}).get("whisper_match_score", 1))
+            for item in chapter_words:
+                global_words.append({**item, "index": len(global_words)})
+        else:
+            transcript_words = _transcribe_audio_with_whisper(audio_path)
+            aligned = _align_whisper_words_to_paragraphs({"paragraphs": [paragraph]}, transcript_words, speech_duration)
+            match_score = aligned["paragraphs"][0]["whisper_match_score"]
+            for item in aligned["words"]:
+                start = round(absolute_start + float(item["start"]), 3)
+                end = round(absolute_start + float(item["end"]), 3)
+                global_words.append({**item, "index": len(global_words), "start": start, "end": end, "duration": round(max(0, end - start), 3)})
+        timed_paragraphs.append({
+            "id": chapter_id, "start": round(absolute_start, 3), "end": round(absolute_end, 3),
+            "duration": round(absolute_end - absolute_start, 3),
+            "speech_duration": round(speech_duration, 3), "trailing_pause": round(float(chapter.get("trailing_pause", 0)), 3),
+            "whisper_match_score": match_score,
+        })
+    timeline_duration = float((manifest.get("chapters") or [{}])[-1].get("absolute_end", 0))
+    if timeline_duration <= 0:
+        raise RuntimeError("Chapter audio manifest has no valid timeline duration")
+    return {
+        "audio_duration_seconds": round(timeline_duration, 3),
+        "mp3_container_duration_seconds": round(ffprobe_duration(voiceover) or timeline_duration, 3),
+        "source": "chapter_whisper_word_timestamps", "voiceover_sha256": voiceover_hash,
+        "paragraphs": timed_paragraphs, "words": global_words,
+    }
+
+
 def derive_timing(run_path: Path, narration: dict[str, Any], *, fallback_duration: float) -> dict[str, Any]:
     duration = ffprobe_duration(run_path / "voiceover.mp3") or fallback_duration
+    chapter_manifest_path = run_path / "audio_chunks" / "manifest.json"
+    if chapter_manifest_path.exists():
+        chapter_timing = _derive_chapter_timing(run_path, narration, read_json(chapter_manifest_path))
+        word_payload = {
+            "audio_duration_seconds": chapter_timing["audio_duration_seconds"], "source": chapter_timing["source"],
+            "voiceover_sha256": chapter_timing["voiceover_sha256"], "words": chapter_timing["words"],
+        }
+        write_json(run_path / "audio_word_timestamps.json", word_payload)
+        payload = {key: value for key, value in chapter_timing.items() if key != "words"}
+        payload["word_timestamps"] = "audio_word_timestamps.json"
+        write_json(run_path / "audio_timing.json", payload)
+        violations = validate_timing(payload, narration)
+        if violations:
+            raise ValueError("; ".join(v.message for v in violations))
+        return payload
     aligned = _timing_from_alignment(run_path, narration, duration)
     if aligned:
         payload = {"audio_duration_seconds": round(duration, 3), "source": "elevenlabs_character_alignment", "paragraphs": aligned}

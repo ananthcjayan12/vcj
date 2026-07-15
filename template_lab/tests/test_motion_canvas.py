@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from motion_canvas.pipeline import assemble, parse_response, prepare, split_chapters
+from motion_canvas.pipeline import _split_from_audio_manifest, assemble, parse_response, prepare, split_chapters
 
 
 class MotionCanvasPipelineTest(unittest.TestCase):
@@ -36,6 +36,7 @@ class MotionCanvasPipelineTest(unittest.TestCase):
             import json
             (run / "audio_word_timestamps.json").write_text(json.dumps(self.words))
             manifest = prepare(run, self.narration, batch_size=1)
+            self.assertTrue((run / "motion_canvas" / "chapters" / "chapter_01.cues.ts").exists())
             for item in manifest["chapters"]:
                 duration = item["duration"]
                 source = f"""import {{makeScene2D}} from '@motion-canvas/2d';\nimport {{createSignal, linear}} from '@motion-canvas/core';\nconst CHAPTER_DURATION = {duration};\nexport default makeScene2D(function* () {{ const progress = createSignal(0); yield* progress(1, CHAPTER_DURATION, linear); }});\n"""
@@ -45,6 +46,24 @@ class MotionCanvasPipelineTest(unittest.TestCase):
     def test_parser_rejects_external_import(self) -> None:
         with self.assertRaises(RuntimeError):
             parse_response("=== chapter_01.tsx ===\nimport x from 'https://bad.test/x'", ["chapter_01"])
+
+    def test_audio_manifest_boundaries_are_authoritative(self) -> None:
+        words = {"words": [
+            {"paragraph_id": "paragraph_01", "word": "move", "start": 0.2, "end": 0.7},
+            {"paragraph_id": "paragraph_02", "word": "stop", "start": 2.3, "end": 2.8},
+        ]}
+        audio = {"chapters": [
+            {"id": "paragraph_01", "absolute_start": 0, "absolute_end": 2.1, "speech_duration": 1.75, "trailing_pause": .35},
+            {"id": "paragraph_02", "absolute_start": 2.1, "absolute_end": 3.0, "speech_duration": .9, "trailing_pause": 0},
+        ]}
+        chapters = _split_from_audio_manifest(words, audio)
+        self.assertEqual([item["duration"] for item in chapters], [2.1, .9])
+        self.assertEqual(chapters[1]["words"][0]["start"], .2)
+
+    def test_generated_scene_requires_presentation_contract(self) -> None:
+        source = "import {makeScene2D} from '@motion-canvas/2d'; export default makeScene2D(function*(){});"
+        with self.assertRaisesRegex(RuntimeError, "presentation components"):
+            parse_response(f"=== chapter_01.tsx ===\n{source}", ["chapter_01"])
 
 
 if __name__ == "__main__": unittest.main()
