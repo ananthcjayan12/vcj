@@ -15,6 +15,11 @@ export interface TextItem {title: string; body?: string; accent?: string}
 export interface TableColumn {id: string; title: string; width?: number}
 export interface TableRow {label: string; values: string[]}
 
+type PresentationVariant = 'default' | 'compact';
+
+const variantValue = <T,>(variant: PresentationVariant | undefined, normal: T, compact: T) =>
+  variant === 'compact' ? compact : normal;
+
 const bounded = (value: string, maximum: number, field: string) => {
   if (value.length > maximum) throw new Error(`${field} exceeds ${maximum} characters`);
   return value;
@@ -31,13 +36,20 @@ export function SceneTitle(props: any) {
 }
 
 export function TextCard(props: any) {
-  const {item, title, body, children, accent, width = 720, height = 260, ...placement} = props;
+  const {item, title, body, children, accent, variant = 'default', width, height, ...placement} = props;
+  const cardWidth = width ?? variantValue(variant, 720, 500);
+  const cardHeight = height ?? variantValue(variant, 260, 140);
+  const padding = variantValue(variant, 32, 20);
+  const gap = variantValue(variant, 22, 10);
+  const titleSize = variantValue(variant, Presentation.heading, 30);
+  const bodySize = variantValue(variant, Presentation.body, 24);
+  const bodyLineHeight = variantValue(variant, 42, 30);
   const resolved = item ?? {title: title ?? '', body: body ?? children ?? '', accent};
   const cardTitle = display(resolved.title, 42, 'Card title');
   const cardBody = resolved.body ? display(resolved.body, 110, 'Card body') : '';
-  return <Rect layout direction={'column'} gap={22} padding={32} width={width} height={height} radius={18} fill={Presentation.colors.panel} {...placement}>
-    <Txt text={cardTitle} width={width - 64} fontFamily={Presentation.font} fontSize={Presentation.heading} fontWeight={700} fill={resolved.accent ?? Presentation.colors.cyan} textWrap />
-    {cardBody ? <Txt text={cardBody} width={width - 64} fontFamily={Presentation.font} fontSize={Presentation.body} lineHeight={42} fill={Presentation.colors.text} textWrap /> : null}
+  return <Rect layout direction={'column'} gap={gap} padding={padding} width={cardWidth} height={cardHeight} radius={18} fill={Presentation.colors.panel} {...placement}>
+    <Txt text={cardTitle} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={titleSize} fontWeight={700} fill={resolved.accent ?? Presentation.colors.cyan} textWrap />
+    {cardBody ? <Txt text={cardBody} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={bodySize} lineHeight={bodyLineHeight} fill={Presentation.colors.text} textWrap /> : null}
   </Rect>;
 }
 
@@ -79,20 +91,31 @@ export function ComparisonTable(props: any) {
 }
 
 export function EquationCard(props: any) {
-  const {equation, caption, description, title, ...placement} = props;
+  const {equation, caption, description, title, variant = 'default', width, height, ...placement} = props;
+  const cardWidth = width ?? variantValue(variant, 900, 500);
+  const cardHeight = height ?? variantValue(variant, 220, 140);
+  const padding = variantValue(variant, 32, 20);
+  const gap = variantValue(variant, 22, 10);
+  const equationSize = variantValue(variant, 46, 34);
+  const noteSize = variantValue(variant, Presentation.label, 23);
   const note = caption ?? description ?? title;
-  return <Rect layout direction={'column'} gap={22} padding={32} width={900} height={220} radius={18} fill={Presentation.colors.panel} {...placement}>
-    <Txt text={display(equation, 58, 'Equation')} width={836} fontFamily={Presentation.font} fontSize={46} fontWeight={700} textAlign={'center'} fill={Presentation.colors.amber} />
-    {note ? <Txt text={display(note, 72, 'Equation caption')} width={836} fontFamily={Presentation.font} fontSize={Presentation.label} textAlign={'center'} fill={Presentation.colors.muted} textWrap /> : null}
+  return <Rect layout direction={'column'} gap={gap} padding={padding} width={cardWidth} height={cardHeight} radius={18} fill={Presentation.colors.panel} {...placement}>
+    <Txt text={display(equation, 58, 'Equation')} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={equationSize} fontWeight={700} textAlign={'center'} fill={Presentation.colors.amber} />
+    {note ? <Txt text={display(note, 72, 'Equation caption')} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={noteSize} textAlign={'center'} fill={Presentation.colors.muted} textWrap /> : null}
   </Rect>;
 }
 
 export function StatReadout(props: any) {
-  const {value, unit = '', label, children, ...placement} = props;
+  const {value, unit = '', label, children, variant = 'default', width, height, ...placement} = props;
+  const cardWidth = width ?? variantValue(variant, 440, 360);
+  const cardHeight = height ?? variantValue(variant, 210, 140);
+  const padding = variantValue(variant, 28, 20);
+  const valueSize = variantValue(variant, 46, 34);
+  const labelSize = variantValue(variant, Presentation.label, 23);
   const resolvedValue = value ?? children ?? '';
   const combined = typeof resolvedValue === 'string' ? `${bounded(resolvedValue, 32, 'Value')}${unit ? ` ${bounded(unit, 12, 'Unit')}` : ''}` : resolvedValue;
-  return <Rect layout direction={'column'} gap={14} padding={28} width={440} height={210} radius={18} fill={Presentation.colors.panel} {...placement}>
-    <Txt text={combined} width={384} fontFamily={Presentation.font} fontSize={46} fontWeight={700} textAlign={'center'} fill={Presentation.colors.cyan} />
-    <Txt text={display(label, 42, 'Readout label')} width={384} fontFamily={Presentation.font} fontSize={Presentation.label} textAlign={'center'} fill={Presentation.colors.muted} textWrap />
+  return <Rect layout direction={'column'} gap={variantValue(variant, 14, 8)} padding={padding} width={cardWidth} height={cardHeight} radius={18} fill={Presentation.colors.panel} {...placement}>
+    <Txt text={combined} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={valueSize} fontWeight={700} textAlign={'center'} fill={Presentation.colors.cyan} />
+    <Txt text={display(label, 42, 'Readout label')} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={labelSize} textAlign={'center'} fill={Presentation.colors.muted} textWrap />
   </Rect>;
 }

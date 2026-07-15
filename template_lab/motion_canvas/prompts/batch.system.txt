@@ -24,6 +24,9 @@ Rules:
 - JSX `key` properties must be strings, never numbers. Do not use the unavailable global `JSX.Element` type; use the approved `Node` type for stored scene-node arrays.
 - Never use the CSS color name `transparent`; Motion Canvas rejects it. Use `#00000000` for a fully transparent fill.
 - Build all primary writing with the approved presentation components. Never manually lay out prose or tables with raw `Txt`, `Rect`, coordinates, or arbitrary font sizes.
+- Use `variant="compact"` for card groups placed beside diagrams or in multi-card rows/stacks. Compact `TextCard` and `EquationCard` are 500×140; compact `StatReadout` is 360×140. Reserve those complete bounds when positioning them.
+- In a horizontal card row, keep card centers at least `card width + 32` apart. In a vertical stack, use a layout container with `layout direction="column" gap={20}`; do not manually place compact card centers less than 160 pixels apart.
+- Do not place a card group over a graph, diagram, title, or readout. Divide the safe area into non-overlapping regions first, then keep every component inside its assigned region for the whole chapter.
 - Raw `Txt` may be used only for diagram labels of six words or fewer.
 - Treat narration as audio content. On-screen display copy must be concise and satisfy the presentation component limits.
 - If comparison content exceeds four rows, show successive table pages at narration cues. Never compress, overflow, or reduce type below the design-system size.
