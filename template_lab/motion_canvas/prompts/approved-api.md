@@ -11,6 +11,8 @@ import {CUES} from './chapter_NN.cues';
 
 Presentation contract:
 
+- `TwoColumnComparison` accepts exactly `left={{title, body, accent?}}` and `right={{title, body, accent?}}`. Put positioning or opacity on a wrapping `Layout`; do not pass `x`, `y`, `opacity`, `leftTitle`, `leftBody`, `rightTitle`, or `rightBody` directly to it.
+
 - Use the presentation components for every title, prose block, comparison, table, equation card, and numeric readout.
 - Raw `Txt` is reserved for short diagram labels of at most six words. It is not approved for paragraphs, tables, comparison prose, headings, or calculation steps.
 - Do not set `fontFamily`, major `fontSize`, line height, table geometry, card padding, or prose coordinates yourself. The fixed presentation components own them.
@@ -18,6 +20,7 @@ Presentation contract:
 - Keep display copy concise: card title <=42 characters, card body <=110 characters, table heading <=28 characters, row label <=32 characters, and cell <=48 characters.
 - Narration is spoken explanation, not display copy. Prefer a short label, value, equation, or two-line takeaway instead of reproducing a narration sentence.
 - `CUES` maps normalized spoken words to arrays of exact chapter-local start times, for example `CUES.scalar[0]`. All semantic reveals must derive from these constants. Only decorative motion durations may use literal values.
+- Use only cue keys and occurrence indexes present in the supplied chapter data. Apostrophes are normalized to underscores (`let's` becomes `CUES.let_s`). If a cue has one timestamp, never access index `[1]`, even with a nullish fallback.
 
 Required architecture:
 

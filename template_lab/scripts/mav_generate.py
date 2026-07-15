@@ -301,7 +301,11 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
     if animation_mode == MOTION_CANVAS_MODE:
         if from_step <= 5:
             manifest = prepare_motion_canvas(path, narration)
-            generation = generate_motion_canvas(path, manifest, allow_model_call=use_model, force=bool(args.force_paid_api), workers=int(os.getenv("MAV_MOTION_CANVAS_WORKERS", "2")))
+            motion_model_call = None
+            if os.getenv("MAV_MOTION_CANVAS_BATCH_PROVIDER", "").strip().lower() == "codex":
+                from mav_codex import call_codex_text
+                motion_model_call = call_codex_text
+            generation = generate_motion_canvas(path, manifest, allow_model_call=use_model, force=bool(args.force_paid_api), workers=int(os.getenv("MAV_MOTION_CANVAS_WORKERS", "2")), model_call=motion_model_call)
         else:
             manifest = _read_cached_json(path / "motion_canvas" / "manifest.json", "Motion Canvas manifest")
             generation = _read_cached_json(path / "motion_canvas" / "generation-report.json", "Motion Canvas generation report")

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _infer_step, _normalized_meta, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, model_map_payload, reset_run_from_step, topic_detail
+from studio.server import _infer_step, _normalized_meta, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, model_map_payload, reset_run_from_step, topic_detail, update_run_models
 
 
 class StudioPayloadTest(unittest.TestCase):
@@ -72,6 +72,21 @@ class StudioPayloadTest(unittest.TestCase):
     def test_model_map_covers_all_paid_pipeline_tasks(self) -> None:
         tasks = {item["task"] for item in model_map_payload()["tasks"]}
         self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "motion_canvas_batch"})
+
+    def test_codex_cli_model_can_be_selected_for_motion_canvas_only(self) -> None:
+        meta = {"id": "physics-1-1-command-test", "facts_path": "video_engine/topics/1.1/facts.json", "settings": {"duration": 480, "model_provider": "gemini", "audio_provider": "gemini", "scene_concurrency": 4, "task_models": {"motion_canvas_batch": {"provider": "codex", "model": "gpt-5.6-sol"}}}}
+        _command, env = build_generation_command(meta, {"from_step": 5, "stop_after_step": 5, "confirm_paid_api": True})
+        self.assertEqual(env["MAV_MOTION_CANVAS_BATCH_PROVIDER"], "codex")
+        self.assertEqual(env["MAV_MOTION_CANVAS_BATCH_MODEL"], "gpt-5.6-sol")
+        self.assertEqual(env["MAV_MOTION_CANVAS_WORKERS"], "2")
+
+    def test_mid_run_model_change_is_persisted_for_next_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
+            run_path = Path(directory) / "model-change-test"
+            run_path.mkdir()
+            (run_path / "studio_run.json").write_text(json.dumps({"id": "model-change-test", "facts_path": "video_engine/topics/1.1/facts.json", "status": "paused", "current_step": 4, "settings": {"task_models": {"motion_canvas_batch": {"provider": "moonshot", "model": "kimi-k2.7-code"}}}}))
+            result = update_run_models("model-change-test", {"task_models": {"motion_canvas_batch": {"provider": "codex", "model": "gpt-5.6-sol"}}})
+            self.assertEqual(result["settings"]["task_models"]["motion_canvas_batch"], {"provider": "codex", "model": "gpt-5.6-sol"})
 
     def test_generation_summary_uses_actual_stopped_step(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

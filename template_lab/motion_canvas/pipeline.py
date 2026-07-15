@@ -173,6 +173,18 @@ def _validate_chapter_source(content: str, chapter_id: str) -> None:
     if not content or "```" in content or "from 'http" in content or 'from "http' in content:
         raise RuntimeError(f"Unsafe or empty chapter: {chapter_id}")
     if "makeScene2D" in content:
+        invalid_numeric_cue = re.search(r"\bCUES\.(\d[\w$]*)", content)
+        if invalid_numeric_cue:
+            raise RuntimeError(
+                f"{chapter_id} uses invalid numeric cue access CUES.{invalid_numeric_cue.group(1)}; "
+                "use bracket notation"
+            )
+        for comparison in re.findall(r"<TwoColumnComparison\b[\s\S]*?/>", content):
+            if not re.search(r"\bleft=\{\{", comparison) or not re.search(r"\bright=\{\{", comparison):
+                raise RuntimeError(
+                    f"{chapter_id} must pass TwoColumnComparison left/right TextItem objects; "
+                    "put placement and opacity on a wrapping Layout"
+                )
         if "../../presentation" not in content:
             raise RuntimeError(f"{chapter_id} must use the fixed presentation components")
         if f"./{chapter_id}.cues" not in content:
@@ -183,6 +195,29 @@ def _validate_chapter_source(content: str, chapter_id: str) -> None:
         for size in re.findall(r"<Txt\b[\s\S]*?\bfontSize=\{(\d+)\}[\s\S]*?/?>", content):
             if int(size) < 26 or int(size) > 32:
                 raise RuntimeError(f"{chapter_id} raw diagram-label fontSize must be 26-32")
+
+
+def _normalize_chapter_source(content: str) -> str:
+    """Repair syntax-safe mechanical drift without another model call."""
+    return re.sub(r"\bCUES\.(\d[\w$]*)", lambda match: f'CUES["{match.group(1)}"]', content)
+
+
+def _validate_cue_references(root: Path, content: str, chapter_id: str) -> None:
+    cue_path = root / "chapters" / f"{chapter_id}.cues.ts"
+    match = re.search(r"export const CUES = (\{.*\}) as const;", cue_path.read_text(encoding="utf-8"))
+    if not match:
+        raise RuntimeError(f"Cannot read deterministic cues for {chapter_id}")
+    cues = json.loads(match.group(1))
+    references = re.findall(r'CUES(?:\.([A-Za-z_$][\w$]*)|\["([^"]+)"\])\[(\d+)\]', content)
+    for dotted, bracketed, raw_index in references:
+        key = dotted or bracketed
+        index = int(raw_index)
+        if key not in cues:
+            raise RuntimeError(f"{chapter_id} references missing cue {key!r}")
+        if index >= len(cues[key]):
+            raise RuntimeError(
+                f"{chapter_id} references CUES[{key!r}][{index}], but that cue has only {len(cues[key])} occurrence(s)"
+            )
 
 
 def _extract_response(response: str, chapter_ids: list[str]) -> dict[str, str]:
@@ -205,7 +240,9 @@ def _extract_response(response: str, chapter_ids: list[str]) -> dict[str, str]:
 def parse_response(response: str, chapter_ids: list[str]) -> dict[str, str]:
     files = _extract_response(response, chapter_ids)
     for chapter_id in chapter_ids:
-        _validate_chapter_source(files[f"{chapter_id}.tsx"], chapter_id)
+        name = f"{chapter_id}.tsx"
+        files[name] = _normalize_chapter_source(files[name])
+        _validate_chapter_source(files[name], chapter_id)
     return files
 
 
@@ -265,9 +302,11 @@ def generate(run_path: Path, manifest: dict[str, Any], *, allow_model_call: bool
             source = extracted[name]
             try:
                 _validate_chapter_source(source, chapter_id)
+                _validate_cue_references(root, source, chapter_id)
             except Exception as exc:
                 try:
                     source = repair_chapter(chapter_id, source, str(exc))
+                    _validate_cue_references(root, source, chapter_id)
                 except Exception as repair_exc:
                     errors.append(f"{chapter_id}: {repair_exc}")
                     continue

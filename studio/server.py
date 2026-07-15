@@ -53,6 +53,7 @@ SCENE_ID_RE = re.compile(r"^scene_\d{2,3}$")
 CHAPTER_ID_RE = re.compile(r"^chapter_\d{2,3}$")
 MODEL_PROVIDERS = {"configured", "gemini", "anthropic"}
 AUDIO_PROVIDERS = {"gemini", "elevenlabs"}
+CODEX_MODELS = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini")
 RENDER_QUALITIES = {"draft", "standard", "high"}
 
 _processes: dict[str, subprocess.Popen[str]] = {}
@@ -74,7 +75,7 @@ def _read_json(path: Path, default: Any = None) -> Any:
 
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary = path.with_suffix(path.suffix + f".tmp-{os.getpid()}-{threading.get_ident()}")
     temporary.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     temporary.replace(path)
 
@@ -106,7 +107,11 @@ def model_map_payload() -> dict[str, Any]:
             continue
         provider_models = dict(config.get("provider_models") or {})
         provider_models.setdefault(str(config.get("provider")), str(config.get("model")))
-        tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
+        provider_model_options = {provider: [model] for provider, model in provider_models.items()}
+        if task == "motion_canvas_batch":
+            provider_models["codex"] = CODEX_MODELS[0]
+            provider_model_options["codex"] = list(CODEX_MODELS)
+        tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
     tasks.append({"task": "audio_generation", "label": labels["audio_generation"], "step": 3, "provider": "gemini", "model": os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview"), "provider_models": {"gemini": "gemini-3.1-flash-tts-preview", "elevenlabs": os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3")}, "prompt_files": [], "max_tokens": None})
     return {"version": payload.get("version"), "tasks": sorted(tasks, key=lambda item: (item.get("step") or 99, item["task"]))}
 
@@ -123,8 +128,8 @@ def _validate_task_models(value: Any) -> dict[str, dict[str, str]]:
             raise ValueError(f"Unsupported model task: {task}")
         provider = str(selection.get("provider", "")).strip().lower()
         model = str(selection.get("model", "")).strip()
-        allowed = catalog[task]["provider_models"]
-        if provider not in allowed or model != allowed[provider]:
+        allowed = catalog[task].get("provider_model_options") or {key: [item] for key, item in catalog[task]["provider_models"].items()}
+        if provider not in allowed or model not in allowed[provider]:
             raise ValueError(f"Unsupported model selection for {task}: {provider}:{model}")
         overrides[task] = {"provider": provider, "model": model}
     return overrides
@@ -575,10 +580,16 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         prefix = f"MAV_{task.upper()}"
         env[f"{prefix}_PROVIDER"] = selection["provider"]
         env[f"{prefix}_MODEL"] = selection["model"]
+    motion_selection = task_models.get("motion_canvas_batch")
+    if motion_selection and motion_selection["provider"] == "codex":
+        # Subscription-backed Codex runs are intentionally conservative; the
+        # normal batch cache still preserves every successful result.
+        concurrency = min(int(settings.get("scene_concurrency", 1)), 2)
+    else:
+        concurrency = int(settings.get("scene_concurrency", 1))
     instruction = str(request.get("custom_instruction", "")).strip()
     if instruction:
         env["MAV_SCENE_REGEN_INSTRUCTION" if scene_id else "MAV_STEP_REGEN_INSTRUCTION"] = instruction
-    concurrency = int(settings.get("scene_concurrency", 1))
     env["MAV_V3_SCENE_CONCURRENCY"] = str(max(1, min(concurrency, 8)))
     # Moonshot currently permits three organization-wide concurrent requests.
     # Keep one slot free for targeted repairs and unrelated activity.
@@ -595,6 +606,10 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
     meta.update({"status": "rendering" if mode == "render" else "running", "error": None})
     _save_meta(meta)
     _append_log(run_id, f"Starting {mode}: {' '.join(command[:3])} …")
+    if mode == "generation" and target_step >= 5 and env.get("MAV_MOTION_CANVAS_BATCH_PROVIDER"):
+        provider = env["MAV_MOTION_CANVAS_BATCH_PROVIDER"]
+        model = env.get("MAV_MOTION_CANVAS_BATCH_MODEL", "authenticated default")
+        _append_log(run_id, f"Step 5 chapter generator: provider={provider} model={model}")
 
     def worker() -> None:
         process: subprocess.Popen[str] | None = None
