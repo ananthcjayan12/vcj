@@ -51,9 +51,10 @@ RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,95}$")
 TOPIC_REF_RE = re.compile(r"^\d+(?:\.\d+){1,2}$")
 SCENE_ID_RE = re.compile(r"^scene_\d{2,3}$")
 CHAPTER_ID_RE = re.compile(r"^chapter_\d{2,3}$")
-MODEL_PROVIDERS = {"configured", "gemini", "anthropic"}
+MODEL_PROVIDERS = {"configured", "gemini", "anthropic", "codex"}
 AUDIO_PROVIDERS = {"gemini", "elevenlabs"}
 CODEX_MODELS = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini")
+CODEX_REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 RENDER_QUALITIES = {"draft", "standard", "high"}
 
 _processes: dict[str, subprocess.Popen[str]] = {}
@@ -99,19 +100,19 @@ def _run_dir(run_id: str) -> Path:
 def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
     tasks = []
-    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas chapter coder"}
-    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch"}
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas chapter coder", "motion_canvas_repair": "Motion Canvas compile repair"}
+    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}
     for task, config in payload.get("tasks", {}).items():
         if task not in retained_tasks:
             continue
         provider_models = dict(config.get("provider_models") or {})
         provider_models.setdefault(str(config.get("provider")), str(config.get("model")))
         provider_model_options = {provider: [model] for provider, model in provider_models.items()}
-        if task == "motion_canvas_batch":
+        if task in {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}:
             provider_models["codex"] = CODEX_MODELS[0]
             provider_model_options["codex"] = list(CODEX_MODELS)
-        tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
+        tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "reasoning_efforts": list(CODEX_REASONING_EFFORTS), "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
     tasks.append({"task": "audio_generation", "label": labels["audio_generation"], "step": 3, "provider": "gemini", "model": os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview"), "provider_models": {"gemini": "gemini-3.1-flash-tts-preview", "elevenlabs": os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3")}, "prompt_files": [], "max_tokens": None})
     return {"version": payload.get("version"), "tasks": sorted(tasks, key=lambda item: (item.get("step") or 99, item["task"]))}
 
@@ -128,10 +129,15 @@ def _validate_task_models(value: Any) -> dict[str, dict[str, str]]:
             raise ValueError(f"Unsupported model task: {task}")
         provider = str(selection.get("provider", "")).strip().lower()
         model = str(selection.get("model", "")).strip()
+        reasoning = str(selection.get("reasoning_effort", "low")).strip().lower()
         allowed = catalog[task].get("provider_model_options") or {key: [item] for key, item in catalog[task]["provider_models"].items()}
         if provider not in allowed or model not in allowed[provider]:
             raise ValueError(f"Unsupported model selection for {task}: {provider}:{model}")
+        if provider == "codex" and reasoning not in CODEX_REASONING_EFFORTS:
+            raise ValueError(f"Unsupported Codex reasoning effort for {task}: {reasoning}")
         overrides[task] = {"provider": provider, "model": model}
+        if provider == "codex":
+            overrides[task]["reasoning_effort"] = reasoning
     return overrides
 
 
@@ -580,6 +586,8 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         prefix = f"MAV_{task.upper()}"
         env[f"{prefix}_PROVIDER"] = selection["provider"]
         env[f"{prefix}_MODEL"] = selection["model"]
+        if selection["provider"] == "codex":
+            env[f"{prefix}_REASONING_EFFORT"] = selection.get("reasoning_effort", "low")
     motion_selection = task_models.get("motion_canvas_batch")
     if motion_selection and motion_selection["provider"] == "codex":
         # Subscription-backed Codex runs are intentionally conservative; the
@@ -609,7 +617,9 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
     if mode == "generation" and target_step >= 5 and env.get("MAV_MOTION_CANVAS_BATCH_PROVIDER"):
         provider = env["MAV_MOTION_CANVAS_BATCH_PROVIDER"]
         model = env.get("MAV_MOTION_CANVAS_BATCH_MODEL", "authenticated default")
-        _append_log(run_id, f"Step 5 chapter generator: provider={provider} model={model}")
+        reasoning = env.get("MAV_MOTION_CANVAS_BATCH_REASONING_EFFORT")
+        suffix = f" reasoning={reasoning}" if reasoning else ""
+        _append_log(run_id, f"Step 5 chapter generator: provider={provider} model={model}{suffix}")
 
     def worker() -> None:
         process: subprocess.Popen[str] | None = None

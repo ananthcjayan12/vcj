@@ -35,7 +35,7 @@ Required architecture:
 - Never use browser-style placement such as `x=1200`, `y=800`, or center `(960,540)`. Convert browser coordinates using `x-960` and `y-540`.
 - Center full-canvas backgrounds at `(0,0)`.
 - Use large readable text, restrained colors, and progressive explanation instead of decorative motion.
-- JSX `key` values must be strings, for example `key={String(index)}`; never pass a number.
+- JSX `key` values must be strings and unique across the entire scene, not merely inside one mapped array. Prefix every mapped group, for example `key={`particles-${String(index)}`}` and `key={`labels-${String(index)}`}`. Never use bare `key={String(index)}` and never pass a number.
 - Do not use the global `JSX.Element` type. When storing constructed scene nodes, import `Node` and use `Node[]`.
 - Motion Canvas does not accept the CSS color name `transparent`; use the explicit alpha color `#00000000`.
 

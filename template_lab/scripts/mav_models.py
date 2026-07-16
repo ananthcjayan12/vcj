@@ -19,7 +19,7 @@ GEMINI_TIMEOUT_MILLISECONDS = 600_000
 DEFAULT_MODEL_TIMEOUT_SECONDS = 600
 ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 MOONSHOT_CHAT_COMPLETIONS_URL = "https://api.moonshot.ai/v1/chat/completions"
-SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot"}
+SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot", "codex"}
 GEMINI_JSON_SCHEMA_KEYS = {
     "$id",
     "$defs",
@@ -211,7 +211,15 @@ def _api_key_hint(provider: str) -> str:
 
 
 def provider_available(provider: str) -> bool:
-    return bool(_api_key_for_provider(_normalize_provider(provider)))
+    normalized = _normalize_provider(provider)
+    if normalized == "codex":
+        from mav_codex import _binary, _login_status
+        try:
+            _login_status(_binary())
+            return True
+        except RuntimeError:
+            return False
+    return bool(_api_key_for_provider(normalized))
 
 
 def anthropic_available() -> bool:
@@ -252,6 +260,9 @@ def call_model_json(
 ) -> dict[str, Any] | None:
     """Call the configured provider for one structured JSON object."""
     resolved = model_config_for_task(task, requested_max_tokens=max_tokens)
+    if resolved.provider == "codex":
+        from mav_codex import call_codex_json
+        return call_codex_json(task=task, system=system, user=user, max_tokens=max_tokens, output_schema=output_schema)
     if not provider_available(resolved.provider):
         raise RuntimeError(
             f"{resolved.provider.title()} provider selected for {task}, but {_api_key_hint(resolved.provider)} is not set"
@@ -276,6 +287,9 @@ def call_model_text(
 ) -> str | None:
     """Call the configured provider and return raw text instead of JSON."""
     resolved = model_config_for_task(task, requested_max_tokens=max_tokens)
+    if resolved.provider == "codex":
+        from mav_codex import call_codex_text
+        return call_codex_text(task=task, system=system, user=user, max_tokens=max_tokens)
     if not provider_available(resolved.provider):
         raise RuntimeError(
             f"{resolved.provider.title()} provider selected for {task}, but {_api_key_hint(resolved.provider)} is not set"

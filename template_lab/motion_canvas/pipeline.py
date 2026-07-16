@@ -199,7 +199,14 @@ def _validate_chapter_source(content: str, chapter_id: str) -> None:
 
 def _normalize_chapter_source(content: str) -> str:
     """Repair syntax-safe mechanical drift without another model call."""
-    return re.sub(r"\bCUES\.(\d[\w$]*)", lambda match: f'CUES["{match.group(1)}"]', content)
+    content = re.sub(r"\bCUES\.(\d[\w$]*)", lambda match: f'CUES["{match.group(1)}"]', content)
+    key_group = 0
+    def unique_index_key(_match: re.Match[str]) -> str:
+        nonlocal key_group
+        replacement = f"key={{`mapped-{key_group}-${{String(index)}}`}}"
+        key_group += 1
+        return replacement
+    return re.sub(r"key=\{String\(index\)\}", unique_index_key, content)
 
 
 def _validate_cue_references(root: Path, content: str, chapter_id: str) -> None:
@@ -267,10 +274,10 @@ def generate(run_path: Path, manifest: dict[str, Any], *, allow_model_call: bool
     if model_call is None:
         from mav_models import call_model_text
         model_call = call_model_text
-    def call_with_backoff(*, system: str, user: str, max_tokens: int) -> str:
+    def call_with_backoff(*, task: str = "motion_canvas_batch", system: str, user: str, max_tokens: int) -> str:
         for attempt in range(4):
             try:
-                response = model_call(task="motion_canvas_batch", system=system, user=user, max_tokens=max_tokens)
+                response = model_call(task=task, system=system, user=user, max_tokens=max_tokens)
                 if not response:
                     raise RuntimeError("Model returned no response")
                 return response
@@ -289,7 +296,7 @@ def generate(run_path: Path, manifest: dict[str, Any], *, allow_model_call: bool
             f"Return exactly this marker and a complete corrected file:\n=== {chapter_id}.tsx ===\n\n"
             f"VALIDATION ERROR\n{error}\n\nAPPROVED API\n{approved}\n\nCURRENT SOURCE\n{source}"
         )
-        response = call_with_backoff(system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
+        response = call_with_backoff(task="motion_canvas_repair", system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
         repaired = parse_response(response, [chapter_id])[f"{chapter_id}.tsx"]
         _write(root / "responses" / f"repair-{chapter_id}.txt", response)
         return repaired
@@ -355,9 +362,48 @@ def generate(run_path: Path, manifest: dict[str, Any], *, allow_model_call: bool
     by_id = {item["id"]: item for item in results + failures}
     for batch in manifest["batches"]: batch.update(by_id.get(batch["id"], {"status": "unknown"}))
     manifest["updated_at"] = _now(); _write_json(root / "manifest.json", manifest)
-    assembled = str(assemble(run_path, manifest)) if not failures else None
+    assembled = None
+    compile_repairs: list[dict[str, Any]] = []
+    if not failures:
+        assembled = str(assemble(run_path, manifest))
+        # Compile the complete generated lesson while the selected coding model
+        # is still available. TypeScript reports are grouped by chapter so all
+        # currently visible failures are repaired together, then rechecked.
+        for attempt in range(4):
+            _sync_runtime(run_path)
+            compile_report = _npm("typecheck", run_path, 180)
+            if compile_report["returncode"] == 0:
+                break
+            output = f"{compile_report.get('stdout', '')}\n{compile_report.get('stderr', '')}"
+            grouped: dict[str, list[str]] = {}
+            for line in output.splitlines():
+                match = re.search(r"src/generated/chapters/(chapter_\d+)\.tsx", line)
+                if match:
+                    grouped.setdefault(match.group(1), []).append(line)
+            compile_repairs.append({"attempt": attempt + 1, "errors": grouped or {"runtime": output[-12000:]}})
+            if attempt == 3:
+                failures.append({"id": "typescript_compile", "status": "failed", "error": "TypeScript still failed after three aggregate repair passes\n" + output[-12000:]})
+                break
+            if not grouped or not allow_model_call:
+                failures.append({"id": "typescript_compile", "status": "failed", "error": output[-12000:]})
+                break
+            repair_errors = []
+            for chapter_id, errors in grouped.items():
+                chapter_path = root / "chapters" / f"{chapter_id}.tsx"
+                try:
+                    repaired = repair_chapter(chapter_id, chapter_path.read_text(encoding="utf-8"), "\n".join(errors))
+                    _validate_cue_references(root, repaired, chapter_id)
+                    _write(chapter_path, repaired)
+                except Exception as exc:
+                    repair_errors.append(f"{chapter_id}: {exc}")
+            if repair_errors:
+                failures.append({"id": "typescript_repair", "status": "failed", "error": "; ".join(repair_errors)})
+                break
+        if not failures:
+            _sync_runtime(run_path)
     report = {"status": "generated" if not failures else "partial", "workers": workers,
-              "results": sorted(results, key=lambda item: item["id"]), "failures": sorted(failures, key=lambda item: item["id"]), "assembled_scenes": assembled}
+              "results": sorted(results, key=lambda item: item["id"]), "failures": sorted(failures, key=lambda item: item["id"]), "assembled_scenes": assembled,
+              "compile_repairs": compile_repairs}
     _write_json(root / "generation-report.json", report)
     return report
 

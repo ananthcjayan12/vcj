@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from mav_codex import _binary
+from mav_codex import _binary, _strict_output_schema
 from motion_canvas.pipeline import _normalize_chapter_source, _validate_chapter_source, _validate_cue_references
 
 
@@ -23,6 +23,11 @@ class CodexDiscoveryTest(unittest.TestCase):
         source = "const x = CUES.148[0];"
         normalized = _normalize_chapter_source(source)
         self.assertEqual(normalized, 'const x = CUES["148"][0];')
+
+    def test_bare_mapped_keys_receive_scene_unique_prefixes(self) -> None:
+        normalized = _normalize_chapter_source("<Rect key={String(index)} /><Circle key={String(index)} />")
+        self.assertIn('key={`mapped-0-${String(index)}`}', normalized)
+        self.assertIn('key={`mapped-1-${String(index)}`}', normalized)
 
     def test_numeric_cue_property_is_rejected_if_not_normalized(self) -> None:
         source = "import x from '../../presentation'; import './chapter_11.cues'; makeScene2D(); const x = CUES.148[0];"
@@ -44,6 +49,12 @@ class CodexDiscoveryTest(unittest.TestCase):
         source = "import x from '../../presentation'; import './chapter_01.cues'; makeScene2D(); <TwoColumnComparison leftTitle={'Mass'} rightTitle={'Weight'} />"
         with self.assertRaisesRegex(RuntimeError, "left/right TextItem"):
             _validate_chapter_source(source, "chapter_01")
+
+    def test_codex_schema_is_strict_at_every_object_level(self) -> None:
+        schema = {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}}, "required": ["items"]}
+        strict = _strict_output_schema(schema)
+        self.assertFalse(strict["additionalProperties"])
+        self.assertFalse(strict["properties"]["items"]["items"]["additionalProperties"])
 
 
 if __name__ == "__main__":

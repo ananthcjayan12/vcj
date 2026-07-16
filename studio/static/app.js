@@ -18,7 +18,7 @@ const formatUsd = value => { const number = Number(value || 0); return number >=
 const activeStatuses = new Set(["running", "rendering"]);
 const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Chapters", "Compile & QA", "Review", "Approval"];
 const stepsForRun = () => motionCanvasSteps;
-const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch"]);
+const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"]);
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -106,7 +106,8 @@ function modelMapMarkup(run, working) {
     const providers = Object.keys(task.provider_models || {});
     const prompts = task.prompt_files?.length ? task.prompt_files.join(" · ") : "Voice synthesis (no text prompt file)";
     const modelOptions = task.provider_model_options?.[current.provider] || [task.provider_models[current.provider]];
-    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}"><span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(provider === "codex" ? "Codex CLI (ChatGPT)" : provider)}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select></article>`;
+    const reasoning = current.reasoning_effort || "low";
+    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}"><span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(provider === "codex" ? "Codex CLI (ChatGPT)" : provider)}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select><select class="task-reasoning" ${working || current.provider !== "codex" ? "disabled" : ""}>${(task.reasoning_efforts || ["low"]).map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select></article>`;
   }).join("")}</div><p class="model-map-note">Changes are saved to this run and applied on its next execution. Past usage records keep the model that actually produced them.</p></section>`;
 }
 
@@ -118,7 +119,7 @@ function costMarkup(artifacts) {
 }
 
 function collectTaskModels() {
-  return Object.fromEntries($$("[data-model-task]").map(row => [row.dataset.modelTask, { provider: $(".task-provider", row).value, model: $(".task-model", row).value }]));
+  return Object.fromEntries($$("[data-model-task]").map(row => [row.dataset.modelTask, { provider: $(".task-provider", row).value, model: $(".task-model", row).value, ...($(".task-provider", row).value === "codex" ? {reasoning_effort: $(".task-reasoning", row).value} : {}) }]));
 }
 
 async function boot() {
@@ -228,10 +229,12 @@ function renderTopicDetail() {
       <div class="form-grid">
         <label class="field"><span>Run ID</span><input id="run-id-input" value="${escapeHtml(runDefault)}"></label>
         <label class="field"><span>Duration</span><select id="duration-input"><option value="300">5 minutes</option><option value="480" selected>8 minutes</option><option value="600">10 minutes</option><option value="720">12 minutes</option></select></label>
-        <label class="field"><span>Script model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><option value="configured">Configured</option></select></label>
+        <label class="field"><span>Script generator / model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><optgroup label="Codex CLI (ChatGPT)"><option value="codex:gpt-5.6-sol">GPT-5.6-Sol</option><option value="codex:gpt-5.6-terra">GPT-5.6-Terra</option><option value="codex:gpt-5.6-luna">GPT-5.6-Luna</option><option value="codex:gpt-5.5">GPT-5.5</option><option value="codex:gpt-5.4">GPT-5.4</option><option value="codex:gpt-5.4-mini">GPT-5.4-Mini</option></optgroup><option value="configured">Configured</option></select></label>
+        <label class="field"><span>Script reasoning</span><select id="script-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Voice</span><select id="audio-provider"><option value="gemini">Gemini TTS</option><option value="elevenlabs">ElevenLabs</option></select></label>
         <label class="field"><span>Chapter generator</span><select id="chapter-provider"><option value="moonshot">Kimi K2.7 Code</option><option value="codex">Codex CLI (ChatGPT)</option></select></label>
         <label class="field"><span>Codex model</span><select id="codex-model" disabled><option value="gpt-5.6-sol">GPT-5.6-Sol</option><option value="gpt-5.6-terra">GPT-5.6-Terra</option><option value="gpt-5.6-luna">GPT-5.6-Luna</option><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.4-mini">GPT-5.4-Mini</option></select></label>
+        <label class="field"><span>Chapter reasoning</span><select id="chapter-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Chapter workers</span><select id="scene-concurrency"><option>1</option><option selected>2</option><option>4</option></select></label>
       </div>
       <div class="form-actions">
@@ -362,6 +365,20 @@ function switchViewTo(view) {
 
 function productionPayload(execute) {
   const chapterProvider = $("#chapter-provider").value;
+  const scriptSelection = $("#model-provider").value;
+  const scriptProvider = scriptSelection.startsWith("codex:") ? "codex" : scriptSelection;
+  const scriptModel = scriptProvider === "codex" ? scriptSelection.split(":", 2)[1] : null;
+  const taskModels = {
+    motion_canvas_batch: {
+      provider: chapterProvider,
+      model: chapterProvider === "codex" ? $("#codex-model").value : "kimi-k2.7-code",
+      ...(chapterProvider === "codex" ? {reasoning_effort: $("#chapter-reasoning").value} : {})
+    },
+    motion_canvas_repair: {provider: "codex", model: $("#codex-model").value, reasoning_effort: "high"}
+  };
+  if (scriptProvider === "codex") {
+    for (const task of ["script_structure", "script_writing"]) taskModels[task] = {provider: "codex", model: scriptModel, reasoning_effort: $("#script-reasoning").value};
+  }
   return {
     topic_ref: state.selectedTopicRef,
     run_id: $("#run-id-input").value.trim(),
@@ -370,12 +387,7 @@ function productionPayload(execute) {
     audio_provider: $("#audio-provider").value,
     animation_mode: "motion-canvas",
     scene_concurrency: Number($("#scene-concurrency").value),
-    task_models: {
-      motion_canvas_batch: {
-        provider: chapterProvider,
-        model: chapterProvider === "codex" ? $("#codex-model").value : "kimi-k2.7-code"
-      }
-    },
+    task_models: taskModels,
     confirm_paid_api: $("#paid-confirm").checked,
     execute
   };
@@ -502,6 +514,10 @@ document.addEventListener("change", event => {
   if (event.target.classList.contains("topic-status-select")) updateCoverage(event.target);
   if (event.target.id === "chapter-provider") {
     $("#codex-model").disabled = event.target.value !== "codex";
+    $("#chapter-reasoning").disabled = event.target.value !== "codex";
+  }
+  if (event.target.id === "model-provider") {
+    $("#script-reasoning").disabled = !event.target.value.startsWith("codex:");
   }
   if (event.target.classList.contains("task-provider")) {
     const row = event.target.closest("[data-model-task]");
@@ -509,6 +525,7 @@ document.addEventListener("change", event => {
     const options = JSON.parse(row.dataset.providerModelOptions || "{}");
     const available = options[event.target.value] || [models[event.target.value]];
     $(".task-model", row).innerHTML = available.map(model => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
+    $(".task-reasoning", row).disabled = event.target.value !== "codex";
   }
 });
 

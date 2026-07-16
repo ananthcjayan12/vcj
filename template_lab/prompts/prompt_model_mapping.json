@@ -99,6 +99,18 @@
       "env_var": "MAV_MOTION_CANVAS_BATCH_MODEL",
       "prompt_files": ["../motion_canvas/prompts/batch.system.txt"]
     },
+    "motion_canvas_repair": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {
+        "moonshot": "kimi-k2.7-code"
+      },
+      "max_tokens": 64000,
+      "timeout_seconds": 2400,
+      "provider_env_var": "MAV_MOTION_CANVAS_REPAIR_PROVIDER",
+      "env_var": "MAV_MOTION_CANVAS_REPAIR_MODEL",
+      "prompt_files": ["../motion_canvas/prompts/repair.system.txt"]
+    },
     "direct_html_composer": {
       "provider": "moonshot",
       "model": "kimi-k2.7-code",
