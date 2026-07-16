@@ -10,49 +10,49 @@
     "covered",
     "needs_revision"
   ],
-  "updated_at": "2026-07-14T08:59:11+00:00",
+  "updated_at": "2026-07-16T13:02:43+00:00",
   "objectives": {
     "1.1-C01": {
-      "status": "uncovered",
+      "status": "covered",
       "primary_video_id": null,
       "reinforcement_video_ids": [],
-      "updated_at": null
+      "updated_at": "2026-07-16T13:02:43+00:00"
     },
     "1.1-C02": {
-      "status": "uncovered",
+      "status": "covered",
       "primary_video_id": null,
       "reinforcement_video_ids": [],
-      "updated_at": null
+      "updated_at": "2026-07-16T13:02:43+00:00"
     },
     "1.1-C03": {
-      "status": "uncovered",
+      "status": "covered",
       "primary_video_id": null,
       "reinforcement_video_ids": [],
-      "updated_at": null
+      "updated_at": "2026-07-16T13:02:43+00:00"
     },
     "1.1-S04": {
-      "status": "uncovered",
+      "status": "covered",
       "primary_video_id": null,
       "reinforcement_video_ids": [],
-      "updated_at": null
+      "updated_at": "2026-07-16T13:02:43+00:00"
     },
     "1.1-S05": {
-      "status": "uncovered",
+      "status": "covered",
       "primary_video_id": null,
       "reinforcement_video_ids": [],
-      "updated_at": null
+      "updated_at": "2026-07-16T13:02:43+00:00"
     },
     "1.1-S06": {
-      "status": "uncovered",
+      "status": "covered",
       "primary_video_id": null,
       "reinforcement_video_ids": [],
-      "updated_at": null
+      "updated_at": "2026-07-16T13:02:43+00:00"
     },
     "1.1-S07": {
-      "status": "uncovered",
+      "status": "covered",
       "primary_video_id": null,
       "reinforcement_video_ids": [],
-      "updated_at": null
+      "updated_at": "2026-07-16T13:02:43+00:00"
     },
     "1.2-C01": {
       "status": "uncovered",

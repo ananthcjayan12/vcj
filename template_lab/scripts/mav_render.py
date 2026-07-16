@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -109,7 +110,7 @@ def _resolve_node_bin_dir(min_version: tuple[int, int, int] = (22, 12, 0)) -> Pa
     return None
 
 
-def _probe_media(path: Path) -> dict[str, Any]:
+def _probe_media(path: Path, *, require_audio: bool = True) -> dict[str, Any]:
     result = subprocess.run(
         [
             "ffprobe",
@@ -129,8 +130,10 @@ def _probe_media(path: Path) -> dict[str, Any]:
     )
     payload = json.loads(result.stdout)
     stream_types = {item.get("codec_type") for item in payload.get("streams", [])}
-    if "video" not in stream_types or "audio" not in stream_types:
-        raise RuntimeError(f"Rendered MP4 must contain video and audio streams: {path}")
+    if "video" not in stream_types:
+        raise RuntimeError(f"Rendered MP4 must contain a video stream: {path}")
+    if require_audio and "audio" not in stream_types:
+        raise RuntimeError(f"Rendered MP4 must contain an audio stream: {path}")
     return payload
 
 
@@ -239,17 +242,71 @@ def render_mp4(
     keep_visual: bool = False,
     animation_mode: str | None = None,
 ) -> Path:
+    started_at = time.monotonic()
     run_path = run_dir(run_id)
     selected_mode = animation_mode or animation_mode_for_run(run_path)
+    print(
+        f"[render] Starting run={run_id} mode={selected_mode} quality={quality} "
+        f"fps={fps} workers={workers}",
+        flush=True,
+    )
     if selected_mode == MOTION_CANVAS_MODE:
         from motion_canvas.pipeline import render_video
+
+        _require_binary("ffmpeg")
+        voiceover_path = run_path / "voiceover.mp3"
         result = render_video(run_path)
         rendered = Path(result["output"])
         output_path = (output or rendered).expanduser().resolve()
         if output_path != rendered.resolve():
             output_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(rendered, output_path)
-        write_json(run_path / "render_report.json", {"run_id": run_id, "animation_mode": selected_mode, "output": str(output_path), "visual_renderer": "motion-canvas"})
+        probe: dict[str, Any] = {}
+        audio_attached: bool | None = None
+        if shutil.which("ffprobe"):
+            try:
+                probe = _probe_media(output_path, require_audio=False)
+                stream_types = {item.get("codec_type") for item in probe.get("streams", [])}
+                audio_attached = "audio" in stream_types
+            except Exception as exc:
+                print(
+                    f"[render] WARNING: Could not inspect the completed Motion Canvas MP4: {exc}",
+                    flush=True,
+                )
+        else:
+            print(
+                "[render] WARNING: ffprobe is unavailable; skipping the completed MP4 stream check.",
+                flush=True,
+            )
+        if audio_attached is False:
+            print(
+                "[render] WARNING: Motion Canvas output has no audio stream; "
+                "the completed video-only MP4 has been preserved.",
+                flush=True,
+            )
+        write_json(
+            run_path / "render_report.json",
+            {
+                "run_id": run_id,
+                "animation_mode": selected_mode,
+                "output": str(output_path),
+                "visual_renderer": "motion-canvas",
+                "audio_source": str(voiceover_path),
+                "audio_attached": audio_attached,
+                "ffprobe": probe,
+            },
+        )
+        summary_path = run_path / "generation_summary.json"
+        if summary_path.exists():
+            summary = read_json(summary_path)
+            summary["mp4"] = str(output_path)
+            write_json(summary_path, summary)
+        elapsed = time.monotonic() - started_at
+        size_mb = output_path.stat().st_size / (1024 * 1024) if output_path.exists() else 0
+        print(
+            f"[render] Finished in {elapsed:.1f}s; output={output_path}; size={size_mb:.1f} MB",
+            flush=True,
+        )
         return output_path
     hyperframes_env = _hyperframes_env()
     _require_hyperframes_node(hyperframes_env)

@@ -444,6 +444,22 @@ def _npm(script: str, run_path: Path, timeout: int) -> dict[str, Any]:
     return {"command": f"npm run {script}", "returncode": result.returncode, "stdout": result.stdout[-12000:], "stderr": result.stderr[-12000:]}
 
 
+def _npm_live(script: str, run_path: Path, timeout: int) -> dict[str, Any]:
+    """Run a long renderer with output inherited by Studio's live log pipe."""
+    env = os.environ.copy()
+    env["MAV_MOTION_RUN_ROOT"] = str((run_path / "motion_canvas").resolve())
+    node_bin = _modern_node_bin()
+    if node_bin:
+        env["PATH"] = str(node_bin) + os.pathsep + env.get("PATH", "")
+    result = subprocess.run(
+        ["npm", "run", script],
+        cwd=RUNTIME_ROOT,
+        env=env,
+        timeout=timeout,
+    )
+    return {"command": f"npm run {script}", "returncode": result.returncode, "stdout": "", "stderr": ""}
+
+
 def validate_and_assemble(run_path: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     assemble(run_path, manifest); _sync_runtime(run_path)
     compile_report = _npm("check", run_path, 180)
@@ -461,7 +477,10 @@ def validate_and_assemble(run_path: Path, manifest: dict[str, Any]) -> dict[str,
 
 def render_video(run_path: Path) -> dict[str, Any]:
     manifest = _load(run_path / "motion_canvas" / "manifest.json")
+    print("[render] Stage 1/3: validating and assembling Motion Canvas chapters", flush=True)
     validate_and_assemble(run_path, manifest)
-    report = _npm("render-video", run_path, 3600)
+    print("[render] Stage 2/3: rendering animation frames and encoding video", flush=True)
+    report = _npm_live("render-video", run_path, 3600)
     if report["returncode"] != 0: raise RuntimeError(report["stderr"] or report["stdout"])
+    print("[render] Stage 3/3: Motion Canvas video render completed", flush=True)
     return {"status": "rendered", "output": str(run_path / "motion_canvas" / "final.mp4"), "render": report}
