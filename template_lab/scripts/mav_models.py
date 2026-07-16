@@ -250,6 +250,43 @@ def _extract_json(text: str, task: str, provider: str, output_schema: dict[str, 
         return json.loads(match.group(0))
 
 
+def _strict_object_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Add the closed-object declarations required by strict JSON outputs."""
+    def normalize(node: Any) -> Any:
+        if isinstance(node, list):
+            return [normalize(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        result = {key: normalize(value) for key, value in node.items()}
+        if result.get("type") == "object" or "properties" in result:
+            result["additionalProperties"] = False
+        return result
+
+    return normalize(schema)
+
+
+def _anthropic_compatible_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Return Anthropic's supported strict JSON-Schema subset."""
+    strict = _strict_object_schema(schema)
+
+    def normalize(node: Any) -> Any:
+        if isinstance(node, list):
+            return [normalize(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        unsupported_constraints = {"minimum", "maximum", "minLength", "maxLength", "maxItems"}
+        result = {
+            key: normalize(value)
+            for key, value in node.items()
+            if key not in unsupported_constraints
+        }
+        if result.get("type") == "array" and int(result.get("minItems", 0) or 0) > 1:
+            result["minItems"] = 1
+        return result
+
+    return normalize(strict)
+
+
 def call_model_json(
     *,
     task: str,
@@ -342,7 +379,7 @@ def _call_anthropic_json(
         payload["output_config"] = {
             "format": {
                 "type": "json_schema",
-                "schema": output_schema,
+                "schema": _anthropic_compatible_json_schema(output_schema),
             }
         }
     request = urllib.request.Request(

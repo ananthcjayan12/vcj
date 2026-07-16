@@ -108,7 +108,11 @@ def model_map_payload() -> dict[str, Any]:
             continue
         provider_models = dict(config.get("provider_models") or {})
         provider_models.setdefault(str(config.get("provider")), str(config.get("model")))
-        provider_model_options = {provider: [model] for provider, model in provider_models.items()}
+        configured_options = config.get("provider_model_options") or {}
+        provider_model_options = {
+            provider: list(configured_options.get(provider) or [model])
+            for provider, model in provider_models.items()
+        }
         if task in {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}:
             provider_models["codex"] = CODEX_MODELS[0]
             provider_model_options["codex"] = list(CODEX_MODELS)

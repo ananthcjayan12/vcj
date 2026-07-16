@@ -11,8 +11,12 @@ Grounded fact handles:
 {fact_lines}
 
 Write one spoken paragraph for each beat in the teaching sequence.
+Return exactly the same number of paragraphs as there are beats, in the same order. Use only sequential IDs from paragraph_01 onward. Do not add placeholders, skip entries, suffixed IDs, or empty text.
 
 Before returning JSON, silently verify all of the following:
+- the paragraph count exactly equals the teaching-sequence beat count;
+- paragraph IDs are sequential with no gaps or suffixes;
+- every paragraph has non-empty spoken text and at least one exact claim ID;
 - every assigned syllabus objective is taught by at least one paragraph;
 - the narration contains {min_paragraphs}-{max_paragraphs} paragraphs and {min_words}-{max_words} spoken words;
 - each paragraph performs one distinct learning move rather than repeating prior content;

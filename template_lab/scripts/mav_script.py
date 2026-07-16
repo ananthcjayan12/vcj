@@ -14,18 +14,44 @@ from prompts import load as load_prompt
 
 from mav_schema import narration_bounds, normalize_text, run_dir, spoken_word_count, validate_narration, write_json
 
+SCRIPT_BEAT_TYPES = [
+    "curiosity_hook",
+    "prior_knowledge",
+    "observation",
+    "prediction",
+    "model_build",
+    "mechanism",
+    "diagram_reading",
+    "equation_meaning",
+    "worked_example",
+    "misconception_check",
+    "practical_skill",
+    "retrieval_check",
+    "transfer_question",
+    "synthesis",
+]
+SCRIPT_EMOTIONAL_REGISTERS = [
+    "curiosity",
+    "confidence",
+    "productive_tension",
+    "surprise",
+    "clarity",
+    "challenge",
+    "satisfaction",
+]
+
 
 def _script_structure_schema(target_duration: float = 50.0) -> dict[str, Any]:
-    del target_duration
+    bounds = narration_bounds(target_duration)
     beat = {
         "type": "object",
         "properties": {
             "beat_id": {"type": "string"},
-            "beat_type": {"type": "string"},
+            "beat_type": {"type": "string", "enum": SCRIPT_BEAT_TYPES},
             "one_sentence_summary": {"type": "string"},
             "key_number_or_claim": {"type": "string"},
-            "emotional_register": {"type": "string"},
-            "claim_ids": {"type": "array", "items": {"type": "string"}},
+            "emotional_register": {"type": "string", "enum": SCRIPT_EMOTIONAL_REGISTERS},
+            "claim_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         },
         "required": [
             "beat_id",
@@ -42,6 +68,8 @@ def _script_structure_schema(target_duration: float = 50.0) -> dict[str, Any]:
             "beats": {
                 "type": "array",
                 "items": beat,
+                "minItems": bounds["min_paragraphs"],
+                "maxItems": bounds["max_paragraphs"],
             }
         },
         "required": ["beats"],
@@ -49,14 +77,14 @@ def _script_structure_schema(target_duration: float = 50.0) -> dict[str, Any]:
 
 
 def _script_writing_schema(target_duration: float = 50.0) -> dict[str, Any]:
-    del target_duration
+    bounds = narration_bounds(target_duration)
     paragraph = {
         "type": "object",
         "properties": {
             "id": {"type": "string"},
             "beat_label": {"type": "string"},
-            "text": {"type": "string"},
-            "claim_ids": {"type": "array", "items": {"type": "string"}},
+            "text": {"type": "string", "minLength": 1},
+            "claim_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         },
         "required": ["id", "beat_label", "text", "claim_ids"],
     }
@@ -69,6 +97,8 @@ def _script_writing_schema(target_duration: float = 50.0) -> dict[str, Any]:
             "paragraphs": {
                 "type": "array",
                 "items": paragraph,
+                "minItems": bounds["min_paragraphs"],
+                "maxItems": bounds["max_paragraphs"],
             },
             "elevenlabs_narration": {"type": "string"},
         },
@@ -123,6 +153,21 @@ def _normalize_narration_shape(narration: dict[str, Any], skeleton: dict[str, An
         return narration
 
     beats = skeleton.get("beats", []) if isinstance(skeleton, dict) else []
+    if len(paragraphs) > len(beats):
+        filtered_paragraphs = [
+            item
+            for item in paragraphs
+            if not (
+                isinstance(item, dict)
+                and not str(item.get("text", "")).strip()
+                and str(item.get("beat_label", "")).strip().lower() in {"", "skip", "placeholder"}
+            )
+        ]
+        if len(filtered_paragraphs) == len(beats):
+            paragraphs = filtered_paragraphs
+            narration = dict(narration)
+            narration["paragraphs"] = paragraphs
+
     fallback_claim_ids = [
         str(item.get("id"))
         for item in input_payload.get("facts", [])
@@ -170,6 +215,30 @@ def _normalize_narration_shape(narration: dict[str, Any], skeleton: dict[str, An
     narration["spoken_word_count"] = spoken_word_count(joined_text)
     narration.setdefault("target_duration_seconds", input_payload.get("target_duration_seconds", 50))
     return narration
+
+
+def _validate_narration_against_skeleton(narration: dict[str, Any], skeleton: dict[str, Any]) -> list[dict[str, str]]:
+    beats = skeleton.get("beats", []) if isinstance(skeleton, dict) else []
+    paragraphs = narration.get("paragraphs", []) if isinstance(narration, dict) else []
+    violations: list[dict[str, str]] = []
+    if not isinstance(paragraphs, list):
+        return [{"code": "NARRATION_PARAGRAPH_SHAPE", "message": "Narration paragraphs must be an array", "field": "paragraphs"}]
+    if len(paragraphs) != len(beats):
+        violations.append({
+            "code": "NARRATION_BEAT_COUNT_MISMATCH",
+            "message": f"Narration has {len(paragraphs)} paragraphs for {len(beats)} structure beats",
+            "field": "paragraphs",
+        })
+    for index, paragraph in enumerate(paragraphs):
+        expected_id = f"paragraph_{index + 1:02d}"
+        actual_id = str(paragraph.get("id", "")).strip() if isinstance(paragraph, dict) else ""
+        if actual_id != expected_id:
+            violations.append({
+                "code": "NARRATION_PARAGRAPH_SEQUENCE",
+                "message": f"Expected {expected_id}, received {actual_id or 'missing ID'}",
+                "field": actual_id or expected_id,
+            })
+    return violations
 
 
 def generate_narration(input_payload: dict[str, Any], *, use_model: bool = False) -> dict[str, Any]:
@@ -249,7 +318,14 @@ def generate_narration(input_payload: dict[str, Any], *, use_model: bool = False
     write_json(run_path / "debug" / "narration_normalized.json", narration)
     debug_events.append({"event": "script_writing_normalized", "artifact": "debug/narration_normalized.json"})
 
+    skeleton_violations = _validate_narration_against_skeleton(narration, skeleton)
     violations = validate_narration(narration, input_payload)
+    if skeleton_violations:
+        from mav_schema import Violation
+        violations = [
+            Violation(item["code"], item["message"], field=item["field"])
+            for item in skeleton_violations
+        ] + violations
     if violations:
         violation_payload = [violation.to_dict() for violation in violations]
         strict = os.getenv("MAV_STRICT_NARRATION", "1").strip().lower() not in {"0", "false", "no"}

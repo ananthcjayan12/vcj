@@ -29,6 +29,10 @@ Rules:
 - Use `variant="compact"` for card groups placed beside diagrams or in multi-card rows/stacks. Compact `TextCard` and `EquationCard` are 500×140; compact `StatReadout` is 360×140. Reserve those complete bounds when positioning them.
 - In a horizontal card row, keep card centers at least `card width + 32` apart. In a vertical stack, use a layout container with `layout direction="column" gap={20}`; do not manually place compact card centers less than 160 pixels apart.
 - Do not place a card group over a graph, diagram, title, or readout. Divide the safe area into non-overlapping regions first, then keep every component inside its assigned region for the whole chapter.
+- Treat every visible component and diagram as a rectangle, not as a center point. For an element centered at `(x, y)`, reserve `x ± width/2` and `y ± height/2`. Complete rectangles must stay inside the safe area. Keep unrelated regions at least 32 pixels apart; intentional card groups may use their prescribed 20-pixel stack gap.
+- Check layout cumulatively after every semantic reveal. A one-way reveal such as `localTime() >= cue` remains visible for the rest of the chapter, so include all earlier persistent elements when checking each later frame.
+- Prefer one stable visual slot whose contents change over time. If a later beat needs an occupied region, hide the earlier group with an end cue and reuse the region instead of adding another persistent box. Replace rather than accumulate when space is limited.
+- Before returning each file, inspect its densest frame—usually the final frame where all one-way reveals are active. If any reserved rectangles intersect, leave the safe area, or cover diagram labels, simplify the composition or make earlier content cue-windowed.
 - Raw `Txt` may be used only for diagram labels of six words or fewer.
 - Treat narration as audio content. On-screen display copy must be concise and satisfy the presentation component limits.
 - If comparison content exceeds four rows, show successive table pages at narration cues. Never compress, overflow, or reduce type below the design-system size.

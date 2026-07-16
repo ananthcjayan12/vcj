@@ -13,6 +13,17 @@ Presentation contract:
 
 - `TwoColumnComparison` accepts exactly `left={{title, body, accent?}}` and `right={{title, body, accent?}}`. Put positioning or opacity on a wrapping `Layout`; do not pass `x`, `y`, `opacity`, `leftTitle`, `leftBody`, `rightTitle`, or `rightBody` directly to it.
 
+- Reserve these complete presentation-component footprints when planning layout:
+  - `SceneTitle`: reserve a 1500×120 title band when it includes a subtitle.
+  - default `TextCard`: 720×260; compact `TextCard`: 500×140.
+  - default `EquationCard`: 900×220; compact `EquationCard`: 500×140.
+  - default `StatReadout`: 440×210; compact `StatReadout`: 360×140.
+  - `TwoColumnComparison`: 1720×620. It is nearly full-screen and must normally be centered in its own region, not placed beside another panel.
+  - `ComparisonTable`: 1720 pixels wide; reserve its full row-dependent height.
+- A wrapper's `x` and `y` identify the center of the complete child footprint. Bounds are `left=x-width/2`, `right=x+width/2`, `top=y-height/2`, and `bottom=y+height/2`.
+- Simultaneously visible presentation footprints must not intersect. Keep unrelated regions at least 32 pixels apart; intentional grouped card stacks may use the prescribed 20-pixel gap. A component revealed with `localTime() >= cue` remains present in every later frame unless its opacity also has an end cue.
+- When successive narration beats need the same space, window the earlier component and replace it in the same stable slot. Do not keep adding permanent cards around a diagram.
+
 - Use the presentation components for every title, prose block, comparison, table, equation card, and numeric readout.
 - Raw `Txt` is reserved for short diagram labels of at most six words. It is not approved for paragraphs, tables, comparison prose, headings, or calculation steps.
 - Do not set `fontFamily`, major `fontSize`, line height, table geometry, card padding, or prose coordinates yourself. The fixed presentation components own them.

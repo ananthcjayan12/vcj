@@ -29,6 +29,13 @@ RETENTION AND PACING:
 5. End by asking the learner to transfer the model to a fresh situation, then state the compact rule that lets them self-check.
 6. Never use filler such as "let's dive in", "without further ado", "in conclusion", "it is important to note", or "this is huge".
 
+PARAGRAPH INTEGRITY:
+1. Return exactly one paragraph for every beat in the supplied teaching sequence, in the same order.
+2. Use sequential paragraph IDs only: paragraph_01, paragraph_02, paragraph_03, and so on.
+3. Never emit placeholder, skip, bridge, alternate, suffixed, or empty entries such as paragraph_11b.
+4. Every paragraph must contain non-empty spoken narration and at least one exact supplied claim ID.
+5. If two adjacent beats feel closely related, keep both paragraphs and give each its own distinct learning move; never insert or remove an entry to reorganize the sequence.
+
 ELEVENLABS/GEMINI TTS:
 - Use performance tags sparingly and only before complete sentences.
 - Allowed tags: [curious], [gentle emphasis], [thinking pause], [clear and measured]
