@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -17,6 +18,9 @@ PROMPT_MODEL_MAPPING_PATH = LAB_ROOT / "prompts" / "prompt_model_mapping.json"
 DEFAULT_MODEL_MAX_TOKENS = 64000
 GEMINI_TIMEOUT_MILLISECONDS = 600_000
 DEFAULT_MODEL_TIMEOUT_SECONDS = 600
+DEFAULT_ANTHROPIC_MAX_RETRIES = 2
+DEFAULT_ANTHROPIC_RETRY_BASE_SECONDS = 2.0
+ANTHROPIC_RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 529}
 ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 MOONSHOT_CHAT_COMPLETIONS_URL = "https://api.moonshot.ai/v1/chat/completions"
 SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot", "codex"}
@@ -147,6 +151,16 @@ def _positive_int(value: Any, label: str) -> int:
     return parsed
 
 
+def _nonnegative_int(value: Any, label: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"{label} must be a non-negative integer") from exc
+    if parsed < 0:
+        raise RuntimeError(f"{label} must be a non-negative integer")
+    return parsed
+
+
 def _max_tokens_for_task(task: str, provider: str, requested: int | None) -> int:
     task_env = f"MAV_{task.upper()}_MAX_TOKENS"
     provider_env = f"MAV_{provider.upper()}_MAX_TOKENS"
@@ -183,6 +197,60 @@ def model_timeout_seconds(resolved: ResolvedModelConfig) -> int:
     if configured:
         return _positive_int(configured, f"timeout_seconds for {resolved.task}")
     return DEFAULT_MODEL_TIMEOUT_SECONDS
+
+
+def _anthropic_retry_delay(exc: urllib.error.HTTPError, retry_number: int) -> float:
+    retry_after = exc.headers.get("retry-after") if exc.headers else None
+    if retry_after:
+        try:
+            return max(0.0, float(retry_after))
+        except ValueError:
+            pass
+    base_raw = os.getenv("MAV_ANTHROPIC_RETRY_BASE_SECONDS", str(DEFAULT_ANTHROPIC_RETRY_BASE_SECONDS))
+    try:
+        base = float(base_raw)
+    except ValueError as exc_value:
+        raise RuntimeError("MAV_ANTHROPIC_RETRY_BASE_SECONDS must be a non-negative number") from exc_value
+    if base < 0:
+        raise RuntimeError("MAV_ANTHROPIC_RETRY_BASE_SECONDS must be a non-negative number")
+    return base * (2 ** (retry_number - 1))
+
+
+def _anthropic_request_json(
+    request: urllib.request.Request,
+    resolved: ResolvedModelConfig,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    max_retries = _nonnegative_int(
+        os.getenv("MAV_ANTHROPIC_MAX_RETRIES", str(DEFAULT_ANTHROPIC_MAX_RETRIES)),
+        "MAV_ANTHROPIC_MAX_RETRIES",
+    )
+    for attempt in range(max_retries + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code not in ANTHROPIC_RETRYABLE_HTTP_STATUSES or attempt >= max_retries:
+                attempts = attempt + 1
+                suffix = f" after {attempts} attempts" if attempts > 1 else ""
+                raise RuntimeError(
+                    f"Anthropic {resolved.task} call failed with HTTP {exc.code}{suffix}: {detail}"
+                ) from exc
+            retry_number = attempt + 1
+            delay = _anthropic_retry_delay(exc, retry_number)
+            print(
+                f"MAV model warning: Anthropic {resolved.task} returned HTTP {exc.code}; "
+                f"retrying in {delay:g}s ({retry_number}/{max_retries}).",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"Anthropic {resolved.task} call timed out after {timeout_seconds} seconds"
+            ) from exc
+    raise AssertionError("Anthropic retry loop exited unexpectedly")
 
 
 def _api_key_for_provider(provider: str) -> str | None:
@@ -393,14 +461,7 @@ def _call_anthropic_json(
         method="POST",
     )
     timeout_seconds = model_timeout_seconds(resolved)
-    try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Anthropic {resolved.task} call failed with HTTP {exc.code}: {detail}") from exc
-    except TimeoutError as exc:
-        raise RuntimeError(f"Anthropic {resolved.task} call timed out after {timeout_seconds} seconds") from exc
+    data = _anthropic_request_json(request, resolved, timeout_seconds)
 
     stop_reason = data.get("stop_reason")
     if stop_reason in {"max_tokens", "refusal"}:
@@ -443,14 +504,7 @@ def _call_anthropic_text(
         method="POST",
     )
     timeout_seconds = model_timeout_seconds(resolved)
-    try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Anthropic {resolved.task} call failed with HTTP {exc.code}: {detail}") from exc
-    except TimeoutError as exc:
-        raise RuntimeError(f"Anthropic {resolved.task} call timed out after {timeout_seconds} seconds") from exc
+    data = _anthropic_request_json(request, resolved, timeout_seconds)
 
     stop_reason = data.get("stop_reason")
     if stop_reason in {"max_tokens", "refusal"}:

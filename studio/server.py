@@ -18,7 +18,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 from urllib.request import urlopen
 
 from video_engine.cli import TOPIC_ORDER, VALID_STATES
@@ -43,7 +43,7 @@ PROJECT_PYTHON = REPO_ROOT / ".venv" / "bin" / "python3"
 PYTHON_EXECUTABLE = str(PROJECT_PYTHON if PROJECT_PYTHON.exists() else Path(sys.executable))
 
 STEP_NAMES = ("Inputs", "Script", "Audio", "Timing", "Scenes", "Validate", "Preview", "QA")
-PAID_STEPS = {2, 3, 5}
+PAID_STEPS = {2, 3, 5, 6}
 DIRECT_HTML_MODE = "direct-html"
 MOTION_CANVAS_MODE = "motion-canvas"
 LEGACY_MODE = "legacy-recipes"
@@ -51,6 +51,7 @@ RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,95}$")
 TOPIC_REF_RE = re.compile(r"^\d+(?:\.\d+){1,2}$")
 SCENE_ID_RE = re.compile(r"^scene_\d{2,3}$")
 CHAPTER_ID_RE = re.compile(r"^chapter_\d{2,3}$")
+MOTION_UNIT_ID_RE = re.compile(r"^(?:chapter|shot|reel|beat)_\d{2,3}$")
 MODEL_PROVIDERS = {"configured", "gemini", "anthropic", "codex"}
 AUDIO_PROVIDERS = {"gemini", "elevenlabs"}
 CODEX_MODELS = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini")
@@ -101,7 +102,7 @@ def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
     tasks = []
     step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas chapter coder", "motion_canvas_repair": "Motion Canvas compile repair"}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair"}
     retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}
     for task, config in payload.get("tasks", {}).items():
         if task not in retained_tasks:
@@ -299,19 +300,21 @@ def topic_detail(topic_ref: str) -> dict[str, Any]:
 
 def _infer_step(run_path: Path) -> int:
     markers = (
-        "input.json",
-        "narration.json",
-        "audio_generation.json",
-        "audio_timing.json",
-        "motion_canvas/generation-report.json",
-        "motion_canvas/robot-report.json",
-        "motion_canvas/preview/contact-sheet.png",
-        "motion_canvas/final.mp4",
+        (1, "input.json"),
+        (2, "narration.json"),
+        (3, "audio_generation.json"),
+        (4, "audio_timing.json"),
+        (5, "motion_canvas/generation-report.json"),
+        (6, "motion_canvas/robot-report.json"),
+        # The contact sheet is produced by Step 6 browser-frame validation;
+        # it is evidence for that step, not proof that Step 7 ran.
+        (6, "motion_canvas/preview/contact-sheet.png"),
+        (8, "motion_canvas/final.mp4"),
     )
     completed = 0
-    for index, marker in enumerate(markers, 1):
+    for step, marker in markers:
         if (run_path / marker).exists():
-            completed = index
+            completed = max(completed, step)
     summary = _read_json(run_path / "generation_summary.json", {}) or {}
     if summary.get("stopped_after_step") is not None:
         completed = max(completed, max(0, min(int(summary["stopped_after_step"]), 8)))
@@ -437,11 +440,41 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
             )
     motion_manifest = _read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
     motion_report = _read_json(run_path / "motion_canvas" / "generation-report.json", {}) or {}
+    audio_manifest = _read_json(run_path / "audio_chunks" / "manifest.json", {}) or {}
+    audio_by_id = {str(item.get("id")): item for item in audio_manifest.get("chapters", [])}
     batch_status = {}
     for batch in motion_manifest.get("batches", []):
         for scene_id in batch.get("chapter_ids", []):
             batch_status[scene_id] = batch.get("status", "pending")
-    chapters = [{**chapter, "status": batch_status.get(chapter.get("scene_id"), "pending")} for chapter in motion_manifest.get("chapters", [])]
+    chapter_status = motion_manifest.get("chapter_status", {}) or {}
+    chapters = []
+    motion_units = (
+        motion_manifest.get("reels") if motion_manifest.get("timeline_mode") == "immutable_reels"
+        else motion_manifest.get("shots") or motion_manifest.get("chapters") or []
+    )
+    motion_directory = (
+        "reels" if motion_manifest.get("timeline_mode") == "immutable_reels"
+        else "shots" if motion_manifest.get("timeline_mode") == "immutable_shots"
+        else "chapters"
+    )
+    for chapter in motion_units:
+        audio = audio_by_id.get(str(chapter.get("source_paragraph_id") or chapter.get("id")), {})
+        audio_path = str(audio.get("path") or "")
+        chapters.append(
+            {
+                **chapter,
+                "status": chapter_status.get(chapter.get("scene_id"), batch_status.get(chapter.get("scene_id"), "pending")),
+                "source_ready": (run_path / "motion_canvas" / motion_directory / f"{chapter.get('scene_id')}.tsx").exists(),
+                "audio_url": (
+                    f"/artifacts/runs/{run_id}/voiceover.mp3#t={float(chapter.get('absolute_start', 0)):.3f},{float(chapter.get('absolute_end', 0)):.3f}"
+                    if motion_manifest.get("timeline_mode") in {"immutable_shots", "immutable_reels"} and (run_path / "voiceover.mp3").exists()
+                    else f"/artifacts/runs/{run_id}/" + "/".join(quote(part) for part in audio_path.split("/"))
+                    if audio_path and (run_path / audio_path).exists()
+                    else None
+                ),
+                "audio_quality": audio.get("quality", {}),
+            }
+        )
     files = []
     for relative in (
         "input.json", "story_skeleton.json", "narration.json", "narration.txt",
@@ -452,6 +485,7 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "debug/narration_validation.json", "debug/step_02_script.json",
         "costs/summary.json", "costs/model_usage.json",
         "motion_canvas/manifest.json", "motion_canvas/generation-report.json",
+        "motion_canvas/timeline.json",
         "motion_canvas/scenes.ts", "motion_canvas/validation.json",
         "motion_canvas/robot-report.json", "motion_canvas/preview/contact-sheet.png",
         "motion_canvas/final.mp4",
@@ -463,6 +497,9 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "animation_mode": animation_mode,
         "scenes": scenes,
         "chapters": chapters,
+        "timeline_mode": motion_manifest.get("timeline_mode", "legacy_chapters"),
+        "timeline_id": motion_manifest.get("timeline_id"),
+        "reels": motion_manifest.get("reels", []),
         "preview_url": _preview_url if _preview_run_id == run_id and _preview_process and _preview_process.poll() is None else None,
         "validation_preview_url": f"/artifacts/runs/{run_id}/motion_canvas/preview/contact-sheet.png" if (run_path / "motion_canvas" / "preview" / "contact-sheet.png").exists() else None,
         "mp4_url": f"/artifacts/runs/{run_id}/motion_canvas/final.mp4" if (run_path / "motion_canvas" / "final.mp4").exists() else (f"/artifacts/runs/{run_id}/{Path(output).relative_to(run_path)}" if output and Path(output).is_relative_to(run_path) else None),
@@ -527,7 +564,7 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
     paid = _paid_range(from_step, stop_after_step) or (animation_mode == DIRECT_HTML_MODE and from_step <= 6 <= stop_after_step)
     confirmed = bool(request.get("confirm_paid_api", settings.get("confirm_paid_api", False)))
     if paid and not confirmed:
-        raise PermissionError("Steps 2, 3, and 5 require explicit paid-API confirmation")
+        raise PermissionError("Steps 2, 3, 5, and conditional step-6 repairs require explicit paid-API confirmation")
     facts_path = Path(meta["facts_path"])
     if not facts_path.is_absolute():
         facts_path = REPO_ROOT / facts_path
@@ -536,12 +573,14 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
     if from_step >= 6:
         motion_root = _run_dir(str(meta["id"])) / "motion_canvas"
         manifest = _read_json(motion_root / "manifest.json", {}) or {}
-        required = [str(item.get("scene_id")) for item in manifest.get("chapters", []) if item.get("scene_id")]
-        missing = [chapter_id for chapter_id in required if not (motion_root / "chapters" / f"{chapter_id}.tsx").exists()]
+        units = manifest.get("reels") if manifest.get("timeline_mode") == "immutable_reels" else manifest.get("shots") or manifest.get("chapters") or []
+        directory = "reels" if manifest.get("timeline_mode") == "immutable_reels" else "shots" if manifest.get("timeline_mode") == "immutable_shots" else "chapters"
+        required = [str(item.get("scene_id")) for item in units if item.get("scene_id")]
+        missing = [chapter_id for chapter_id in required if not (motion_root / directory / f"{chapter_id}.tsx").exists()]
         generation = _read_json(motion_root / "generation-report.json", {}) or {}
         if not required or missing or generation.get("status") != "generated":
             detail = f" Missing: {', '.join(missing)}." if missing else ""
-            raise RuntimeError(f"Complete all Motion Canvas chapters before starting step 6.{detail} Resume from step 5.")
+            raise RuntimeError(f"Complete all Motion Canvas visual reels before starting step 6.{detail} Resume from step 5.")
     task_models = _validate_task_models(request.get("task_models", settings.get("task_models", {})))
     audio_selection = task_models.get("audio_generation", {})
     provider = str(settings.get("model_provider", "gemini"))
@@ -573,6 +612,11 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         if not SCENE_ID_RE.fullmatch(str(scene_id)):
             raise ValueError("Invalid scene ID")
         command.extend(["--v3-scene-id", str(scene_id)])
+    motion_chapter_id = request.get("target_motion_chapter_id")
+    if motion_chapter_id:
+        if not MOTION_UNIT_ID_RE.fullmatch(str(motion_chapter_id)):
+            raise ValueError("Invalid Motion Canvas reel or beat ID")
+        command.extend(["--motion-chapter-id", str(motion_chapter_id)])
     env = os.environ.copy()
     if provider != "configured":
         catalog = {item["task"]: item for item in model_map_payload()["tasks"]}
@@ -601,7 +645,10 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         concurrency = int(settings.get("scene_concurrency", 1))
     instruction = str(request.get("custom_instruction", "")).strip()
     if instruction:
-        env["MAV_SCENE_REGEN_INSTRUCTION" if scene_id else "MAV_STEP_REGEN_INSTRUCTION"] = instruction
+        if motion_chapter_id:
+            env["MAV_MOTION_CHAPTER_REGEN_INSTRUCTION"] = instruction
+        else:
+            env["MAV_SCENE_REGEN_INSTRUCTION" if scene_id else "MAV_STEP_REGEN_INSTRUCTION"] = instruction
     env["MAV_V3_SCENE_CONCURRENCY"] = str(max(1, min(concurrency, 8)))
     # Moonshot currently permits three organization-wide concurrent requests.
     # Keep one slot free for targeted repairs and unrelated activity.
@@ -753,6 +800,47 @@ def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         "--animation-mode", MOTION_CANVAS_MODE,
     ]
     return _start_process(run_id, command, os.environ.copy(), mode="render", target_step=8)
+
+
+def regenerate_motion_chapter(run_id: str, chapter_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    meta = _load_meta(run_id)
+    if not MOTION_UNIT_ID_RE.fullmatch(chapter_id):
+        raise ValueError("Invalid Motion Canvas reel or beat ID")
+    if not payload.get("confirm_paid_api"):
+        raise PermissionError("Chapter regeneration requires explicit paid-API confirmation")
+    run_path = _run_dir(run_id)
+    manifest = _read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
+    units = manifest.get("reels") if manifest.get("timeline_mode") == "immutable_reels" else manifest.get("shots") or manifest.get("chapters") or []
+    chapter_ids = {str(item.get("scene_id")) for item in units}
+    target_id = chapter_id
+    custom_instruction = str(payload.get("custom_instruction", "")).strip()
+    if chapter_id.startswith("beat_"):
+        beat = next((item for item in manifest.get("beats", []) if str(item.get("beat_id")) == chapter_id), None)
+        if beat is None:
+            raise FileNotFoundError(f"Unknown visual beat: {chapter_id}")
+        target_id = str(beat["reel_id"])
+        custom_instruction = (
+            f"Edit only {chapter_id} inside {target_id}, from reel-local {float(beat['local_start']):.3f}s "
+            f"to {float(beat['local_end']):.3f}s. Preserve the visual state before this window and the persistent "
+            f"composition after it. Do not clear or restart the stage at either beat boundary. "
+            f"Beat narration: {beat.get('narration', '')}\nUser request: {custom_instruction or 'Improve this beat visually.'}"
+        )
+    if target_id not in chapter_ids:
+        raise FileNotFoundError(f"Unknown Motion Canvas timeline unit: {chapter_id}")
+    command, env = build_generation_command(
+        meta,
+        {
+            "from_step": 5,
+            "stop_after_step": 6,
+            "confirm_paid_api": True,
+            "force_paid_api": True,
+            "target_motion_chapter_id": target_id,
+            "custom_instruction": custom_instruction,
+            "task_models": payload.get("task_models", (meta.get("settings") or {}).get("task_models", {})),
+        },
+    )
+    _append_log(run_id, f"Regenerating bounded visual beat {chapter_id} in continuous reel {target_id}; immutable timeline and audio are preserved")
+    return _start_process(run_id, command, env, mode="beat regeneration", target_step=6)
 
 
 def start_motion_preview(run_id: str) -> dict[str, Any]:
@@ -923,6 +1011,26 @@ def _safe_file(root: Path, relative: str) -> Path:
     return candidate
 
 
+def _parse_byte_range(value: str, size: int) -> tuple[int, int]:
+    """Parse one RFC 7233 byte range and return inclusive start/end offsets."""
+    match = re.fullmatch(r"bytes=(\d*)-(\d*)", value.strip())
+    if not match or size <= 0:
+        raise ValueError("Invalid byte range")
+    raw_start, raw_end = match.groups()
+    if not raw_start and not raw_end:
+        raise ValueError("Invalid byte range")
+    if not raw_start:
+        suffix = int(raw_end)
+        if suffix <= 0:
+            raise ValueError("Invalid byte range")
+        return max(0, size - suffix), size - 1
+    start = int(raw_start)
+    end = min(int(raw_end), size - 1) if raw_end else size - 1
+    if start >= size or end < start:
+        raise ValueError("Unsatisfiable byte range")
+    return start, end
+
+
 class StudioHandler(BaseHTTPRequestHandler):
     server_version = "PhysicsStudio/1.0"
 
@@ -947,14 +1055,40 @@ class StudioHandler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length) or b"{}")
 
     def _file(self, path: Path, *, cache: bool = False) -> None:
-        data = path.read_bytes()
+        size = path.stat().st_size
         content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        self.send_response(200)
+        range_header = self.headers.get("Range")
+        if range_header:
+            try:
+                start, end = _parse_byte_range(range_header, size)
+            except ValueError:
+                self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            status = HTTPStatus.PARTIAL_CONTENT
+        else:
+            start, end = 0, size - 1
+            status = HTTPStatus.OK
+        length = max(0, end - start + 1)
+        self.send_response(status)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Length", str(length))
+        self.send_header("Accept-Ranges", "bytes")
+        if status == HTTPStatus.PARTIAL_CONTENT:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         self.send_header("Cache-Control", "public, max-age=3600" if cache else "no-cache")
         self.end_headers()
-        self.wfile.write(data)
+        with path.open("rb") as handle:
+            handle.seek(start)
+            remaining = length
+            while remaining:
+                chunk = handle.read(min(64 * 1024, remaining))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                remaining -= len(chunk)
 
     def _error(self, exc: Exception) -> None:
         if isinstance(exc, PermissionError):
@@ -967,7 +1101,10 @@ class StudioHandler(BaseHTTPRequestHandler):
             status = HTTPStatus.CONFLICT
         else:
             status = HTTPStatus.INTERNAL_SERVER_ERROR
-        self._json({"error": str(exc)}, int(status))
+        try:
+            self._json({"error": str(exc)}, int(status))
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
 
     def do_GET(self) -> None:  # noqa: N802
         try:
@@ -1005,6 +1142,8 @@ class StudioHandler(BaseHTTPRequestHandler):
                 return self._file(_safe_file(SCENE_LIBRARY_ROOT, relative), cache=True)
             relative = "index.html" if path in {"/", ""} else path.lstrip("/")
             return self._file(_safe_file(STATIC_ROOT, relative))
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
         except Exception as exc:  # noqa: BLE001
             self._error(exc)
 
@@ -1036,6 +1175,15 @@ class StudioHandler(BaseHTTPRequestHandler):
             match = re.fullmatch(r"/api/runs/([^/]+)/chapters/([^/]+)/repair", path)
             if match:
                 return self._json({"run": repair_chapter_run(match.group(1), match.group(2), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/motion-chapters/([^/]+)/regenerate", path)
+            if match:
+                return self._json({"run": regenerate_motion_chapter(match.group(1), match.group(2), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/motion-shots/([^/]+)/regenerate", path)
+            if match:
+                return self._json({"run": regenerate_motion_chapter(match.group(1), match.group(2), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/motion-beats/([^/]+)/regenerate", path)
+            if match:
+                return self._json({"run": regenerate_motion_chapter(match.group(1), match.group(2), body)}, 202)
             match = re.fullmatch(r"/api/runs/([^/]+)/render", path)
             if match:
                 return self._json({"run": render_run(match.group(1), body)}, 202)
@@ -1047,6 +1195,8 @@ class StudioHandler(BaseHTTPRequestHandler):
             if match:
                 return self._json({"run": stop_run(match.group(1))})
             raise FileNotFoundError(path)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
         except Exception as exc:  # noqa: BLE001
             self._error(exc)
 
@@ -1057,6 +1207,8 @@ class StudioHandler(BaseHTTPRequestHandler):
             if match:
                 return self._json(delete_run(match.group(1)))
             raise FileNotFoundError(path)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
         except Exception as exc:  # noqa: BLE001
             self._error(exc)
 

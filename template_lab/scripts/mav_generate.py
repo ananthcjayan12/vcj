@@ -22,6 +22,7 @@ from direct_html.pipeline import (
 )
 from motion_canvas.pipeline import generate as generate_motion_canvas
 from motion_canvas.pipeline import prepare as prepare_motion_canvas
+from motion_canvas.pipeline import prepare_runtime_preview as prepare_motion_canvas_runtime_preview
 from motion_canvas.pipeline import validate_and_assemble as validate_and_assemble_motion_canvas
 from mav_audio import generate_audio, is_live_audio_provider, resolve_audio_provider
 from mav_build_preview_v3 import build_preview_v3
@@ -173,6 +174,7 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         or (animation_mode == DIRECT_HTML_MODE and bool(getattr(args, "auto_repair", False)) and from_step <= 6 <= stop_after_step)
         or (is_live_audio_provider(audio_provider) and from_step <= 3 <= stop_after_step)
         or (animation_mode == MOTION_CANVAS_MODE and use_model and from_step <= 5 <= stop_after_step)
+        or (animation_mode == MOTION_CANVAS_MODE and use_model and from_step <= 6 <= stop_after_step)
     )
     if not use_model and from_step <= 2 <= stop_after_step:
         raise RuntimeError("Script generation requires --use-model, --use-gemini, or --use-claude.")
@@ -299,18 +301,66 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
         return _step_summary(input_payload, path, 4, artifacts, audio_duration_seconds=timing["audio_duration_seconds"])
 
     if animation_mode == MOTION_CANVAS_MODE:
+        chapter_backup: str | None = None
+        chapter_path: Path | None = None
         if from_step <= 5:
-            manifest = prepare_motion_canvas(path, narration)
-            generation = generate_motion_canvas(path, manifest, allow_model_call=use_model, force=bool(args.force_paid_api), workers=int(os.getenv("MAV_MOTION_CANVAS_WORKERS", "2")))
+            if args.motion_chapter_id:
+                manifest = _read_cached_json(path / "motion_canvas" / "manifest.json", "Motion Canvas manifest")
+                unit_directory = "reels" if manifest.get("timeline_mode") == "immutable_reels" else "shots" if manifest.get("timeline_mode") == "immutable_shots" else "chapters"
+                chapter_path = path / "motion_canvas" / unit_directory / f"{args.motion_chapter_id}.tsx"
+                if not chapter_path.exists():
+                    raise RuntimeError(f"Cannot regenerate missing Motion Canvas source: {chapter_path}")
+                chapter_backup = chapter_path.read_text(encoding="utf-8")
+                _log(f"step 5: regenerating only fixed timeline unit {args.motion_chapter_id}; all timing and audio caches are preserved")
+            else:
+                manifest = prepare_motion_canvas(path, narration)
+            try:
+                generation = generate_motion_canvas(
+                    path,
+                    manifest,
+                    allow_model_call=use_model,
+                    force=bool(args.force_paid_api),
+                    workers=int(os.getenv("MAV_MOTION_CANVAS_WORKERS", "2")),
+                    target_chapter_id=args.motion_chapter_id,
+                    instruction=os.getenv("MAV_MOTION_CHAPTER_REGEN_INSTRUCTION", "").strip(),
+                )
+                if generation.get("status") != "generated" and args.motion_chapter_id:
+                    raise RuntimeError(f"{args.motion_chapter_id} regeneration did not produce an accepted chapter")
+            except Exception:
+                if chapter_path is not None and chapter_backup is not None:
+                    chapter_path.write_text(chapter_backup, encoding="utf-8")
+                    prepare_motion_canvas_runtime_preview(path)
+                    _log(f"restored the previous accepted source for {args.motion_chapter_id}")
+                raise
         else:
             manifest = _read_cached_json(path / "motion_canvas" / "manifest.json", "Motion Canvas manifest")
             generation = _read_cached_json(path / "motion_canvas" / "generation-report.json", "Motion Canvas generation report")
         if stop_after_step == 5:
-            return _step_summary(input_payload, path, 5, ["motion_canvas/manifest.json", "motion_canvas/generation-report.json", "motion_canvas/chapters"], mode=MOTION_CANVAS_MODE, chapters=len(manifest["chapters"]))
-        validation = validate_and_assemble_motion_canvas(path, manifest)
+            units = manifest.get("reels") if manifest.get("timeline_mode") == "immutable_reels" else manifest.get("shots") or manifest.get("chapters") or []
+            unit_directory = "reels" if manifest.get("timeline_mode") == "immutable_reels" else "shots" if manifest.get("timeline_mode") == "immutable_shots" else "chapters"
+            return _step_summary(input_payload, path, 5, ["motion_canvas/manifest.json", "motion_canvas/generation-report.json", f"motion_canvas/{unit_directory}"], mode=MOTION_CANVAS_MODE, chapters=len(units), timeline_mode=manifest.get("timeline_mode"))
+        try:
+            _log(
+                "step 6: compiling and validating browser frames"
+                + (" with bounded Codex chapter repair enabled" if use_model else "")
+            )
+            validation = validate_and_assemble_motion_canvas(
+                path,
+                manifest,
+                allow_model_repair=use_model,
+                max_model_repairs=2,
+            )
+        except Exception:
+            if chapter_path is not None and chapter_backup is not None:
+                chapter_path.write_text(chapter_backup, encoding="utf-8")
+                prepare_motion_canvas_runtime_preview(path)
+                _log(f"validation failed; restored the previous accepted source for {args.motion_chapter_id}")
+            raise
         if stop_after_step == 6:
-            return _step_summary(input_payload, path, 6, ["motion_canvas/robot-report.json", "motion_canvas/validation.json", "motion_canvas/preview/contact-sheet.png", "motion_canvas/scenes.ts"], mode=MOTION_CANVAS_MODE, chapters=len(manifest["chapters"]), validation=validation["status"])
-        summary = {"run_id": input_payload["run_id"], "mode": MOTION_CANVAS_MODE, "animation_mode": MOTION_CANVAS_MODE, "run_path": str(path), "audio_duration_seconds": timing["audio_duration_seconds"], "scenes": len(manifest["chapters"]), "generation": generation["status"], "validation": validation["status"], "manual_review": "required", "preview": "motion_canvas_runtime", "mp4": "not rendered"}
+            units = manifest.get("reels") if manifest.get("timeline_mode") == "immutable_reels" else manifest.get("shots") or manifest.get("chapters") or []
+            return _step_summary(input_payload, path, 6, ["motion_canvas/robot-report.json", "motion_canvas/validation.json", "motion_canvas/preview/contact-sheet.png", "motion_canvas/scenes.ts"], mode=MOTION_CANVAS_MODE, chapters=len(units), validation=validation["status"], timeline_mode=manifest.get("timeline_mode"))
+        units = manifest.get("reels") if manifest.get("timeline_mode") == "immutable_reels" else manifest.get("shots") or manifest.get("chapters") or []
+        summary = {"run_id": input_payload["run_id"], "mode": MOTION_CANVAS_MODE, "animation_mode": MOTION_CANVAS_MODE, "run_path": str(path), "audio_duration_seconds": timing["audio_duration_seconds"], "scenes": len(units), "generation": generation["status"], "validation": validation["status"], "manual_review": "required", "preview": "motion_canvas_runtime", "mp4": "not rendered", "timeline_mode": manifest.get("timeline_mode")}
         write_json(path / "generation_summary.json", summary)
         return summary
 
@@ -544,6 +594,7 @@ def parse_args() -> argparse.Namespace:
         help="Visual production route. Legacy remains the default until the direct-HTML rollout gates pass.",
     )
     parser.add_argument("--v3-scene-id", help="Regenerate or rebuild around one V3 scene id, for example scene_02")
+    parser.add_argument("--motion-chapter-id", help="Regenerate one cached Motion Canvas reel (or legacy unit), for example reel_002")
     parser.add_argument("--use-gemini-tts", action="store_true", help="Use Gemini TTS for voiceover audio. This is also the default audio provider.")
     parser.add_argument("--use-elevenlabs", action="store_true", help="Use live ElevenLabs timed TTS for voiceover audio.")
     parser.add_argument(
@@ -575,7 +626,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     try:
-        summary = generate_preview(parse_args())
+        args = parse_args()
+        if args.motion_chapter_id and args.stop_after_step < 6:
+            raise RuntimeError("Targeted Motion Canvas chapter regeneration must continue through step 6 validation")
+        summary = generate_preview(args)
     except Exception as exc:
         print(f"MAV generation failed: {exc}", file=sys.stderr)
         return 1

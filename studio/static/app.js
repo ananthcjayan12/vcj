@@ -5,6 +5,8 @@ const state = {
   topicDetail: null,
   activeRunId: null,
   activeRun: null,
+  selectedChapterId: null,
+  selectedBeatId: null,
   pollTimer: null,
   view: "production"
 };
@@ -16,7 +18,7 @@ const percent = (value, total) => total ? Math.round((Number(value) / Number(tot
 const formatNumber = value => Number(value || 0).toLocaleString();
 const formatUsd = value => { const number = Number(value || 0); return number >= 1 ? `$${number.toFixed(2)}` : `$${number.toFixed(4)}`; };
 const activeStatuses = new Set(["running", "rendering"]);
-const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Chapters", "Compile & QA", "Review", "Approval"];
+const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Visual reels", "Compile & QA", "Review", "Approval"];
 const stepsForRun = () => motionCanvasSteps;
 const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"]);
 
@@ -80,6 +82,67 @@ function artifactLabel(path) {
 
 function artifactUrl(runId, path) {
   return `/artifacts/runs/${encodeURIComponent(runId)}/${String(path).split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function chapterPlayerUrl(previewUrl, chapter) {
+  if (!previewUrl || !chapter) return null;
+  const base = previewUrl.endsWith("/") ? previewUrl : `${previewUrl}/`;
+  const params = new URLSearchParams({
+    start: String(Number(chapter.absolute_start || 0)),
+    end: String(Number(chapter.absolute_end || 0)),
+    visualStart: String(Number(chapter.render_absolute_start ?? (chapter.render_start_frame != null ? chapter.render_start_frame / 30 : chapter.absolute_start) ?? 0)),
+    visualEnd: String(Number(chapter.render_absolute_end ?? (chapter.render_end_frame != null ? chapter.render_end_frame / 30 : chapter.absolute_end) ?? 0)),
+    chapter: chapter.scene_id || ""
+  });
+  return `${base}chapter-player.html?${params}`;
+}
+
+function selectedChapter(run = state.activeRun) {
+  const chapters = run?.artifacts?.chapters || [];
+  return chapters.find(chapter => chapter.scene_id === state.selectedChapterId) || chapters[0] || null;
+}
+
+function selectedBeat(reel) {
+  const beats = reel?.beats || [];
+  return beats.find(beat => beat.beat_id === state.selectedBeatId) || beats[0] || null;
+}
+
+function chapterWorkspaceMarkup(run, working) {
+  const artifacts = run.artifacts || {};
+  const chapters = artifacts.chapters || [];
+  if (!chapters.length) return "";
+  const chapter = selectedChapter(run);
+  state.selectedChapterId = chapter?.scene_id || null;
+  const beat = artifacts.timeline_mode === "immutable_reels" ? selectedBeat(chapter) : chapter;
+  state.selectedBeatId = beat?.beat_id || null;
+  const playerUrl = chapterPlayerUrl(artifacts.preview_url, beat || chapter);
+  return `<details class="chapter-workspace" open>
+    <summary>
+      <div><p class="eyebrow">Persistent visual timeline</p><h2>Continuous reels with editable narration beats</h2></div>
+      <span class="count-chip">${chapters.length} ${artifacts.timeline_mode === "immutable_reels" ? "reels" : artifacts.timeline_mode === "immutable_shots" ? "shots" : "chapters"}</span>
+    </summary>
+    <div class="chapter-workspace-grid">
+      <nav class="chapter-nav" aria-label="Continuous visual reels">${chapters.map((item, index) => `<button type="button" class="chapter-select${item.scene_id === chapter.scene_id ? " is-selected" : ""}" data-chapter-id="${escapeHtml(item.scene_id)}"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(item.scene_id)}</strong><small>${Number(item.duration || 0).toFixed(1)}s · ${(item.beats || []).length} beats</small></div><i>${item.source_ready ? "READY" : "MISSING"}</i></button>`).join("")}</nav>
+      <section class="chapter-review">
+        <header><div><p class="eyebrow">${escapeHtml(chapter.scene_id)} · ${Number(chapter.absolute_start || 0).toFixed(1)}s–${Number(chapter.absolute_end || 0).toFixed(1)}s</p><h3>Continuous reel preview</h3></div>${artifacts.preview_url ? `<a href="${escapeHtml(chapterPlayerUrl(artifacts.preview_url, chapter))}" target="_blank" rel="noreferrer">OPEN REEL ↗</a>` : ""}</header>
+        ${chapter.beats?.length ? `<div class="chapter-beat-nav" aria-label="Editable narration beats">${chapter.beats.map((item, index) => `<button type="button" class="beat-select${item.beat_id === beat?.beat_id ? " is-selected" : ""}" data-beat-id="${escapeHtml(item.beat_id)}"><strong>${String(index + 1).padStart(2, "0")}</strong><small>${Number(item.local_start || 0).toFixed(1)}–${Number(item.local_end || 0).toFixed(1)}s</small></button>`).join("")}</div>` : ""}
+        ${playerUrl ? `<iframe class="chapter-player-frame" src="${escapeHtml(playerUrl)}" title="${escapeHtml(chapter.scene_id)} live preview" allow="autoplay"></iframe>` : `<div class="chapter-preview-empty"><p>Start the same live Motion Canvas preview used by the full lesson. No MP4 render is required.</p><button class="primary-button start-preview" ${working ? "disabled" : ""}>Start live preview</button></div>`}
+        <div class="chapter-audio-row"><div><strong>${beat?.beat_id ? `${escapeHtml(beat.beat_id)} synchronized window` : "Master-timeline audio"}</strong><small>${Number((beat || chapter).duration || 0).toFixed(1)}s · frames ${Number((beat || chapter).render_start_frame ?? 0)}–${Number((beat || chapter).render_end_frame ?? 0)}</small></div><span class="artifact-empty">Audio is synchronized in the live preview above.</span></div>
+        <div class="chapter-copy"><strong>${beat?.beat_id ? "Beat narration" : "Narration"}</strong><p>${escapeHtml((beat || chapter).narration || "No timestamped narration is available.")}</p></div>
+        <div class="chapter-edit">
+          <label for="chapter-edit-instruction"><span>Edit request for ${escapeHtml(beat?.beat_id || chapter.scene_id)}</span><textarea id="chapter-edit-instruction" placeholder="Example: preserve the existing diagram, but make the force change in this beat clearer."></textarea></label>
+          <div><button class="danger-button" id="regenerate-motion-chapter" data-chapter-id="${escapeHtml(beat?.beat_id || chapter.scene_id)}" ${working || !chapter.source_ready ? "disabled" : ""}>Regenerate this beat in context</button><small>The parent reel remains continuous. Its clock, master audio, surrounding visual state, and later reels are preserved.</small></div>
+        </div>
+      </section>
+    </div>
+  </details>`;
+}
+
+function renderChapterWorkspace() {
+  const root = $("#chapter-workspace-root");
+  if (!root || !state.activeRun) return;
+  const working = activeStatuses.has(state.activeRun.status) || state.activeRun.process_active;
+  root.innerHTML = chapterWorkspaceMarkup(state.activeRun, working);
 }
 
 function selectedTaskModels(run) {
@@ -232,7 +295,7 @@ function renderTopicDetail() {
         <label class="field"><span>Script generator / model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><optgroup label="Codex CLI (ChatGPT)"><option value="codex:gpt-5.6-sol">GPT-5.6-Sol</option><option value="codex:gpt-5.6-terra">GPT-5.6-Terra</option><option value="codex:gpt-5.6-luna">GPT-5.6-Luna</option><option value="codex:gpt-5.5">GPT-5.5</option><option value="codex:gpt-5.4">GPT-5.4</option><option value="codex:gpt-5.4-mini">GPT-5.4-Mini</option></optgroup><option value="configured">Configured</option></select></label>
         <label class="field"><span>Script reasoning</span><select id="script-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Voice</span><select id="audio-provider"><option value="gemini">Gemini TTS</option><option value="elevenlabs">ElevenLabs</option></select></label>
-        <label class="field"><span>Chapter generator</span><select id="chapter-provider"><option value="moonshot">Kimi K2.7 Code</option><option value="codex">Codex CLI (ChatGPT)</option></select></label>
+        <label class="field"><span>Visual reel generator</span><select id="chapter-provider"><option value="moonshot">Kimi K2.7 Code</option><option value="codex">Codex CLI (ChatGPT)</option></select></label>
         <label class="field"><span>Codex model</span><select id="codex-model" disabled><option value="gpt-5.6-sol">GPT-5.6-Sol</option><option value="gpt-5.6-terra">GPT-5.6-Terra</option><option value="gpt-5.6-luna">GPT-5.6-Luna</option><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.4-mini">GPT-5.4-Mini</option></select></label>
         <label class="field"><span>Chapter reasoning</span><select id="chapter-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Chapter workers</span><select id="scene-concurrency"><option>1</option><option selected>2</option><option>4</option></select></label>
@@ -276,7 +339,7 @@ function renderPipeline() {
       return `<button class="step${completed >= number ? " is-done" : ""}${working && completed + 1 === number ? " is-current" : ""}" data-step="${number}" ${working ? "disabled" : ""}><span>${completed >= number ? "✓" : number}</span><b>${name}</b></button>`;
     }).join("")}</div>
     <div class="run-workspace">
-      <div class="preview-shell"><div class="preview-toolbar"><span>MOTION CANVAS · VIDEO + SYNCHRONIZED VOICEOVER</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank" rel="noreferrer">OPEN PLAYER ↗</a>` : "LOCAL EDITOR PREVIEW"}</div>${artifacts.preview_url ? `<iframe class="preview-frame editor-preview" src="${escapeHtml(artifacts.preview_url)}" title="Motion Canvas lesson preview" allow="autoplay"></iframe>` : `<div class="preview-placeholder preview-launch"><span>Start the local Motion Canvas player to review animation and voiceover before rendering.</span><button class="primary-button" id="start-preview" ${working || completed < 6 ? "disabled" : ""}>Start video preview</button></div>`}</div>
+      <div class="preview-shell"><div class="preview-toolbar"><span>LIVE MOTION CANVAS · PRE-RENDER VIDEO + SYNCHRONIZED VOICEOVER</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank" rel="noreferrer">OPEN EDITOR ↗</a>` : "LOCAL EDITOR PREVIEW"}</div>${artifacts.preview_url ? `<iframe class="preview-frame editor-preview" src="${escapeHtml(artifacts.preview_url)}" title="Motion Canvas lesson preview" allow="autoplay"></iframe>` : `<div class="preview-placeholder preview-launch"><span>Start the live Motion Canvas player to review animation and voiceover immediately. Rendering is not required.</span><button class="primary-button start-preview" ${working || completed < 6 ? "disabled" : ""}>Start live preview</button></div>`}</div>
       <div class="run-side">
         <div class="run-control-card"><h3>Run or regenerate a stage</h3><div class="step-control"><select id="step-select">${steps.map((name,index) => `<option value="${index+1}">${index+1}. ${name}</option>`).join("")}</select><button class="secondary-button" id="run-step" ${working ? "disabled" : ""}>Run selected step</button><button class="danger-button" id="regenerate-step" ${working ? "disabled" : ""}>Regenerate from step</button></div><label class="paid-check" style="margin-top:9px"><input type="checkbox" id="run-paid-confirm" checked disabled> Paid model and voice APIs authorized</label><p class="control-help">Regenerate removes the selected stage and every downstream artifact before starting that stage again.</p></div>
         <div class="run-control-card"><h3>Generated artifacts</h3>${artifacts.validation_preview_url ? `<a class="validation-evidence-link" href="${escapeHtml(artifacts.validation_preview_url)}" target="_blank" rel="noreferrer">Open deterministic contact sheet ↗</a>` : ""}<div class="artifact-list">${artifacts.files?.length ? artifacts.files.map(path => `<a href="${artifactUrl(run.id, path)}" target="_blank" title="${escapeHtml(path)}"><span>${escapeHtml(artifactLabel(path))}</span><small>${escapeHtml(path)}</small><b>OPEN ↗</b></a>`).join("") : `<p class="artifact-empty">Artifacts appear after each completed stage.</p>`}</div></div>
@@ -286,7 +349,7 @@ function renderPipeline() {
       </div>
     </div>
     <div class="run-intelligence">${modelMapMarkup(run, working)}${costMarkup(artifacts)}</div>
-    ${artifacts.chapters?.length ? `<div class="panel-heading compact"><div><p class="eyebrow">Timestamp-derived production manifest</p><h2>Motion Canvas chapters</h2></div><span class="count-chip">${artifacts.chapters.length} chapters</span></div><div class="scene-list">${artifacts.chapters.map(chapter => `<article class="scene-row"><strong>${escapeHtml(chapter.scene_id)}<br><small>${Number(chapter.duration || 0).toFixed(1)}s</small><span class="route-mode module">${escapeHtml(chapter.status || "pending")}</span></strong><p>${escapeHtml(chapter.narration || "Timestamped chapter")}</p></article>`).join("")}</div>` : ""}`;
+    <div id="chapter-workspace-root">${chapterWorkspaceMarkup(run, working)}</div>`;
   loadLogs(run.id);
   managePolling();
 }
@@ -295,6 +358,7 @@ async function selectRun(runId, switchView = true) {
   clearError();
   try {
     const payload = await request(`/api/runs/${encodeURIComponent(runId)}`);
+    if (state.activeRunId !== runId) state.selectedChapterId = null;
     state.activeRunId = runId;
     state.activeRun = payload.run;
     renderPipeline();
@@ -497,12 +561,46 @@ document.addEventListener("click", async event => {
     try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/render`, { method: "POST", body: JSON.stringify({ quality: "high", fps: 30, workers: 1 }) }); state.activeRun = response.run; renderPipeline(); toast("High-quality MP4 render started."); } catch (error) { showError(error); }
     return;
   }
-  if (event.target.closest("#start-preview")) {
+  if (event.target.closest(".start-preview")) {
     const button = event.target.closest("button"); setBusy(button, true, "Starting player…");
     try {
       const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/preview`, { method: "POST", body: "{}" });
       state.activeRun = response.run; renderPipeline(); toast("Motion Canvas video preview started. Press play in the embedded player.");
     } catch (error) { showError(error); setBusy(button, false); }
+    return;
+  }
+  const chapterSelect = event.target.closest(".chapter-select");
+  if (chapterSelect) {
+    state.selectedChapterId = chapterSelect.dataset.chapterId;
+    state.selectedBeatId = null;
+    renderChapterWorkspace();
+    return;
+  }
+  const beatSelect = event.target.closest(".beat-select");
+  if (beatSelect) {
+    state.selectedBeatId = beatSelect.dataset.beatId;
+    renderChapterWorkspace();
+    return;
+  }
+  if (event.target.closest("#regenerate-motion-chapter")) {
+    const button = event.target.closest("button");
+    const chapterId = button.dataset.chapterId;
+    const instruction = $("#chapter-edit-instruction")?.value.trim() || "";
+    if (!window.confirm(`Regenerate ${chapterId} inside its continuous reel? The reel clock, audio, and surrounding visual state will remain fixed.`)) return;
+    setBusy(button, true, "Starting…");
+    try {
+      const endpoint = chapterId.startsWith("beat_") ? "motion-beats" : "motion-shots";
+      const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/${endpoint}/${encodeURIComponent(chapterId)}/regenerate`, {
+        method: "POST",
+        body: JSON.stringify({ confirm_paid_api: true, custom_instruction: instruction, task_models: collectTaskModels() })
+      });
+      state.activeRun = response.run;
+      renderPipeline();
+      toast(`${chapterId} regeneration started inside its persistent reel. The master timeline and audio are locked.`);
+    } catch (error) {
+      showError(error);
+      setBusy(button, false);
+    }
     return;
   }
 });

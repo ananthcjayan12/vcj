@@ -1,4 +1,4 @@
-import {Layout, Rect, Txt} from '@motion-canvas/2d';
+import {Latex, Layout, Rect, Txt} from '@motion-canvas/2d';
 
 export const Presentation = {
   font: 'Inter, Arial, sans-serif',
@@ -25,6 +25,8 @@ const bounded = (value: string, maximum: number, field: string) => {
   return value;
 };
 const display = (value: any, maximum: number, field: string) => typeof value === 'string' ? bounded(value, maximum, field) : value;
+const isLatexEquation = (value: unknown) =>
+  typeof value === 'string' && /\\[A-Za-z]+|[_^]\{?|\\[()[\]]/.test(value);
 
 export function SceneTitle(props: any) {
   const {text, title, subtitle, children, ...placement} = props;
@@ -99,8 +101,11 @@ export function EquationCard(props: any) {
   const equationSize = variantValue(variant, 46, 34);
   const noteSize = variantValue(variant, Presentation.label, 23);
   const note = caption ?? description ?? title;
+  const equationValue = display(equation, 120, 'Equation');
   return <Rect layout direction={'column'} gap={gap} padding={padding} width={cardWidth} height={cardHeight} radius={18} fill={Presentation.colors.panel} {...placement}>
-    <Txt text={display(equation, 58, 'Equation')} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={equationSize} fontWeight={700} textAlign={'center'} fill={Presentation.colors.amber} />
+    {isLatexEquation(equationValue)
+      ? <Latex tex={equationValue} fontSize={equationSize} fill={Presentation.colors.amber} />
+      : <Txt text={equationValue} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={equationSize} fontWeight={700} textAlign={'center'} fill={Presentation.colors.amber} />}
     {note ? <Txt text={display(note, 72, 'Equation caption')} width={cardWidth - padding * 2} fontFamily={Presentation.font} fontSize={noteSize} textAlign={'center'} fill={Presentation.colors.muted} textWrap /> : null}
   </Rect>;
 }

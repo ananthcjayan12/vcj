@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 import unittest
+import urllib.error
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,7 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import mav_models
-from mav_models import ResolvedModelConfig, _call_gemini_json, _gemini_compatible_json_schema, model_timeout_seconds
+from mav_models import (
+    ResolvedModelConfig,
+    _anthropic_request_json,
+    _call_gemini_json,
+    _gemini_compatible_json_schema,
+    model_timeout_seconds,
+)
 from mav_plan_v3 import _parameter_output_schema, _route_output_schema
 
 
@@ -85,6 +93,76 @@ class GeminiSchemaCompatibilityTest(unittest.TestCase):
         self.assertEqual(len(fake_models.configs), 2)
         self.assertIsNotNone(fake_models.configs[0].response_json_schema)
         self.assertIsNone(fake_models.configs[1].response_json_schema)
+
+
+class AnthropicRetryTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.resolved = ResolvedModelConfig(
+            task="script_writing",
+            provider="anthropic",
+            model="claude-opus-4-8",
+            max_tokens=64000,
+        )
+        self.request = urllib.request.Request("https://api.anthropic.test/v1/messages")
+
+    @staticmethod
+    def overloaded_error(retry_after: str | None = None) -> urllib.error.HTTPError:
+        headers = {"retry-after": retry_after} if retry_after is not None else {}
+        return urllib.error.HTTPError(
+            "https://api.anthropic.test/v1/messages",
+            529,
+            "Overloaded",
+            headers,
+            BytesIO(b'{"error":{"type":"overloaded_error"}}'),
+        )
+
+    def test_529_retries_and_succeeds(self) -> None:
+        response = BytesIO(b'{"id":"msg_test","content":[]}')
+        with (
+            patch.dict("os.environ", {"MAV_ANTHROPIC_RETRY_BASE_SECONDS": "0"}, clear=True),
+            patch.object(mav_models.urllib.request, "urlopen", side_effect=[self.overloaded_error(), response]) as urlopen,
+            patch.object(mav_models.time, "sleep") as sleep,
+        ):
+            result = _anthropic_request_json(self.request, self.resolved, 600)
+
+        self.assertEqual(result["id"], "msg_test")
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(0.0)
+
+    def test_529_honors_retry_after_and_stops_after_three_attempts(self) -> None:
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch.object(
+                mav_models.urllib.request,
+                "urlopen",
+                side_effect=[self.overloaded_error("3"), self.overloaded_error(), self.overloaded_error()],
+            ) as urlopen,
+            patch.object(mav_models.time, "sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 529 after 3 attempts"):
+                _anthropic_request_json(self.request, self.resolved, 600)
+
+        self.assertEqual(urlopen.call_count, 3)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [3.0, 4.0])
+
+    def test_non_retryable_http_error_fails_immediately(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.anthropic.test/v1/messages",
+            401,
+            "Unauthorized",
+            {},
+            BytesIO(b'{"error":{"type":"authentication_error"}}'),
+        )
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch.object(mav_models.urllib.request, "urlopen", side_effect=error) as urlopen,
+            patch.object(mav_models.time, "sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 401"):
+                _anthropic_request_json(self.request, self.resolved, 600)
+
+        self.assertEqual(urlopen.call_count, 1)
+        sleep.assert_not_called()
 
 
 if __name__ == "__main__":

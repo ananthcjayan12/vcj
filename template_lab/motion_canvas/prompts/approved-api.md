@@ -6,7 +6,7 @@ Use only these imports unless the starter scene already demonstrates another one
 import {Circle, Grid, Layout, Line, Node, Rect, Txt, makeScene2D} from '@motion-canvas/2d';
 import {Vector2, all, chain, createRef, createSignal, linear, waitFor} from '@motion-canvas/core';
 import {ComparisonTable, EquationCard, SceneTitle, StatReadout, TextCard, TwoColumnComparison} from '../../presentation';
-import {CUES} from './chapter_NN.cues';
+import {CUES} from './reel_NNN.cues';
 ```
 
 Presentation contract:
@@ -25,10 +25,11 @@ Presentation contract:
 - When successive narration beats need the same space, window the earlier component and replace it in the same stable slot. Do not keep adding permanent cards around a diagram.
 
 - Use the presentation components for every title, prose block, comparison, table, equation card, and numeric readout.
+- `EquationCard` supports real LaTeX through its `equation` property. Use valid TeX for fractions, powers, subscripts, vectors, Greek symbols, and arrows, for example `equation={'v = \\dfrac{s}{t}'}` or `equation={'F_{\\text{drag}} = W'}`. In a TSX expression, escape each TeX backslash as `\\`. Never show LaTeX commands in a raw `Txt` node, and never use Unicode-art approximations when proper TeX is clearer.
 - Raw `Txt` is reserved for short diagram labels of at most six words. It is not approved for paragraphs, tables, comparison prose, headings, or calculation steps.
 - Do not set `fontFamily`, major `fontSize`, line height, table geometry, card padding, or prose coordinates yourself. The fixed presentation components own them.
 - `ComparisonTable` accepts 2-3 columns and at most 4 visible rows. Split a larger comparison into successive cue-driven table pages; never shrink it.
-- Keep display copy concise: card title <=42 characters, card body <=110 characters, table heading <=28 characters, row label <=32 characters, and cell <=48 characters.
+- Keep display copy within the runtime-enforced limits: scene title <=64 characters, scene subtitle <=72, card title <=42, card body <=110, equation TeX source <=120, equation caption <=72, stat value <=32, stat unit <=12, stat label <=42, table title <=54, table heading <=28, row label <=32, and cell <=48.
 - Narration is spoken explanation, not display copy. Prefer a short label, value, equation, or two-line takeaway instead of reproducing a narration sentence.
 - `CUES` maps normalized spoken words to arrays of exact chapter-local start times, for example `CUES.scalar[0]`. All semantic reveals must derive from these constants. Only decorative motion durations may use literal values.
 - Use only cue keys and occurrence indexes present in the supplied chapter data. Apostrophes are normalized to underscores (`let's` becomes `CUES.let_s`). If a cue has one timestamp, never access index `[1]`, even with a nullish fallback.

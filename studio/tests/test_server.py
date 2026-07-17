@@ -9,10 +9,17 @@ from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _infer_step, _normalized_meta, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, model_map_payload, reset_run_from_step, topic_detail, update_run_models
+from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, model_map_payload, regenerate_motion_chapter, reset_run_from_step, topic_detail, update_run_models
 
 
 class StudioPayloadTest(unittest.TestCase):
+    def test_byte_ranges_support_open_ended_and_suffix_requests(self) -> None:
+        self.assertEqual(_parse_byte_range("bytes=10-19", 100), (10, 19))
+        self.assertEqual(_parse_byte_range("bytes=90-", 100), (90, 99))
+        self.assertEqual(_parse_byte_range("bytes=-10", 100), (90, 99))
+        with self.assertRaises(ValueError):
+            _parse_byte_range("bytes=100-", 100)
+
     def test_dashboard_exposes_complete_curriculum_and_scene_catalog(self) -> None:
         payload = dashboard_payload()
         self.assertEqual(payload["summary"]["topic_count"], 58)
@@ -41,8 +48,8 @@ class StudioPayloadTest(unittest.TestCase):
         }
         with self.assertRaises(PermissionError):
             build_generation_command(meta, {"from_step": 2, "stop_after_step": 2})
-        command, _env = build_generation_command(meta, {"from_step": 6, "stop_after_step": 8})
-        self.assertNotIn("--confirm-paid-api", command)
+        with self.assertRaises(PermissionError):
+            build_generation_command(meta, {"from_step": 6, "stop_after_step": 8})
         command, _env = build_generation_command(meta, {"from_step": 2, "stop_after_step": 2, "confirm_paid_api": True})
         self.assertIn("--confirm-paid-api", command)
 
@@ -81,6 +88,114 @@ class StudioPayloadTest(unittest.TestCase):
         self.assertEqual(env["MAV_MOTION_CANVAS_BATCH_REASONING_EFFORT"], "high")
         self.assertEqual(env["MAV_MOTION_CANVAS_WORKERS"], "2")
 
+    def test_targeted_motion_chapter_command_preserves_the_rest_of_the_run(self) -> None:
+        meta = {
+            "id": "physics-1-1-command-test",
+            "facts_path": "video_engine/topics/1.1/facts.json",
+            "settings": {
+                "duration": 480,
+                "model_provider": "configured",
+                "audio_provider": "gemini",
+                "scene_concurrency": 2,
+                "task_models": {
+                    "motion_canvas_batch": {
+                        "provider": "codex",
+                        "model": "gpt-5.6-sol",
+                        "reasoning_effort": "medium",
+                    }
+                },
+            },
+        }
+        command, env = build_generation_command(
+            meta,
+            {
+                "from_step": 5,
+                "stop_after_step": 6,
+                "confirm_paid_api": True,
+                "force_paid_api": True,
+                "target_motion_chapter_id": "chapter_03",
+                "custom_instruction": "Use a clearer force diagram.",
+            },
+        )
+        self.assertIn("--motion-chapter-id", command)
+        self.assertEqual(command[command.index("--motion-chapter-id") + 1], "chapter_03")
+        self.assertIn("--force-paid-api", command)
+        self.assertEqual(env["MAV_MOTION_CHAPTER_REGEN_INSTRUCTION"], "Use a clearer force diagram.")
+
+    def test_motion_chapter_snapshot_exposes_cached_audio_and_source_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
+            run_path = Path(directory) / "chapter-preview-test"
+            (run_path / "motion_canvas" / "chapters").mkdir(parents=True)
+            (run_path / "audio_chunks" / "paragraph_01").mkdir(parents=True)
+            (run_path / "motion_canvas" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "chapters": [
+                            {
+                                "id": "paragraph_01",
+                                "scene_id": "chapter_01",
+                                "absolute_start": 0,
+                                "absolute_end": 12.5,
+                                "duration": 12.5,
+                            }
+                        ],
+                        "batches": [{"id": "batch_01", "chapter_ids": ["chapter_01"], "status": "generated"}],
+                    }
+                )
+            )
+            (run_path / "motion_canvas" / "chapters" / "chapter_01.tsx").write_text("// chapter")
+            (run_path / "audio_chunks" / "paragraph_01" / "audio.wav").write_bytes(b"audio")
+            (run_path / "audio_chunks" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "chapters": [
+                            {
+                                "id": "paragraph_01",
+                                "path": "audio_chunks/paragraph_01/audio.wav",
+                                "quality": {"status": "passed"},
+                            }
+                        ]
+                    }
+                )
+            )
+            chapter = _artifact_snapshot("chapter-preview-test")["chapters"][0]
+            self.assertTrue(chapter["source_ready"])
+            self.assertEqual(chapter["audio_quality"]["status"], "passed")
+            self.assertEqual(
+                chapter["audio_url"],
+                "/artifacts/runs/chapter-preview-test/audio_chunks/paragraph_01/audio.wav",
+            )
+
+    def test_beat_regeneration_targets_parent_reel_with_fixed_context(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
+            run_path = Path(directory) / "beat-edit-test"
+            (run_path / "motion_canvas").mkdir(parents=True)
+            (run_path / "motion_canvas" / "manifest.json").write_text(json.dumps({
+                "timeline_mode": "immutable_reels",
+                "reels": [{"scene_id": "reel_002"}],
+                "beats": [{
+                    "beat_id": "beat_006", "reel_id": "reel_002",
+                    "local_start": 8.25, "local_end": 17.5,
+                    "narration": "The force now increases.",
+                }],
+            }))
+            captured = {}
+
+            def fake_command(_meta, request):
+                captured.update(request)
+                return ["python", "fake"], {}
+
+            with patch("studio.server._load_meta", return_value={"id": "beat-edit-test"}), patch(
+                "studio.server.build_generation_command", side_effect=fake_command
+            ), patch("studio.server._start_process", return_value={"status": "running"}), patch("studio.server._append_log"):
+                regenerate_motion_chapter(
+                    "beat-edit-test", "beat_006",
+                    {"confirm_paid_api": True, "custom_instruction": "Clarify the arrow."},
+                )
+            self.assertEqual(captured["target_motion_chapter_id"], "reel_002")
+            self.assertIn("8.250s to 17.500s", captured["custom_instruction"])
+            self.assertIn("Preserve the visual state", captured["custom_instruction"])
+
     def test_mid_run_model_change_is_persisted_for_next_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
             run_path = Path(directory) / "model-change-test"
@@ -109,6 +224,15 @@ class StudioPayloadTest(unittest.TestCase):
             (run_path / "motion_canvas").mkdir()
             (run_path / "motion_canvas" / "final.mp4").write_bytes(b"video")
             self.assertEqual(_infer_step(run_path), 8)
+
+    def test_validation_contact_sheet_stays_at_step_six(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_path = Path(directory)
+            preview = run_path / "motion_canvas" / "preview"
+            preview.mkdir(parents=True)
+            (run_path / "motion_canvas" / "robot-report.json").write_text("{}")
+            (preview / "contact-sheet.png").write_bytes(b"image")
+            self.assertEqual(_infer_step(run_path), 6)
 
     def test_existing_run_metadata_backfills_facts_and_paid_settings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -187,6 +311,15 @@ class StudioHttpTest(unittest.TestCase):
         self.assertIn("Production workspace", html)
         self.assertNotIn("Scene library", html)
         self.assertIn("Motion Canvas", html)
+
+    def test_static_files_support_http_byte_ranges(self) -> None:
+        request = urllib.request.Request(f"{self.base}/", headers={"Range": "bytes=0-15"})
+        with urllib.request.urlopen(request, timeout=5) as response:
+            data = response.read()
+            self.assertEqual(response.status, 206)
+            self.assertEqual(response.headers["Accept-Ranges"], "bytes")
+            self.assertTrue(response.headers["Content-Range"].startswith("bytes 0-15/"))
+        self.assertEqual(len(data), 16)
 
     def test_scene_library_is_served_from_repo(self) -> None:
         with urllib.request.urlopen(f"{self.base}/scene-library/", timeout=5) as response:

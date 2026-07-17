@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <link rel="icon" href="data:,">
+    <title>MAV Chapter Preview</title>
+    <style>
+      :root {color-scheme: dark; font-family: Inter, Arial, sans-serif}
+      * {box-sizing: border-box}
+      html, body {margin: 0; width: 100%; min-height: 100%; background: #07111f; color: #eaf3ff}
+      body {display: grid; grid-template-rows: minmax(0, 1fr) auto}
+      #stage {min-height: 0; display: grid; place-items: center; overflow: hidden}
+      canvas {width: 100%; height: auto; max-height: 100%; aspect-ratio: 16 / 9; display: block}
+      #controls {padding: 12px 14px; border-top: 1px solid #263a54; background: #0e1d31; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px}
+      button {min-width: 76px; min-height: 34px; border: 1px solid #46d9ff; border-radius: 7px; color: #07111f; background: #46d9ff; font-weight: 750; cursor: pointer}
+      input {width: 100%; accent-color: #46d9ff}
+      span {color: #91a8c5; font: 12px/1 ui-monospace, monospace}
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="controls">
+      <button id="toggle" type="button">Play</button>
+      <input id="scrubber" type="range" min="0" max="1" step="0.001" value="0" aria-label="Chapter position">
+      <span id="time">0:00 / 0:00</span>
+    </div>
+    <script type="module" src="/src/chapter-player.ts"></script>
+  </body>
+</html>

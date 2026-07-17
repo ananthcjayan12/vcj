@@ -12,6 +12,8 @@ const PREVIEW_ROOT = path.join(RUN_ROOT, 'preview');
 const FRAME_ROOT = path.join(RUN_ROOT, 'frames');
 const videoMode = process.argv.includes('--video');
 const previewMode = process.argv.includes('--preview') || !videoMode;
+const manifestPath = path.join(RUN_ROOT, 'manifest.json');
+const runManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
 
 function findChrome() {
   const candidates = [
@@ -80,6 +82,10 @@ const consoleErrors = [];
 const consoleTasks = [];
 const pageErrors = [];
 
+function isIgnorableConsoleError(message) {
+  return /^\[hmr\] Failed to reload \/src\/generated\/(?:chapters|shots|reels)\/(?:chapter|shot|reel)_\d+\.meta\b/.test(message);
+}
+
 try {
   const url = `http://127.0.0.1:${port}/render.html`;
   renderLog('Starting local render host');
@@ -127,6 +133,16 @@ try {
     throw new Error(`Invalid animation duration: ${duration}`);
   }
   renderLog(`Scene initialized; duration=${formatDuration(duration)}`);
+  const expectedDuration = Number(runManifest.render_duration || 0);
+  const fps = await page.evaluate(() => window.MotionCanvasRobot.fps);
+  const timelineDelta = expectedDuration > 0 ? duration - expectedDuration : 0;
+  const timelineStable = expectedDuration <= 0 || Math.abs(timelineDelta) <= 1.1 / fps;
+  if (!timelineStable) {
+    throw new Error(
+      `Master timeline drifted by ${timelineDelta.toFixed(6)}s; ` +
+      `expected=${expectedDuration.toFixed(6)}s measured=${duration.toFixed(6)}s`,
+    );
+  }
 
   const capture = async (time, target) => {
     await page.evaluate(at => window.MotionCanvasRobot.seek(at), time);
@@ -161,14 +177,25 @@ try {
       create: {width: 2400, height: 270, channels: 4, background: '#07111f'},
     }).composite(composites).png().toFile(path.join(PREVIEW_ROOT, 'contact-sheet.png'));
     await Promise.all(consoleTasks);
+    const hasIgnoredHmrError = consoleErrors.some(isIgnorableConsoleError);
+    const ignoredConsoleErrors = consoleErrors.filter(
+      message => isIgnorableConsoleError(message) || (hasIgnoredHmrError && message === '{}'),
+    );
+    const actionableConsoleErrors = consoleErrors.filter(
+      message => !isIgnorableConsoleError(message) && !(hasIgnoredHmrError && message === '{}'),
+    );
     fs.writeFileSync(
       path.join(RUN_ROOT, 'validation.json'),
       JSON.stringify({
-        status: deterministic && !consoleErrors.length && !pageErrors.length ? 'passed' : 'failed',
+        status: deterministic && timelineStable && !actionableConsoleErrors.length && !pageErrors.length ? 'passed' : 'failed',
         duration,
+        expectedDuration,
+        timelineDelta,
+        timelineStable,
         sampledTimes: [0, .25, .5, .75, 1].map(ratio => duration * ratio),
         deterministic,
-        consoleErrors,
+        consoleErrors: actionableConsoleErrors,
+        ignoredConsoleErrors,
         pageErrors,
       }, null, 2) + '\n',
     );
@@ -180,7 +207,6 @@ try {
     const hasAudioSource = fs.existsSync(audio) && fs.statSync(audio).size > 0;
     fs.rmSync(FRAME_ROOT, {recursive: true, force: true});
     fs.mkdirSync(FRAME_ROOT, {recursive: true});
-    const fps = await page.evaluate(() => window.MotionCanvasRobot.fps);
     const frameCount = Math.ceil(duration * fps);
     const totalFrames = frameCount + 1;
     const progressInterval = Math.max(1, Math.min(Math.ceil(totalFrames / 100), fps * 5));
