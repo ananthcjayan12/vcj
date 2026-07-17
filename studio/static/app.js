@@ -190,16 +190,18 @@ function collectTaskModels() {
 async function boot() {
   clearError();
   try {
-    const [dashboard, runsPayload] = await Promise.all([
-      request("/api/dashboard"), request("/api/runs")
+    const [dashboard, runsPayload, queuePayload] = await Promise.all([
+      request("/api/dashboard"), request("/api/runs"), request("/api/render-queue")
     ]);
     state.dashboard = dashboard;
     state.runs = runsPayload.runs || [];
+    state.renderQueue = await hydrateRenderQueueLogs(queuePayload.queue || {entries: [], summary: {}});
     state.selectedTopicRef = state.selectedTopicRef || dashboard.next_topic?.ref || dashboard.topics?.[0]?.ref;
     renderChrome();
     renderDashboard();
     renderCurriculum();
     renderRuns();
+    manageQueuePolling();
     if (state.selectedTopicRef) await selectTopic(state.selectedTopicRef, false);
     if (state.activeRunId) await selectRun(state.activeRunId, false);
   } catch (error) { showError(error); }
@@ -417,22 +419,59 @@ function renderRuns() {
   }).join("") || `<div class="loading-card">No production runs yet.</div>`;
   const entries = state.renderQueue?.entries || [];
   $("#render-queue-strip").innerHTML = entries.length
-    ? entries.slice(-12).map(item => `<article class="render-queue-item${item.status === "running" ? " is-running" : ""}"><strong>${escapeHtml(item.run_id)}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(item.settings?.quality || "standard")} · ${Number(item.settings?.fps || 30)} fps</small>${item.error ? `<small>${escapeHtml(item.error)}</small>` : ""}</article>`).join("")
+    ? entries.slice(-12).map(item => renderQueueItem(item)).join("")
     : `<span class="artifact-empty">Render queue is empty. Select completed runs below and queue them together.</span>`;
+}
+
+function renderQueueItem(item) {
+  const running = item.status === "running";
+  const lines = String(item.live_log || "").split(/\r?\n/).filter(Boolean);
+  const renderStart = lines.map((line, index) => line.includes("Starting queued render:") ? index : -1).filter(index => index >= 0).pop();
+  const currentRenderLines = renderStart == null ? lines : lines.slice(renderStart);
+  const recentLines = currentRenderLines.filter(line => line.includes("[render]")).slice(-8);
+  const progressLine = [...recentLines].reverse().find(line => line.includes("[render] Frames ")) || "";
+  const match = progressLine.match(/Frames\s+([\d,]+)\/([\d,]+)\s+\(([\d.]+)%\);.*?speed=([\d.]+) frames\/s; ETA=([^\]]+)$/);
+  let progress = "";
+  if (match) {
+    const completed = Number(match[1].replaceAll(",", ""));
+    const total = Number(match[2].replaceAll(",", ""));
+    const percentage = Number(match[3]);
+    const remaining = Math.max(0, total - completed);
+    progress = `<div class="render-live-progress"><div class="render-progress-track"><i style="width:${Math.max(0, Math.min(100, percentage))}%"></i></div><div class="render-progress-stats"><strong>${formatNumber(completed)} / ${formatNumber(total)} frames</strong><span>${formatNumber(remaining)} left</span><span>${percentage.toFixed(1)}%</span><span>${escapeHtml(match[4])} fps</span><span>ETA ${escapeHtml(match[5])}</span></div></div>`;
+  }
+  const liveOutput = running
+    ? `<pre class="render-live-log">${escapeHtml(recentLines.join("\n") || "Waiting for the renderer to report its first frame…")}</pre>`
+    : "";
+  return `<article class="render-queue-item${running ? " is-running" : ""}"><div class="render-queue-heading"><strong>${escapeHtml(item.run_id)}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(item.settings?.quality || "standard")} · ${Number(item.settings?.fps || 30)} fps</small></div>${progress}${liveOutput}${item.error ? `<small>${escapeHtml(item.error)}</small>` : ""}</article>`;
+}
+
+async function hydrateRenderQueueLogs(queue) {
+  const running = (queue?.entries || []).filter(item => item.status === "running");
+  await Promise.all(running.map(async item => {
+    try {
+      const payload = await request(`/api/runs/${encodeURIComponent(item.run_id)}/logs`);
+      item.live_log = payload.log || "";
+    } catch { item.live_log = ""; }
+  }));
+  return queue;
 }
 
 async function refreshRuns() {
   const [payload, queuePayload] = await Promise.all([request("/api/runs"), request("/api/render-queue")]);
   state.runs = payload.runs || [];
-  state.renderQueue = queuePayload.queue || {entries: [], summary: {}};
+  state.renderQueue = await hydrateRenderQueueLogs(queuePayload.queue || {entries: [], summary: {}});
   renderRuns(); renderChrome();
+  manageQueuePolling();
+}
+
+function manageQueuePolling() {
   const queueActive = (state.renderQueue.entries || []).some(item => ["queued", "running"].includes(item.status));
   if (queueActive && !state.queueTimer) {
     state.queueTimer = setInterval(async () => {
       try {
         const [runsPayload, nextQueue] = await Promise.all([request("/api/runs"), request("/api/render-queue")]);
         state.runs = runsPayload.runs || [];
-        state.renderQueue = nextQueue.queue || {entries: [], summary: {}};
+        state.renderQueue = await hydrateRenderQueueLogs(nextQueue.queue || {entries: [], summary: {}});
         renderRuns();
         if (!(state.renderQueue.entries || []).some(item => ["queued", "running"].includes(item.status))) {
           clearInterval(state.queueTimer); state.queueTimer = null;
@@ -537,8 +576,9 @@ document.addEventListener("click", async event => {
         method: "POST",
         body: JSON.stringify({run_ids: runIds, quality: "high", fps: 30, workers: 1})
       });
-      state.renderQueue = response.queue;
+      state.renderQueue = await hydrateRenderQueueLogs(response.queue);
       renderRuns();
+      manageQueuePolling();
       toast(`${runIds.length} run${runIds.length === 1 ? "" : "s"} added to the MP4 render queue.`);
     } catch (error) { showError(error); }
     return;
