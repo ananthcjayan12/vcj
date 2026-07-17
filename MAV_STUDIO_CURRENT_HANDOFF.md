@@ -70,6 +70,22 @@ run, rebuild step 5 without selecting an individual unit; this explicitly
 creates and generates the continuous reel set instead of silently expanding one
 paid edit request.
 
+### Resumable MP4 rendering and queue
+
+Motion Canvas video renders preserve completed PNG frames in
+`motion_canvas/frames/` and record `motion_canvas/render-checkpoint.json`.
+Frames are written atomically. A retry fingerprints the accepted visual source,
+scans the contiguous valid PNG sequence, and resumes at the first missing frame.
+If the visual source, FPS, duration, or frame count changed, cached frames are
+discarded instead of being mixed into a different render. Older interrupted
+runs without a checkpoint can be adopted when their frame files are newer than
+the underlying visual TSX/runtime sources.
+
+Studio stores its sequential MP4 queue in `template_lab/render_queue.json`.
+The Runs view can select several step-7/8 runs and enqueue them together. Only
+one renderer runs at a time. Failed runs remain selectable; re-queuing them uses
+their valid frame checkpoint. Queue state is restored when Studio restarts.
+
 The repository still contains Direct HTML and legacy recipe code, but
 `studio/server.py` currently forces newly created and resumed Studio runs to
 `motion-canvas`.

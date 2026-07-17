@@ -9,10 +9,24 @@ from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, model_map_payload, regenerate_motion_chapter, reset_run_from_step, topic_detail, update_run_models
+from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, topic_detail, update_run_models
 
 
 class StudioPayloadTest(unittest.TestCase):
+    def test_multiple_ready_runs_are_added_to_render_queue_in_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "studio.server.RENDER_QUEUE_PATH", Path(directory) / "render_queue.json"
+        ), patch(
+            "studio.server._load_meta",
+            side_effect=lambda run_id: {"id": run_id, "topic": f"Topic {run_id}", "current_step": 7},
+        ), patch("studio.server._ensure_render_queue_worker"):
+            queue = enqueue_render_runs(
+                ["physics-1-1-v01", "physics-1-2-v01", "physics-1-1-v01"],
+                {"quality": "high", "fps": 30, "workers": 1},
+            )
+        self.assertEqual([item["run_id"] for item in queue["entries"]], ["physics-1-1-v01", "physics-1-2-v01"])
+        self.assertTrue(all(item["status"] == "queued" for item in queue["entries"]))
+
     def test_byte_ranges_support_open_ended_and_suffix_requests(self) -> None:
         self.assertEqual(_parse_byte_range("bytes=10-19", 100), (10, 19))
         self.assertEqual(_parse_byte_range("bytes=90-", 100), (90, 99))

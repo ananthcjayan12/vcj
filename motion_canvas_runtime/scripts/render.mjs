@@ -1,4 +1,5 @@
 import {spawn, spawnSync} from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -10,10 +11,67 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const RUN_ROOT = process.env.MAV_MOTION_RUN_ROOT || path.join(ROOT, 'runs', 'latest');
 const PREVIEW_ROOT = path.join(RUN_ROOT, 'preview');
 const FRAME_ROOT = path.join(RUN_ROOT, 'frames');
+const CHECKPOINT_PATH = path.join(RUN_ROOT, 'render-checkpoint.json');
 const videoMode = process.argv.includes('--video');
 const previewMode = process.argv.includes('--preview') || !videoMode;
 const manifestPath = path.join(RUN_ROOT, 'manifest.json');
 const runManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
+
+function visualSourceFiles() {
+  const files = [
+    manifestPath,
+    path.join(RUN_ROOT, 'scenes.ts'),
+    path.join(ROOT, 'src', 'presentation.tsx'),
+    path.join(ROOT, 'src', 'render-host.ts'),
+    path.join(ROOT, 'src', 'project.ts'),
+  ];
+  for (const directory of ['chapters', 'shots', 'reels']) {
+    const root = path.join(RUN_ROOT, directory);
+    if (!fs.existsSync(root)) continue;
+    for (const name of fs.readdirSync(root).sort()) {
+      if (name.endsWith('.tsx') || name.endsWith('.cues.ts')) files.push(path.join(root, name));
+    }
+  }
+  return files.filter(file => fs.existsSync(file));
+}
+
+function renderFingerprint({fps, duration, frameCount}) {
+  const hash = crypto.createHash('sha256');
+  hash.update(JSON.stringify({version: 1, fps, duration, frameCount}));
+  for (const file of visualSourceFiles()) {
+    hash.update(path.relative(ROOT, file));
+    hash.update(fs.readFileSync(file));
+  }
+  return hash.digest('hex');
+}
+
+function validPng(file) {
+  if (!fs.existsSync(file) || fs.statSync(file).size < 100) return false;
+  const signature = Buffer.alloc(8);
+  const handle = fs.openSync(file, 'r');
+  try {
+    if (fs.readSync(handle, signature, 0, 8, 0) !== 8) return false;
+  } finally {
+    fs.closeSync(handle);
+  }
+  return signature.equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+}
+
+function framePath(frame) {
+  return path.join(FRAME_ROOT, `${String(frame).padStart(6, '0')}.png`);
+}
+
+function contiguousFrameCount(frameCount) {
+  let completed = 0;
+  while (completed <= frameCount && validPng(framePath(completed))) completed += 1;
+  return completed;
+}
+
+function writeCheckpoint(payload) {
+  const temporary = `${CHECKPOINT_PATH}.tmp-${process.pid}`;
+  fs.writeFileSync(temporary, JSON.stringify(payload, null, 2) + '\n');
+  fs.renameSync(temporary, CHECKPOINT_PATH);
+}
 
 function findChrome() {
   const candidates = [
@@ -144,10 +202,10 @@ try {
     );
   }
 
+  const canvas = await page.$('#robot-canvas');
+  if (!canvas) throw new Error('Motion Canvas render surface was not found.');
   const capture = async (time, target) => {
     await page.evaluate(at => window.MotionCanvasRobot.seek(at), time);
-    const canvas = await page.$('#robot-canvas');
-    if (!canvas) throw new Error('Motion Canvas render surface was not found.');
     await canvas.screenshot({path: target, type: 'png'});
   };
 
@@ -205,23 +263,68 @@ try {
   if (videoMode) {
     const audio = path.join(RUN_ROOT, 'voiceover.mp3');
     const hasAudioSource = fs.existsSync(audio) && fs.statSync(audio).size > 0;
-    fs.rmSync(FRAME_ROOT, {recursive: true, force: true});
     fs.mkdirSync(FRAME_ROOT, {recursive: true});
     const frameCount = Math.ceil(duration * fps);
     const totalFrames = frameCount + 1;
+    const fingerprint = renderFingerprint({fps, duration, frameCount});
+    const checkpoint = fs.existsSync(CHECKPOINT_PATH)
+      ? JSON.parse(fs.readFileSync(CHECKPOINT_PATH, 'utf8'))
+      : null;
+    // Older interrupted renders predate checkpoint files. Assembly rewrites
+    // manifest/scenes.ts even when their effective content is unchanged, so
+    // bootstrap adoption is based on the actual visual TSX/runtime sources.
+    const legacyVisualFiles = visualSourceFiles().filter(
+      file => file !== manifestPath && file !== path.join(RUN_ROOT, 'scenes.ts'),
+    );
+    const sourceModifiedAt = Math.max(...legacyVisualFiles.map(file => fs.statSync(file).mtimeMs));
+    const firstFrame = framePath(0);
+    const legacyFramesAreCurrent = !checkpoint && validPng(firstFrame) && fs.statSync(firstFrame).mtimeMs >= sourceModifiedAt;
+    const reusable = checkpoint?.fingerprint === fingerprint || legacyFramesAreCurrent;
+    if (!reusable) {
+      fs.rmSync(FRAME_ROOT, {recursive: true, force: true});
+      fs.mkdirSync(FRAME_ROOT, {recursive: true});
+    }
+    const startFrame = reusable ? contiguousFrameCount(frameCount) : 0;
+    for (const name of fs.readdirSync(FRAME_ROOT)) {
+      const match = /^(\d{6})\.png$/.exec(name);
+      if (match && Number(match[1]) >= startFrame) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
+      if (name.includes('.tmp-')) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
+    }
+    writeCheckpoint({
+      version: 1,
+      status: startFrame >= totalFrames ? 'frames_complete' : 'rendering_frames',
+      fingerprint,
+      fps,
+      duration,
+      frameCount,
+      totalFrames,
+      completedFrames: startFrame,
+      updatedAt: new Date().toISOString(),
+    });
     const progressInterval = Math.max(1, Math.min(Math.ceil(totalFrames / 100), fps * 5));
     const renderStarted = Date.now();
-    renderLog(
-      `Frame rendering started: ${totalFrames.toLocaleString()} frames at ${fps} fps, ` +
-      `video duration=${formatDuration(duration)}`,
-    );
+    if (startFrame > 0) {
+      renderLog(
+        `Resuming frame rendering at ${startFrame.toLocaleString()}/${totalFrames.toLocaleString()} ` +
+        `(${(startFrame / totalFrames * 100).toFixed(1)}% already complete)`,
+      );
+    } else {
+      renderLog(
+        `Frame rendering started: ${totalFrames.toLocaleString()} frames at ${fps} fps, ` +
+        `video duration=${formatDuration(duration)}`,
+      );
+    }
 
-    for (let frame = 0; frame <= frameCount; frame++) {
-      await capture(frame / fps, path.join(FRAME_ROOT, `${String(frame).padStart(6, '0')}.png`));
+    for (let frame = startFrame; frame <= frameCount; frame++) {
+      const target = framePath(frame);
+      const temporary = path.join(FRAME_ROOT, `.${String(frame).padStart(6, '0')}.tmp-${process.pid}.png`);
+      await capture(frame / fps, temporary);
+      fs.renameSync(temporary, target);
       const completed = frame + 1;
       if (completed === 1 || completed === totalFrames || completed % progressInterval === 0) {
         const elapsedSeconds = (Date.now() - renderStarted) / 1000;
-        const rate = completed / Math.max(elapsedSeconds, .001);
+        const newlyRendered = completed - startFrame;
+        const rate = newlyRendered / Math.max(elapsedSeconds, .001);
         const remainingSeconds = (totalFrames - completed) / Math.max(rate, .001);
         const percentage = completed / totalFrames * 100;
         renderLog(
@@ -229,6 +332,17 @@ try {
           `(${percentage.toFixed(1)}%); elapsed=${formatDuration(elapsedSeconds)}; ` +
           `speed=${rate.toFixed(2)} frames/s; ETA=${formatDuration(remainingSeconds)}`,
         );
+        writeCheckpoint({
+          version: 1,
+          status: completed === totalFrames ? 'frames_complete' : 'rendering_frames',
+          fingerprint,
+          fps,
+          duration,
+          frameCount,
+          totalFrames,
+          completedFrames: completed,
+          updatedAt: new Date().toISOString(),
+        });
       }
     }
 
@@ -237,6 +351,10 @@ try {
     const audioOutput = path.join(RUN_ROOT, 'final.with-audio.mp4');
     fs.rmSync(audioOutput, {force: true});
     renderLog(`All frames captured in ${formatDuration(frameElapsed)}; starting H.264 video encoding`);
+    writeCheckpoint({
+      version: 1, status: 'encoding', fingerprint, fps, duration, frameCount, totalFrames,
+      completedFrames: totalFrames, updatedAt: new Date().toISOString(),
+    });
     const encodeStarted = Date.now();
     const ffmpeg = spawnSync(
       'ffmpeg',
@@ -299,6 +417,10 @@ try {
       `Rendering completed in ${formatDuration(encodeElapsed)}; audio=${audioAttached ? 'attached' : 'not attached'}; ` +
       `output=${output}; size=${outputSize.toFixed(1)} MB`,
     );
+    writeCheckpoint({
+      version: 1, status: 'rendered', fingerprint, fps, duration, frameCount, totalFrames,
+      completedFrames: totalFrames, output, updatedAt: new Date().toISOString(),
+    });
     process.stdout.write(JSON.stringify({
       status: 'rendered',
       output,

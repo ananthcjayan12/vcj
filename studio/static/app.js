@@ -1,6 +1,7 @@
 const state = {
   dashboard: null,
   runs: [],
+  renderQueue: {entries: [], summary: {}},
   selectedTopicRef: null,
   topicDetail: null,
   activeRunId: null,
@@ -8,6 +9,7 @@ const state = {
   selectedChapterId: null,
   selectedBeatId: null,
   pollTimer: null,
+  queueTimer: null,
   view: "production"
 };
 
@@ -409,13 +411,37 @@ function renderCurriculum() {
 }
 
 function renderRuns() {
-  $("#runs-table").innerHTML = state.runs.map(run => `<article class="run-row-table"><div><strong>${escapeHtml(run.topic)}</strong><small>${escapeHtml(run.id)}</small></div>${statusPill(run.status)}<span>Step ${run.current_step || 0}/8</span><span>${formatDate(run.updated_at)}</span><button class="secondary-button run-open" data-run="${escapeHtml(run.id)}">Open</button></article>`).join("") || `<div class="loading-card">No production runs yet.</div>`;
+  $("#runs-table").innerHTML = state.runs.map(run => {
+    const ready = Number(run.current_step || 0) >= 7 && !activeStatuses.has(run.status);
+    return `<article class="run-row-table"><input type="checkbox" class="render-run-select" value="${escapeHtml(run.id)}" ${ready ? "" : "disabled"} aria-label="Select ${escapeHtml(run.id)} for rendering"><div><strong>${escapeHtml(run.topic)}</strong><small>${escapeHtml(run.id)}</small></div>${statusPill(run.status)}<span>Step ${run.current_step || 0}/8</span><span>${formatDate(run.updated_at)}</span><button class="secondary-button run-open" data-run="${escapeHtml(run.id)}">Open</button></article>`;
+  }).join("") || `<div class="loading-card">No production runs yet.</div>`;
+  const entries = state.renderQueue?.entries || [];
+  $("#render-queue-strip").innerHTML = entries.length
+    ? entries.slice(-12).map(item => `<article class="render-queue-item${item.status === "running" ? " is-running" : ""}"><strong>${escapeHtml(item.run_id)}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(item.settings?.quality || "standard")} · ${Number(item.settings?.fps || 30)} fps</small>${item.error ? `<small>${escapeHtml(item.error)}</small>` : ""}</article>`).join("")
+    : `<span class="artifact-empty">Render queue is empty. Select completed runs below and queue them together.</span>`;
 }
 
 async function refreshRuns() {
-  const payload = await request("/api/runs");
+  const [payload, queuePayload] = await Promise.all([request("/api/runs"), request("/api/render-queue")]);
   state.runs = payload.runs || [];
+  state.renderQueue = queuePayload.queue || {entries: [], summary: {}};
   renderRuns(); renderChrome();
+  const queueActive = (state.renderQueue.entries || []).some(item => ["queued", "running"].includes(item.status));
+  if (queueActive && !state.queueTimer) {
+    state.queueTimer = setInterval(async () => {
+      try {
+        const [runsPayload, nextQueue] = await Promise.all([request("/api/runs"), request("/api/render-queue")]);
+        state.runs = runsPayload.runs || [];
+        state.renderQueue = nextQueue.queue || {entries: [], summary: {}};
+        renderRuns();
+        if (!(state.renderQueue.entries || []).some(item => ["queued", "running"].includes(item.status))) {
+          clearInterval(state.queueTimer); state.queueTimer = null;
+        }
+      } catch { /* Normal active-run polling will surface server errors. */ }
+    }, 2500);
+  } else if (!queueActive && state.queueTimer) {
+    clearInterval(state.queueTimer); state.queueTimer = null;
+  }
 }
 
 function switchViewTo(view) {
@@ -503,6 +529,20 @@ document.addEventListener("click", async event => {
   const runOpen = event.target.closest(".run-open"); if (runOpen) return selectRun(runOpen.dataset.run);
   if (event.target.closest("#refresh-button")) return boot();
   if (event.target.closest("#runs-refresh")) return refreshRuns();
+  if (event.target.closest("#queue-selected-renders")) {
+    const runIds = $$(".render-run-select:checked").map(input => input.value);
+    if (!runIds.length) return showError(new Error("Select at least one completed run to render."));
+    try {
+      const response = await request("/api/render-queue", {
+        method: "POST",
+        body: JSON.stringify({run_ids: runIds, quality: "high", fps: 30, workers: 1})
+      });
+      state.renderQueue = response.queue;
+      renderRuns();
+      toast(`${runIds.length} run${runIds.length === 1 ? "" : "s"} added to the MP4 render queue.`);
+    } catch (error) { showError(error); }
+    return;
+  }
   if (event.target.closest("#prepare-topic-button")) return prepareTopic(event.target.closest("button"));
   if (event.target.closest("#create-run-button")) return createProductionRun(event.target.closest("button"), false);
   if (event.target.closest("#run-refresh")) return selectRun(state.activeRunId, false);
@@ -558,7 +598,7 @@ document.addEventListener("click", async event => {
     return;
   }
   if (event.target.closest("#render-button")) {
-    try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/render`, { method: "POST", body: JSON.stringify({ quality: "high", fps: 30, workers: 1 }) }); state.activeRun = response.run; renderPipeline(); toast("High-quality MP4 render started."); } catch (error) { showError(error); }
+    try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/render`, { method: "POST", body: JSON.stringify({ quality: "high", fps: 30, workers: 1 }) }); state.activeRun = response.run; renderPipeline(); await refreshRuns(); toast("High-quality MP4 added to the render queue. Existing frames will be resumed when available."); } catch (error) { showError(error); }
     return;
   }
   if (event.target.closest(".start-preview")) {

@@ -66,6 +66,7 @@ physics_animation_engine/node_modules/
 template_lab/node_modules/
 template_lab/runs/
 template_lab/renders/
+template_lab/render_queue.json
 video_engine/topics/
 video_engine/output/
 

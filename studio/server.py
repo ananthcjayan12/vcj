@@ -39,6 +39,7 @@ COVERAGE_PATH = CURRICULUM_ROOT / "coverage_registry.json"
 ASSETS_PATH = REGISTRY_ROOT / "animation_assets.json"
 VIDEOS_PATH = REGISTRY_ROOT / "videos.json"
 MODEL_MAP_PATH = TEMPLATE_LAB_ROOT / "prompts" / "prompt_model_mapping.json"
+RENDER_QUEUE_PATH = TEMPLATE_LAB_ROOT / "render_queue.json"
 PROJECT_PYTHON = REPO_ROOT / ".venv" / "bin" / "python3"
 PYTHON_EXECUTABLE = str(PROJECT_PYTHON if PROJECT_PYTHON.exists() else Path(sys.executable))
 
@@ -63,6 +64,9 @@ _process_lock = threading.Lock()
 _preview_process: subprocess.Popen[str] | None = None
 _preview_run_id: str | None = None
 _preview_url: str | None = None
+_render_queue_lock = threading.RLock()
+_render_queue_thread: threading.Thread | None = None
+_render_queue_monitors: set[int] = set()
 
 
 def _now() -> str:
@@ -486,6 +490,7 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "costs/summary.json", "costs/model_usage.json",
         "motion_canvas/manifest.json", "motion_canvas/generation-report.json",
         "motion_canvas/timeline.json",
+        "motion_canvas/render-checkpoint.json",
         "motion_canvas/scenes.ts", "motion_canvas/validation.json",
         "motion_canvas/robot-report.json", "motion_canvas/preview/contact-sheet.png",
         "motion_canvas/final.mp4",
@@ -783,23 +788,220 @@ def execute_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     return _start_process(run_id, command, env, mode="generation", target_step=int(payload.get("stop_after_step", 8)))
 
 
-def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    meta = _load_meta(run_id)
+def _render_settings(payload: dict[str, Any]) -> dict[str, Any]:
     quality = str(payload.get("quality", "standard"))
     fps = int(payload.get("fps", 30))
     workers = int(payload.get("workers", 1))
     if quality not in RENDER_QUALITIES or fps not in {24, 25, 30, 50, 60} or not 1 <= workers <= 8:
         raise ValueError("Invalid render settings")
-    command = [
+    return {"quality": quality, "fps": fps, "workers": workers}
+
+
+def _render_command(run_id: str, settings: dict[str, Any]) -> list[str]:
+    return [
         PYTHON_EXECUTABLE,
         str(TEMPLATE_LAB_ROOT / "scripts" / "mav_render.py"),
         "--run-id", run_id,
-        "--quality", quality,
-        "--fps", str(fps),
-        "--workers", str(workers),
+        "--quality", str(settings["quality"]),
+        "--fps", str(settings["fps"]),
+        "--workers", str(settings["workers"]),
         "--animation-mode", MOTION_CANVAS_MODE,
     ]
-    return _start_process(run_id, command, os.environ.copy(), mode="render", target_step=8)
+
+
+def _read_render_queue() -> dict[str, Any]:
+    payload = _read_json(RENDER_QUEUE_PATH, {}) or {}
+    return {"version": 1, "entries": list(payload.get("entries") or [])}
+
+
+def render_queue_payload() -> dict[str, Any]:
+    with _render_queue_lock:
+        payload = _read_render_queue()
+    payload["summary"] = dict(Counter(str(item.get("status")) for item in payload["entries"]))
+    return payload
+
+
+def _save_render_queue(payload: dict[str, Any]) -> None:
+    _write_json(RENDER_QUEUE_PATH, payload)
+
+
+def _set_queue_entry(entry_id: str, **updates: Any) -> dict[str, Any] | None:
+    with _render_queue_lock:
+        payload = _read_render_queue()
+        entry = next((item for item in payload["entries"] if item.get("id") == entry_id), None)
+        if entry is None:
+            return None
+        entry.update(updates)
+        _save_render_queue(payload)
+        return dict(entry)
+
+
+def _pid_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _finish_external_render(entry_id: str, run_id: str, pid: int) -> None:
+    try:
+        while _pid_is_alive(pid):
+            time.sleep(2)
+        report = _read_json(_run_dir(run_id) / "render_report.json", {}) or {}
+        report_path = _run_dir(run_id) / "render_report.json"
+        output = Path(str(report.get("output") or ""))
+        with _render_queue_lock:
+            entry = next((item for item in _read_render_queue()["entries"] if item.get("id") == entry_id), {})
+        previous_report_mtime = float(entry.get("report_mtime_before") or 0)
+        completed = bool(
+            report and output.is_file() and report_path.exists()
+            and report_path.stat().st_mtime_ns > previous_report_mtime
+        )
+        _set_queue_entry(
+            entry_id,
+            status="completed" if completed else "queued",
+            finished_at=_now() if completed else None,
+            pid=None,
+            error=None if completed else "Renderer stopped before completion; queued for checkpoint resume",
+        )
+        if completed:
+            meta = _load_meta(run_id)
+            meta.update({"status": "rendered", "current_step": max(int(meta.get("current_step", 0)), 8), "error": None})
+            _save_meta(meta)
+    finally:
+        with _render_queue_lock:
+            _render_queue_monitors.discard(pid)
+        _ensure_render_queue_worker()
+
+
+def _render_queue_worker() -> None:
+    global _render_queue_thread
+    try:
+        while True:
+            with _render_queue_lock:
+                payload = _read_render_queue()
+                if any(item.get("status") == "running" for item in payload["entries"]):
+                    return
+                entry = next((item for item in payload["entries"] if item.get("status") == "queued"), None)
+                if entry is None:
+                    return
+                entry.update({"status": "running", "started_at": _now(), "finished_at": None, "error": None})
+                _save_render_queue(payload)
+                entry = dict(entry)
+            run_id = str(entry["run_id"])
+            command = _render_command(run_id, dict(entry["settings"]))
+            process: subprocess.Popen[str] | None = None
+            try:
+                meta = _load_meta(run_id)
+                meta.update({"status": "rendering", "error": None})
+                _save_meta(meta)
+                _append_log(run_id, f"Starting queued render: {' '.join(command[:3])} …")
+                report_path = _run_dir(run_id) / "render_report.json"
+                _set_queue_entry(
+                    str(entry["id"]),
+                    report_mtime_before=report_path.stat().st_mtime_ns if report_path.exists() else 0,
+                )
+                process = subprocess.Popen(
+                    command, cwd=REPO_ROOT, env=os.environ.copy(), stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True, bufsize=1,
+                )
+                with _process_lock:
+                    _processes[run_id] = process
+                _set_queue_entry(str(entry["id"]), pid=process.pid)
+                assert process.stdout is not None
+                for line in process.stdout:
+                    _append_log(run_id, line)
+                return_code = process.wait()
+                latest = _load_meta(run_id)
+                if return_code == 0:
+                    latest.update({"status": "rendered", "current_step": max(int(latest.get("current_step", 0)), 8), "error": None})
+                    _set_queue_entry(str(entry["id"]), status="completed", finished_at=_now(), pid=None, error=None)
+                    _append_log(run_id, "Queued render completed")
+                elif latest.get("status") == "stopped":
+                    _set_queue_entry(str(entry["id"]), status="paused", finished_at=_now(), pid=None, error="Stopped by user; requeue to resume")
+                else:
+                    latest.update({"status": "failed", "error": f"Render exited with code {return_code}; retry resumes saved frames"})
+                    _set_queue_entry(str(entry["id"]), status="failed", finished_at=_now(), pid=None, error=latest["error"])
+                    _append_log(run_id, latest["error"])
+                _save_meta(latest)
+            except Exception as exc:  # noqa: BLE001
+                latest = _load_meta(run_id)
+                latest.update({"status": "failed", "error": str(exc)})
+                _save_meta(latest)
+                _set_queue_entry(str(entry["id"]), status="failed", finished_at=_now(), pid=None, error=str(exc))
+                _append_log(run_id, f"Queued render failed: {exc}")
+            finally:
+                with _process_lock:
+                    if _processes.get(run_id) is process:
+                        _processes.pop(run_id, None)
+    finally:
+        with _render_queue_lock:
+            _render_queue_thread = None
+
+
+def _ensure_render_queue_worker() -> None:
+    global _render_queue_thread
+    with _render_queue_lock:
+        payload = _read_render_queue()
+        running = [item for item in payload["entries"] if item.get("status") == "running"]
+        for entry in running:
+            pid = int(entry.get("pid") or 0)
+            if pid and _pid_is_alive(pid):
+                if pid not in _render_queue_monitors:
+                    _render_queue_monitors.add(pid)
+                    threading.Thread(
+                        target=_finish_external_render,
+                        args=(str(entry["id"]), str(entry["run_id"]), pid),
+                        daemon=True,
+                        name=f"render-monitor-{pid}",
+                    ).start()
+                return
+            entry.update({"status": "queued", "pid": None, "error": "Resuming after interrupted Studio session"})
+            _save_render_queue(payload)
+        if _render_queue_thread and _render_queue_thread.is_alive():
+            return
+        if not any(item.get("status") == "queued" for item in payload["entries"]):
+            return
+        _render_queue_thread = threading.Thread(target=_render_queue_worker, daemon=True, name="studio-render-queue")
+        _render_queue_thread.start()
+
+
+def enqueue_render_runs(run_ids: list[str], payload: dict[str, Any]) -> dict[str, Any]:
+    settings = _render_settings(payload)
+    requested = list(dict.fromkeys(_require_run_id(str(run_id)) for run_id in run_ids))
+    if not requested or len(requested) > 20:
+        raise ValueError("Select between 1 and 20 runs for the render queue")
+    with _render_queue_lock:
+        queue = _read_render_queue()
+        active_ids = {str(item.get("run_id")) for item in queue["entries"] if item.get("status") in {"queued", "running"}}
+        for run_id in requested:
+            meta = _load_meta(run_id)
+            if int(meta.get("current_step", 0)) < 7:
+                raise RuntimeError(f"{run_id} must complete preview/QA before MP4 rendering")
+            if run_id in active_ids:
+                continue
+            queue["entries"].append({
+                "id": f"render-{run_id}-{time.time_ns()}",
+                "run_id": run_id,
+                "topic": meta.get("topic"),
+                "status": "queued",
+                "settings": dict(settings),
+                "queued_at": _now(),
+                "started_at": None,
+                "finished_at": None,
+                "pid": None,
+                "error": None,
+            })
+            active_ids.add(run_id)
+        _save_render_queue(queue)
+    _ensure_render_queue_worker()
+    return render_queue_payload()
+
+
+def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    enqueue_render_runs([run_id], payload)
+    return run_detail(run_id)
 
 
 def regenerate_motion_chapter(run_id: str, chapter_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -925,6 +1127,15 @@ def stop_run(run_id: str) -> dict[str, Any]:
         if process and process.poll() is None:
             process.terminate()
     meta.update({"status": "stopped", "error": None})
+    with _render_queue_lock:
+        queue = _read_render_queue()
+        changed = False
+        for entry in queue["entries"]:
+            if entry.get("run_id") == run_id and entry.get("status") == "queued":
+                entry.update({"status": "paused", "finished_at": _now(), "error": "Stopped before rendering started"})
+                changed = True
+        if changed:
+            _save_render_queue(queue)
     _append_log(run_id, "Stop requested")
     return _save_meta(meta)
 
@@ -939,6 +1150,10 @@ def delete_run(run_id: str) -> dict[str, Any]:
         if process and process.poll() is None:
             raise RuntimeError("Stop the active process before deleting this run")
         _processes.pop(run_id, None)
+    with _render_queue_lock:
+        queue = _read_render_queue()
+        queue["entries"] = [item for item in queue["entries"] if item.get("run_id") != run_id]
+        _save_render_queue(queue)
     shutil.rmtree(run_path)
     return {"status": "deleted", "run_id": run_id}
 
@@ -1115,6 +1330,8 @@ class StudioHandler(BaseHTTPRequestHandler):
                 return self._json(_read_json(ASSETS_PATH, {"scenes": []}))
             if path == "/api/runs":
                 return self._json({"runs": list_runs()})
+            if path == "/api/render-queue":
+                return self._json({"queue": render_queue_payload()})
             if path == "/api/model-map":
                 return self._json(model_map_payload())
             match = re.fullmatch(r"/api/topics/([^/]+)", path)
@@ -1153,6 +1370,9 @@ class StudioHandler(BaseHTTPRequestHandler):
             body = self._body()
             if path == "/api/runs":
                 return self._json({"run": create_run(body)}, 201)
+            if path == "/api/render-queue":
+                queue = enqueue_render_runs(list(body.get("run_ids") or []), body)
+                return self._json({"queue": queue}, 202)
             match = re.fullmatch(r"/api/topics/([^/]+)/prepare", path)
             if match:
                 return self._json(_prepare_topic(match.group(1), bool(body.get("force"))))
@@ -1226,6 +1446,7 @@ def main() -> int:
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
     server = build_server(args.host, args.port, quiet=args.quiet)
+    _ensure_render_queue_worker()
     print(f"Physics Production Studio: http://{args.host}:{args.port}")
     try:
         server.serve_forever()
