@@ -5,3 +5,4 @@ __pycache__/
 runs/
 project/module_runtime/
 renders/
+/archived_reel_runs_*

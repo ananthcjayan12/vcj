@@ -3,6 +3,7 @@ const state = {
   runs: [],
   renderQueue: {entries: [], summary: {}},
   reels: {lessons: [], reel_count: 0},
+  reelLogs: {},
   modelMap: {tasks: []},
   selectedTopicRef: null,
   topicDetail: null,
@@ -203,6 +204,7 @@ async function boot() {
     state.renderQueue = await hydrateRenderQueueLogs(queuePayload.queue || {entries: [], summary: {}});
     state.reels = reelsPayload;
     state.modelMap = modelMap;
+    await hydrateReelLogs();
     state.selectedTopicRef = state.selectedTopicRef || dashboard.next_topic?.ref || dashboard.topics?.[0]?.ref;
     renderChrome();
     renderDashboard();
@@ -276,6 +278,7 @@ function reelTaskModels() {
 
 async function refreshReels() {
   state.reels = await request("/api/reels");
+  await hydrateReelLogs();
   renderReels();
   manageReelPolling();
 }
@@ -302,6 +305,18 @@ function renderReels() {
   }).join("") || `<div class="loading-card">Complete a lesson narration to make it eligible for native Reel creation.</div>`;
 }
 
+async function hydrateReelLogs() {
+  const runs = (state.reels?.lessons || []).flatMap(group => group.children || []);
+  await Promise.all(runs.map(async run => {
+    try {
+      const payload = await request(`/api/runs/${encodeURIComponent(run.id)}/logs`);
+      state.reelLogs[run.id] = payload.log || "";
+    } catch {
+      state.reelLogs[run.id] = state.reelLogs[run.id] || "";
+    }
+  }));
+}
+
 function reelRunMarkup(run) {
   const artifacts = run.artifacts || {};
   const narration = artifacts.reel_narration || {};
@@ -312,12 +327,14 @@ function reelRunMarkup(run) {
   const units = artifacts.chapters || [];
   const finalUnit = units[units.length - 1] || {};
   const verticalPreviewUrl = artifacts.preview_url ? chapterPlayerUrl(artifacts.preview_url, {scene_id: "reel", absolute_start: 0, absolute_end: finalUnit.absolute_end || 0, render_absolute_start: 0, render_absolute_end: finalUnit.render_absolute_end || finalUnit.absolute_end || 0}) : null;
+  const logLines = String(state.reelLogs[run.id] || "").split(/\r?\n/).slice(-80).join("\n");
   return `<section class="reel-run-card" data-reel-run="${escapeHtml(run.id)}">
     <div class="reel-phone">${artifacts.mp4_url ? `<video controls playsinline src="${escapeHtml(artifacts.mp4_url)}"></video>` : verticalPreviewUrl ? `<iframe src="${escapeHtml(verticalPreviewUrl)}" title="Live portrait Reel preview" allow="autoplay"></iframe>` : artifacts.shot_contact_sheet_url ? `<img src="${escapeHtml(artifacts.shot_contact_sheet_url)}" alt="Portrait shot contact sheet">` : `<div><strong>9:16</strong><span>1080 × 1920</span></div>`}</div>
     <div class="reel-run-copy"><header><div><p class="eyebrow">Linked Reel · ${statusPill(run.status)}</p><h3>${escapeHtml(artifacts.reel_candidate?.title || run.topic)}</h3><small>${escapeHtml(run.id)} · step ${run.current_step || 0}/8</small></div></header>
       ${artifacts.reel_treatment?.treatment ? `<p class="reel-treatment">${escapeHtml(artifacts.reel_treatment.treatment)}</p>` : ""}
       ${narrationText ? `<details open><summary>Fast Reel narration · ${Number(narration.spoken_word_count || 0)} words</summary><p>${escapeHtml(narrationText)}</p>${artifacts.files?.includes("voiceover.mp3") ? `<audio controls src="${artifactUrl(run.id, "voiceover.mp3")}"></audio>` : ""}<div class="button-row"><button class="secondary-button reel-edit-script" data-reel-run="${escapeHtml(run.id)}">Edit script</button><button class="secondary-button reel-regenerate-script" data-reel-run="${escapeHtml(run.id)}">Regenerate with instruction</button></div></details>` : ""}
       ${shots.length ? `<details><summary>Portrait shot plan · ${shots.length} shots</summary><div class="reel-shot-list">${shots.map(shot => `<article><strong>${escapeHtml(shot.id)}</strong><p>${escapeHtml(shot.description)}</p><div class="button-row"><button class="secondary-button reel-edit-shot" data-reel-run="${escapeHtml(run.id)}" data-shot-id="${escapeHtml(shot.id)}">Edit</button><button class="secondary-button reel-regenerate-shot" data-reel-run="${escapeHtml(run.id)}" data-shot-id="${escapeHtml(shot.id)}">Regenerate</button></div></article>`).join("")}</div><button class="secondary-button reel-regenerate-plan" data-reel-run="${escapeHtml(run.id)}">Regenerate all with instruction</button></details>` : ""}
+      <details class="reel-log-panel" ${working || run.status === "failed" ? "open" : ""}><summary>Live logs</summary><pre class="reel-live-log">${escapeHtml(logLines || "No process output yet.")}</pre></details>
       <div class="button-row"><button class="primary-button reel-generate" data-reel-run="${escapeHtml(run.id)}" data-from-step="${next}" ${working || next > 8 ? "disabled" : ""}>${next > 8 ? "Generation complete" : `Run step ${next}`}</button><button class="secondary-button reel-generate-all" data-reel-run="${escapeHtml(run.id)}" data-from-step="${next}" ${working || next > 8 ? "disabled" : ""}>Resume to preview</button><button class="secondary-button reel-preview" data-reel-run="${escapeHtml(run.id)}" ${working || Number(run.current_step || 0) < 8 ? "disabled" : ""}>Open vertical preview</button><button class="secondary-button reel-render" data-reel-run="${escapeHtml(run.id)}" ${working || Number(run.current_step || 0) < 8 ? "disabled" : ""}>Render 1080×1920</button></div>
     </div>
   </section>`;

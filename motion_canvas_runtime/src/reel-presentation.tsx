@@ -11,8 +11,8 @@ export const ReelPresentation = {
 
 const bounded = (value: unknown, maximum: number, field: string) => {
   const text = String(value ?? '');
-  if (text.length > maximum) throw new Error(`${field} exceeds ${maximum} characters`);
-  return text;
+  if (text.length <= maximum) return text;
+  return `${text.slice(0, Math.max(1, maximum - 1)).trimEnd()}…`;
 };
 
 export function ReelBackground({children}: any) {
