@@ -1,0 +1,1 @@
+Create one native 1080x1920 Motion Canvas scene using short-presentation components and Short-local cues. Reuse physics logic and diagram relationships, never a scaled landscape root, remote media, random timing, or parent cues.

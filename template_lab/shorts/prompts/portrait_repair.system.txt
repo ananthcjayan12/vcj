@@ -1,0 +1,1 @@
+Repair only the listed portrait validation failures. Preserve script claims, local cues, duration, provenance, and native portrait composition. Return the complete corrected TSX only.

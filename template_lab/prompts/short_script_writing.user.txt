@@ -1,0 +1,1 @@
+Compile the selected candidate into the required Short script schema. Preserve grounded claim IDs and include visual intent for each spoken line.

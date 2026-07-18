@@ -22,6 +22,7 @@ from urllib.parse import quote, unquote, urlparse
 from urllib.request import urlopen
 
 from video_engine.cli import TOPIC_ORDER, VALID_STATES
+from template_lab.shorts.pipeline import ShortsPipeline
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -64,6 +65,9 @@ _process_lock = threading.Lock()
 _preview_process: subprocess.Popen[str] | None = None
 _preview_run_id: str | None = None
 _preview_url: str | None = None
+_short_preview_process: subprocess.Popen[str] | None = None
+_short_preview_key: str | None = None
+_short_preview_url: str | None = None
 _render_queue_lock = threading.RLock()
 _render_queue_thread: threading.Thread | None = None
 _render_queue_monitors: set[int] = set()
@@ -71,6 +75,226 @@ _render_queue_monitors: set[int] = set()
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _shorts_pipeline(run_id: str) -> ShortsPipeline:
+    return ShortsPipeline(RUNS_ROOT, _require_run_id(run_id))
+
+
+def _short_process_key(run_id: str, short_id: str) -> str:
+    return f"{run_id}:short:{short_id}"
+
+
+def _process_running(key: str) -> bool:
+    with _process_lock:
+        process = _processes.get(key)
+        return bool(process and process.poll() is None)
+
+
+def _read_tail(path: Path, limit: int = 120_000) -> str:
+    if not path.is_file():
+        return ""
+    data = path.read_text(encoding="utf-8", errors="replace")
+    return data[-limit:] if len(data) > limit else data
+
+
+def shorts_list(run_id: str) -> dict[str, Any]:
+    pipeline = _shorts_pipeline(run_id)
+    registry = _read_json(pipeline.shorts / "shorts_registry.json", {"version": "1.0", "parent_run_id": run_id, "shorts": []})
+    model_map = model_map_payload()
+    tasks = [item for item in model_map.get("tasks", []) if str(item.get("task", "")).startswith("short_")]
+    usage = (_read_json(_run_dir(run_id) / "costs/model_usage.json", {}) or {}).get("records", [])
+    short_records = [item for item in usage if str(item.get("task", "")).startswith("short_")]
+    short_cost = {
+        "calls": len(short_records),
+        "input_tokens": sum(int(x.get("input_tokens") or 0) for x in short_records),
+        "output_tokens": sum(int(x.get("output_tokens") or 0) for x in short_records),
+        "total_tokens": sum(int(x.get("total_tokens") or 0) for x in short_records),
+        "estimated_cost_usd": round(sum(float(x.get("estimated_cost_usd") or 0) for x in short_records), 6),
+        "records": short_records,
+    }
+    shorts: list[dict[str, Any]] = []
+    for item in registry.get("shorts", []):
+        short_id = str(item.get("short_id") or "")
+        if not short_id or not (pipeline.shorts / short_id).is_dir():
+            continue
+        detail = pipeline.detail(short_id)
+        run_meta = detail.get("run") or {}
+        key = _short_process_key(run_id, short_id)
+        run_meta["process_active"] = _process_running(key)
+        if run_meta["process_active"] and run_meta.get("status") not in {"running", "rendering"}:
+            run_meta["status"] = "running"
+        preview_key = f"{run_id}:{short_id}"
+        detail["preview_url"] = (
+            _short_preview_url
+            if _short_preview_key == preview_key and _short_preview_process and _short_preview_process.poll() is None
+            else None
+        )
+        detail["run"] = run_meta
+        shorts.append(detail)
+    return {
+        "parent_run_id": run_id,
+        "registry": registry,
+        "shorts": shorts,
+        "candidates": _read_json(pipeline.shorts / "candidates.json", {"candidates": []}),
+        "models": {"tasks": tasks, "selections": _read_json(pipeline.shorts / "models.json", {}) or {}},
+        "cost_summary": short_cost,
+        "analysis_estimate": pipeline.analysis_estimate(),
+        "analysis_log": _read_tail(pipeline.shorts / "shorts.log"),
+        "analysis_process_active": _process_running(f"{run_id}:shorts-analyze"),
+    }
+
+
+def delete_short(run_id: str, short_id: str) -> dict[str, Any]:
+    pipeline = _shorts_pipeline(run_id)
+    root = pipeline.shorts / short_id
+    if not re.fullmatch(r"short_[a-zA-Z0-9_-]+", short_id) or not root.is_dir():
+        raise FileNotFoundError(short_id)
+    key = _short_process_key(run_id, short_id)
+    with _process_lock:
+        process = _processes.get(key)
+        if process and process.poll() is None:
+            raise RuntimeError("Stop the Short process before deleting it")
+    shutil.rmtree(root)
+    registry_path = pipeline.shorts / "shorts_registry.json"
+    registry = _read_json(registry_path, {"version": "1.0", "parent_run_id": run_id, "shorts": []})
+    registry["shorts"] = [x for x in registry["shorts"] if x.get("short_id") != short_id]
+    _write_json(registry_path, registry)
+    return {"deleted": short_id, "parent_run_id": run_id}
+
+
+def start_short_action(run_id: str, short_id: str, action: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    pipeline = _shorts_pipeline(run_id)
+    pipeline.detail(short_id)
+    key = _short_process_key(run_id, short_id)
+    with _process_lock:
+        current = _processes.get(key)
+        if current and current.poll() is None:
+            raise RuntimeError("Short already has a running process")
+        command = [
+            PYTHON_EXECUTABLE,
+            str(TEMPLATE_LAB_ROOT / "scripts/mav_shorts.py"),
+            action,
+            "--parent-run-id",
+            run_id,
+            "--short-id",
+            short_id,
+        ]
+        if action == "generate":
+            body = payload or {}
+            command += [
+                "--from-step",
+                str(body.get("from_step", 1)),
+                "--stop-after-step",
+                str(body.get("stop_after_step", 7)),
+                "--confirm-paid-api",
+            ]
+            for name in ("script", "audio", "visual", "captions", "render"):
+                if body.get(f"force_{name}"):
+                    command.append(f"--force-{name}")
+        log_path = pipeline.shorts / short_id / "short.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_stream = log_path.open("a", encoding="utf-8")
+        process = subprocess.Popen(command, cwd=REPO_ROOT, stdout=log_stream, stderr=subprocess.STDOUT, text=True)
+        _processes[key] = process
+    if action == "generate":
+        pipeline._state(short_id, step=int((payload or {}).get("from_step") or 4), status="running")
+    return {"status": f"{action}_started", "pid": process.pid, "short_id": short_id}
+
+
+def start_shorts_analyze(run_id: str) -> dict[str, Any]:
+    pipeline = _shorts_pipeline(run_id)
+    key = f"{run_id}:shorts-analyze"
+    with _process_lock:
+        current = _processes.get(key)
+        if current and current.poll() is None:
+            raise RuntimeError("Short analysis is already running")
+        command = [
+            PYTHON_EXECUTABLE,
+            str(TEMPLATE_LAB_ROOT / "scripts/mav_shorts.py"),
+            "analyze",
+            "--parent-run-id",
+            run_id,
+            "--confirm-paid-api",
+        ]
+        log_path = pipeline.shorts / "shorts.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_stream = log_path.open("a", encoding="utf-8")
+        process = subprocess.Popen(command, cwd=REPO_ROOT, stdout=log_stream, stderr=subprocess.STDOUT, text=True)
+        _processes[key] = process
+    return {"status": "analyze_started", "pid": process.pid, "parent_run_id": run_id}
+
+
+def stop_short(run_id: str, short_id: str) -> dict[str, Any]:
+    key = _short_process_key(_require_run_id(run_id), short_id)
+    with _process_lock:
+        process = _processes.get(key)
+    if process and process.poll() is None:
+        process.terminate()
+    return {"status": "stopped", "short_id": short_id}
+
+
+def start_short_preview(run_id: str, short_id: str) -> dict[str, Any]:
+    """Serve a live Motion Canvas editor for one portrait Short (no MP4 render)."""
+    global _short_preview_process, _short_preview_key, _short_preview_url
+    pipeline = _shorts_pipeline(run_id)
+    detail = pipeline.detail(short_id)
+    root = pipeline.shorts / short_id
+    step = int((detail.get("run") or {}).get("current_step") or 0)
+    if step < 7:
+        raise RuntimeError("Generate the Short through portrait visuals (step 7) before preview")
+    tsx = root / "motion_canvas" / f"{short_id}.tsx"
+    if not tsx.is_file():
+        raise RuntimeError(f"Missing portrait scene: {tsx.name}")
+    if str(TEMPLATE_LAB_ROOT) not in sys.path:
+        sys.path.insert(0, str(TEMPLATE_LAB_ROOT))
+    from motion_canvas.pipeline import RUNTIME_ROOT, _modern_node_bin
+    from shorts.rendering import install_short_runtime
+
+    preview_key = f"{run_id}:{short_id}"
+    with _process_lock:
+        if _short_preview_process and _short_preview_process.poll() is None:
+            if _short_preview_key == preview_key and _short_preview_url:
+                return {"status": "running", "url": _short_preview_url, "short_id": short_id}
+            _short_preview_process.terminate()
+            try:
+                _short_preview_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                _short_preview_process.kill()
+        install_short_runtime(root)
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = int(probe.getsockname()[1])
+        env = os.environ.copy()
+        node_bin = _modern_node_bin()
+        if node_bin:
+            env["PATH"] = str(node_bin) + os.pathsep + env.get("PATH", "")
+        env["MAV_MOTION_RUN_ROOT"] = str((root / "motion_canvas").resolve())
+        log_path = root / "motion_canvas" / "preview-server.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as log_handle:
+            _short_preview_process = subprocess.Popen(
+                ["npm", "run", "serve", "--", "--port", str(port)],
+                cwd=RUNTIME_ROOT,
+                env=env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        _short_preview_key = preview_key
+        _short_preview_url = f"http://127.0.0.1:{port}/"
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if _short_preview_process.poll() is not None:
+            tail = _read_tail(log_path, 2000)
+            raise RuntimeError(f"Short preview failed to start:\n{tail}")
+        try:
+            with urlopen(_short_preview_url, timeout=1) as response:  # noqa: S310 - fixed localhost URL
+                if response.status == 200:
+                    return {"status": "running", "url": _short_preview_url, "short_id": short_id}
+        except OSError:
+            time.sleep(0.25)
+    raise RuntimeError(f"Short preview did not become ready. See {log_path}")
 
 
 def _read_json(path: Path, default: Any = None) -> Any:
@@ -105,9 +329,19 @@ def _run_dir(run_id: str) -> Path:
 def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
     tasks = []
-    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair"}
-    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5, "short_candidate_analysis": 1, "short_script_writing": 2, "short_motion_canvas_adapter": 6, "short_motion_canvas_repair": 7}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair", "short_candidate_analysis": "Short candidate analyzer", "short_script_writing": "Short script writer", "short_motion_canvas_adapter": "Portrait scene adapter", "short_motion_canvas_repair": "Portrait scene repair"}
+    retained_tasks = {
+        "script_structure",
+        "script_writing",
+        "motion_canvas_batch",
+        "motion_canvas_repair",
+        "short_candidate_analysis",
+        "short_script_writing",
+        "short_motion_canvas_adapter",
+        "short_motion_canvas_repair",
+    }
+    # Lesson model map stays lesson-only; Shorts model map is filtered in shorts_list().
     for task, config in payload.get("tasks", {}).items():
         if task not in retained_tasks:
             continue
@@ -118,7 +352,7 @@ def model_map_payload() -> dict[str, Any]:
             provider: list(configured_options.get(provider) or [model])
             for provider, model in provider_models.items()
         }
-        if task in {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}:
+        if task in retained_tasks:
             provider_models["codex"] = CODEX_MODELS[0]
             provider_model_options["codex"] = list(CODEX_MODELS)
         tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "reasoning_efforts": list(CODEX_REASONING_EFFORTS), "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
@@ -522,7 +756,11 @@ def run_detail(run_id: str) -> dict[str, Any]:
     meta = _load_meta(run_id)
     meta["current_step"] = max(int(meta.get("current_step", 0)), _infer_step(_run_dir(run_id)))
     meta["artifacts"] = _artifact_snapshot(run_id)
-    meta["model_map"] = model_map_payload()
+    full_map = model_map_payload()
+    meta["model_map"] = {
+        **full_map,
+        "tasks": [item for item in full_map.get("tasks", []) if not str(item.get("task", "")).startswith("short_")],
+    }
     with _process_lock:
         process = _processes.get(run_id)
         meta["process_active"] = bool(process and process.poll() is None)
@@ -848,11 +1086,11 @@ def _finish_external_render(entry_id: str, run_id: str, pid: int) -> None:
     try:
         while _pid_is_alive(pid):
             time.sleep(2)
-        report = _read_json(_run_dir(run_id) / "render_report.json", {}) or {}
-        report_path = _run_dir(run_id) / "render_report.json"
-        output = Path(str(report.get("output") or ""))
         with _render_queue_lock:
             entry = next((item for item in _read_render_queue()["entries"] if item.get("id") == entry_id), {})
+        is_short = entry.get("type") == "short"; short_id = str(entry.get("short_id") or "")
+        report_path = (_run_dir(run_id)/"shorts"/short_id/"motion_canvas/render-report.json") if is_short else (_run_dir(run_id)/"render_report.json")
+        report = _read_json(report_path, {}) or {}; output = Path(str(report.get("output") or ""))
         previous_report_mtime = float(entry.get("report_mtime_before") or 0)
         completed = bool(
             report and output.is_file() and report_path.exists()
@@ -865,7 +1103,7 @@ def _finish_external_render(entry_id: str, run_id: str, pid: int) -> None:
             pid=None,
             error=None if completed else "Renderer stopped before completion; queued for checkpoint resume",
         )
-        if completed:
+        if completed and not is_short:
             meta = _load_meta(run_id)
             meta.update({"status": "rendered", "current_step": max(int(meta.get("current_step", 0)), 8), "error": None})
             _save_meta(meta)
@@ -890,14 +1128,17 @@ def _render_queue_worker() -> None:
                 _save_render_queue(payload)
                 entry = dict(entry)
             run_id = str(entry["run_id"])
-            command = _render_command(run_id, dict(entry["settings"]))
+            is_short = entry.get("type") == "short"
+            short_id = str(entry.get("short_id") or "")
+            command = ([PYTHON_EXECUTABLE, str(TEMPLATE_LAB_ROOT / "scripts/mav_shorts.py"), "render", "--parent-run-id", run_id, "--short-id", short_id]
+                       if is_short else _render_command(run_id, dict(entry["settings"])))
             process: subprocess.Popen[str] | None = None
             try:
                 meta = _load_meta(run_id)
-                meta.update({"status": "rendering", "error": None})
-                _save_meta(meta)
+                if not is_short:
+                    meta.update({"status": "rendering", "error": None}); _save_meta(meta)
                 _append_log(run_id, f"Starting queued render: {' '.join(command[:3])} …")
-                report_path = _run_dir(run_id) / "render_report.json"
+                report_path = (_run_dir(run_id) / "shorts" / short_id / "motion_canvas" / "render-report.json") if is_short else (_run_dir(run_id) / "render_report.json")
                 _set_queue_entry(
                     str(entry["id"]),
                     report_mtime_before=report_path.stat().st_mtime_ns if report_path.exists() else 0,
@@ -907,7 +1148,7 @@ def _render_queue_worker() -> None:
                     stderr=subprocess.STDOUT, text=True, bufsize=1,
                 )
                 with _process_lock:
-                    _processes[run_id] = process
+                    _processes[f"{run_id}:short:{short_id}" if is_short else run_id] = process
                 _set_queue_entry(str(entry["id"]), pid=process.pid)
                 assert process.stdout is not None
                 for line in process.stdout:
@@ -915,26 +1156,29 @@ def _render_queue_worker() -> None:
                 return_code = process.wait()
                 latest = _load_meta(run_id)
                 if return_code == 0:
-                    latest.update({"status": "rendered", "current_step": max(int(latest.get("current_step", 0)), 8), "error": None})
+                    if not is_short: latest.update({"status": "rendered", "current_step": max(int(latest.get("current_step", 0)), 8), "error": None})
+                    else: _shorts_pipeline(run_id)._state(short_id, step=9, status="rendered")
                     _set_queue_entry(str(entry["id"]), status="completed", finished_at=_now(), pid=None, error=None)
                     _append_log(run_id, "Queued render completed")
                 elif latest.get("status") == "stopped":
                     _set_queue_entry(str(entry["id"]), status="paused", finished_at=_now(), pid=None, error="Stopped by user; requeue to resume")
                 else:
-                    latest.update({"status": "failed", "error": f"Render exited with code {return_code}; retry resumes saved frames"})
-                    _set_queue_entry(str(entry["id"]), status="failed", finished_at=_now(), pid=None, error=latest["error"])
-                    _append_log(run_id, latest["error"])
-                _save_meta(latest)
+                    error = f"Render exited with code {return_code}; retry resumes saved frames"
+                    if not is_short: latest.update({"status": "failed", "error": error})
+                    else: _shorts_pipeline(run_id)._state(short_id, step=int(_shorts_pipeline(run_id).detail(short_id)["run"].get("current_step", 0)), status="failed", error=error)
+                    _set_queue_entry(str(entry["id"]), status="failed", finished_at=_now(), pid=None, error=error)
+                    _append_log(run_id, error)
+                if not is_short: _save_meta(latest)
             except Exception as exc:  # noqa: BLE001
                 latest = _load_meta(run_id)
-                latest.update({"status": "failed", "error": str(exc)})
-                _save_meta(latest)
+                if not is_short: latest.update({"status": "failed", "error": str(exc)}); _save_meta(latest)
+                else: _shorts_pipeline(run_id)._state(short_id, step=int(_shorts_pipeline(run_id).detail(short_id)["run"].get("current_step", 0)), status="failed", error=str(exc))
                 _set_queue_entry(str(entry["id"]), status="failed", finished_at=_now(), pid=None, error=str(exc))
                 _append_log(run_id, f"Queued render failed: {exc}")
             finally:
                 with _process_lock:
-                    if _processes.get(run_id) is process:
-                        _processes.pop(run_id, None)
+                    process_key = f"{run_id}:short:{short_id}" if is_short else run_id
+                    if _processes.get(process_key) is process: _processes.pop(process_key, None)
     finally:
         with _render_queue_lock:
             _render_queue_thread = None
@@ -983,6 +1227,7 @@ def enqueue_render_runs(run_ids: list[str], payload: dict[str, Any]) -> dict[str
                 continue
             queue["entries"].append({
                 "id": f"render-{run_id}-{time.time_ns()}",
+                "type": "lesson",
                 "run_id": run_id,
                 "topic": meta.get("topic"),
                 "status": "queued",
@@ -997,6 +1242,19 @@ def enqueue_render_runs(run_ids: list[str], payload: dict[str, Any]) -> dict[str
         _save_render_queue(queue)
     _ensure_render_queue_worker()
     return render_queue_payload()
+
+
+def enqueue_short_render(run_id: str, short_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    settings = _render_settings(payload); pipeline = _shorts_pipeline(run_id); detail = pipeline.detail(short_id)
+    if int(detail["run"].get("current_step", 0)) < 7: raise RuntimeError("Short must pass portrait validation before rendering")
+    with _render_queue_lock:
+        queue = _read_render_queue()
+        if not any(x.get("type") == "short" and x.get("run_id") == run_id and x.get("short_id") == short_id and x.get("status") in {"queued", "running"} for x in queue["entries"]):
+            queue["entries"].append({"id": f"render-short-{run_id}-{short_id}-{time.time_ns()}", "type": "short", "run_id": run_id,
+                "short_id": short_id, "topic": detail["script"].get("title"), "status": "queued", "settings": settings, "queued_at": _now(),
+                "started_at": None, "finished_at": None, "pid": None, "error": None})
+            _save_render_queue(queue)
+    _ensure_render_queue_worker(); return render_queue_payload()
 
 
 def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1342,6 +1600,37 @@ class StudioHandler(BaseHTTPRequestHandler):
                 run_id = _require_run_id(match.group(1))
                 log = _log_path(run_id).read_text(encoding="utf-8") if _log_path(run_id).exists() else ""
                 return self._json({"log": log[-80_000:]})
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/candidates", path)
+            if match:
+                pipeline = _shorts_pipeline(match.group(1))
+                return self._json({"candidates": _read_json(pipeline.shorts / "candidates.json", {"candidates": []})})
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/logs", path)
+            if match:
+                run_id = match.group(1)
+                pipeline = _shorts_pipeline(run_id)
+                return self._json({
+                    "log": _read_tail(pipeline.shorts / "shorts.log"),
+                    "process_active": _process_running(f"{run_id}:shorts-analyze"),
+                })
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/([^/]+)/logs", path)
+            if match:
+                run_id, short_id = match.group(1), match.group(2)
+                pipeline = _shorts_pipeline(run_id)
+                return self._json({
+                    "log": _read_tail(pipeline.shorts / short_id / "short.log"),
+                    "process_active": _process_running(_short_process_key(run_id, short_id)),
+                    "short_id": short_id,
+                })
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/([^/]+)", path)
+            if match:
+                payload = shorts_list(match.group(1))
+                short = next((item for item in payload["shorts"] if item.get("run", {}).get("short_id") == match.group(2)), None)
+                if short is None:
+                    raise FileNotFoundError(match.group(2))
+                return self._json({"short": short})
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts", path)
+            if match:
+                return self._json(shorts_list(match.group(1)))
             match = re.fullmatch(r"/api/runs/([^/]+)", path)
             if match:
                 return self._json({"run": run_detail(match.group(1))})
@@ -1373,6 +1662,55 @@ class StudioHandler(BaseHTTPRequestHandler):
             if path == "/api/render-queue":
                 queue = enqueue_render_runs(list(body.get("run_ids") or []), body)
                 return self._json({"queue": queue}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/analyze", path)
+            if match:
+                if not body.get("confirm_paid_api"):
+                    raise PermissionError("Short analysis requires explicit paid-API confirmation")
+                return self._json(start_shorts_analyze(match.group(1)), 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/models", path)
+            if match:
+                pipeline = _shorts_pipeline(match.group(1))
+                allowed = {x["task"] for x in model_map_payload().get("tasks", []) if str(x.get("task", "")).startswith("short_")}
+                selections = body.get("task_models") or {}
+                if set(selections) - allowed:
+                    raise ValueError("Unknown Shorts model task")
+                validated = _validate_task_models(selections)
+                _write_json(pipeline.shorts / "models.json", validated)
+                return self._json({"models": shorts_list(match.group(1))["models"]})
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts", path)
+            if match:
+                if not body.get("confirm_paid_api"):
+                    raise PermissionError("Short creation requires explicit paid-API confirmation")
+                state = _shorts_pipeline(match.group(1)).create(
+                    str(body.get("candidate_id", "")),
+                    str(body.get("short_id", "")),
+                    use_model=True,
+                )
+                return self._json({"short": state}, 201)
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/([^/]+)/(execute|models|regenerate-audio-line|regenerate-visual)", path)
+            if match:
+                if not body.get("confirm_paid_api"):
+                    raise PermissionError("This Short action requires explicit paid-API confirmation")
+                action = match.group(3)
+                if action == "models":
+                    root = _shorts_pipeline(match.group(1)).shorts / match.group(2)
+                    settings = _read_json(root / "models.json", {}) or {}
+                    settings.update(body.get("task_models") or {})
+                    _write_json(root / "models.json", settings)
+                    return self._json({"short": _shorts_pipeline(match.group(1)).detail(match.group(2))})
+                body.setdefault("from_step", 4 if action == "regenerate-audio-line" else 7 if action == "regenerate-visual" else 1)
+                body.setdefault("stop_after_step", 7)
+                if action != "execute":
+                    body[f"force_{'audio' if action == 'regenerate-audio-line' else 'visual'}"] = True
+                return self._json({"short": start_short_action(match.group(1), match.group(2), "generate", body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/([^/]+)/(preview|render)", path)
+            if match:
+                if match.group(3) == "render":
+                    return self._json({"queue": enqueue_short_render(match.group(1), match.group(2), body)}, 202)
+                return self._json({"preview": start_short_preview(match.group(1), match.group(2))}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/([^/]+)/stop", path)
+            if match:
+                return self._json({"short": stop_short(match.group(1), match.group(2))})
             match = re.fullmatch(r"/api/topics/([^/]+)/prepare", path)
             if match:
                 return self._json(_prepare_topic(match.group(1), bool(body.get("force"))))
@@ -1423,6 +1761,9 @@ class StudioHandler(BaseHTTPRequestHandler):
     def do_DELETE(self) -> None:  # noqa: N802
         try:
             path = urlparse(self.path).path
+            match = re.fullmatch(r"/api/runs/([^/]+)/shorts/([^/]+)", path)
+            if match:
+                return self._json(delete_short(match.group(1), match.group(2)))
             match = re.fullmatch(r"/api/runs/([^/]+)", path)
             if match:
                 return self._json(delete_run(match.group(1)))

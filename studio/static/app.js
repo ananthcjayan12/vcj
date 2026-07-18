@@ -6,9 +6,12 @@ const state = {
   topicDetail: null,
   activeRunId: null,
   activeRun: null,
+  activeShorts: {registry: {shorts: []}, shorts: [], candidates: {candidates: []}, models: {tasks: [], selections: {}}},
+  selectedShortId: null,
   selectedChapterId: null,
   selectedBeatId: null,
   pollTimer: null,
+  shortsPollTimer: null,
   queueTimer: null,
   view: "production"
 };
@@ -22,7 +25,9 @@ const formatUsd = value => { const number = Number(value || 0); return number >=
 const activeStatuses = new Set(["running", "rendering"]);
 const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Visual reels", "Compile & QA", "Review", "Approval"];
 const stepsForRun = () => motionCanvasSteps;
-const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"]);
+const lessonModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"]);
+const shortModelTasks = new Set(["short_candidate_analysis", "short_script_writing", "short_motion_canvas_adapter", "short_motion_canvas_repair"]);
+const shortActiveStatuses = new Set(["running", "rendering", "analyze_started", "generate_started"]);
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -149,7 +154,7 @@ function renderChapterWorkspace() {
 
 function selectedTaskModels(run) {
   const overrides = run.settings?.task_models || {};
-  return Object.fromEntries((run.model_map?.tasks || []).filter(task => visibleModelTasks.has(task.task)).map(task => {
+  return Object.fromEntries((run.model_map?.tasks || []).filter(task => lessonModelTasks.has(task.task)).map(task => {
     if (overrides[task.task]) return [task.task, overrides[task.task]];
     let provider = task.provider;
     if (["script_structure", "script_writing"].includes(task.task)) {
@@ -166,7 +171,7 @@ function selectedTaskModels(run) {
 
 function modelMapMarkup(run, working) {
   const selected = selectedTaskModels(run);
-  return `<section class="model-map-panel"><div class="model-map-heading"><div><p class="eyebrow">Prompt routing</p><h3>Models used by Motion Canvas production</h3></div><button class="secondary-button" id="save-model-map" ${working ? "disabled" : ""}>Save model map</button></div><div class="model-map-list">${(run.model_map?.tasks || []).filter(task => visibleModelTasks.has(task.task)).map(task => {
+  return `<section class="model-map-panel"><div class="model-map-heading"><div><p class="eyebrow">Prompt routing</p><h3>Models used by Motion Canvas production</h3></div><button class="secondary-button" id="save-model-map" ${working ? "disabled" : ""}>Save model map</button></div><div class="model-map-list">${(run.model_map?.tasks || []).filter(task => lessonModelTasks.has(task.task)).map(task => {
     const current = selected[task.task];
     const providers = Object.keys(task.provider_models || {});
     const prompts = task.prompt_files?.length ? task.prompt_files.join(" · ") : "Voice synthesis (no text prompt file)";
@@ -178,10 +183,153 @@ function modelMapMarkup(run, working) {
 
 function costMarkup(artifacts) {
   const summary = artifacts.cost_summary || {};
-  const rows = Object.entries(summary.by_task || {}).sort((a,b) => Number(b[1].estimated_cost_usd || 0) - Number(a[1].estimated_cost_usd || 0));
+  const rows = Object.entries(summary.by_task || {}).filter(([task]) => !String(task).startsWith("short_")).sort((a,b) => Number(b[1].estimated_cost_usd || 0) - Number(a[1].estimated_cost_usd || 0));
   if (!rows.length) return `<section class="cost-panel"><div class="model-map-heading"><div><p class="eyebrow">Usage ledger</p><h3>Model cost</h3></div></div><p class="artifact-empty">Usage appears after the first completed provider call.</p></section>`;
   return `<section class="cost-panel"><div class="cost-head"><div><p class="eyebrow">Usage ledger</p><h3>Model cost</h3></div><strong>${formatUsd(summary.estimated_cost_usd)}</strong></div><div class="cost-stats"><span><b>${formatNumber(summary.calls ?? summary.priced_records)}</b> calls</span><span><b>${formatNumber(summary.input_tokens)}</b> input</span><span><b>${formatNumber(summary.output_tokens)}</b> output</span><span><b>${formatNumber(summary.cached_input_tokens)}</b> cached</span><span><b>${formatNumber(summary.total_tokens || (Number(summary.input_tokens || 0) + Number(summary.output_tokens || 0)))}</b> total tokens</span></div><div class="cost-task-list">${rows.map(([task,item]) => `<article><div><strong>${escapeHtml(task.replaceAll("_", " "))}</strong><small>${formatNumber(item.calls)} call${Number(item.calls) === 1 ? "" : "s"} · ${formatNumber(Number(item.input_tokens || 0) + Number(item.output_tokens || 0))} tokens</small></div><b>${formatUsd(item.estimated_cost_usd)}</b></article>`).join("")}</div><footer>${formatNumber(summary.priced_records)} priced · ${formatNumber(summary.unpriced_records)} unpriced</footer></section>`;
 }
+
+function selectedShort(data = state.activeShorts) {
+  const shorts = data?.shorts || [];
+  return shorts.find(item => item.run?.short_id === state.selectedShortId) || shorts[0] || null;
+}
+
+function shortsModelMarkup(data, working = false) {
+  const tasks = (data.models?.tasks || []).filter(task => shortModelTasks.has(task.task));
+  const saved = data.models?.selections || {};
+  const estimate = data.analysis_estimate || {};
+  return `<section class="short-model-map">
+    <header><div><p class="eyebrow">Shorts-only prompt routing</p><h3>AI models for analysis, script, portrait and repair</h3></div>
+    <button class="secondary-button" id="save-shorts-models" ${working ? "disabled" : ""}>Save Shorts model map</button></header>
+    <aside class="short-token-estimate">
+      <span><b>${formatNumber(estimate.estimated_input_tokens)}</b> estimated input tokens</span>
+      <span><b>${formatNumber(estimate.expected_output_tokens)}–${formatNumber(estimate.high_output_tokens)}</b> expected output range</span>
+      <span><b>${formatNumber(estimate.configured_max_output_tokens)}</b> maximum output</span>
+      <span><b>${formatUsd(estimate.estimated_cost_usd)}–${formatUsd(estimate.high_estimated_cost_usd)}</b> expected analysis cost</span>
+      <span><b>${formatUsd(estimate.maximum_estimated_cost_usd)}</b> maximum configured exposure</span>
+      ${estimate.last_actual ? `<span><b>${formatNumber(estimate.last_actual.input_tokens)} in · ${formatNumber(estimate.last_actual.output_tokens)} out · ${formatUsd(estimate.last_actual.estimated_cost_usd)}</b> last actual analysis</span>` : ""}
+      <small>${escapeHtml(estimate.provider || "")}:${escapeHtml(estimate.model || "")} · conservative JSON estimate before cache</small>
+    </aside>
+    <div>${tasks.map(task => {
+      const current = saved[task.task] || {provider: task.provider, model: task.model, reasoning_effort: "low"};
+      const providers = Object.keys(task.provider_models || {});
+      const options = task.provider_model_options?.[current.provider] || [task.provider_models?.[current.provider]];
+      const reasoning = current.reasoning_effort || "low";
+      return `<article data-short-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}">
+        <span>STEP ${task.step}</span>
+        <div><b>${escapeHtml(task.label)}</b><small>${escapeHtml((task.prompt_files || []).join(" · "))}</small></div>
+        <select class="short-task-provider" ${working ? "disabled" : ""}>${providers.map(p => `<option value="${escapeHtml(p)}" ${p === current.provider ? "selected" : ""}>${escapeHtml(p === "codex" ? "Codex CLI (ChatGPT)" : p)}</option>`).join("")}</select>
+        <select class="short-task-model" ${working ? "disabled" : ""}>${(options || []).filter(Boolean).map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select>
+        <select class="short-task-reasoning" ${working || current.provider !== "codex" ? "disabled" : ""}>${(task.reasoning_efforts || ["low"]).map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select>
+      </article>`;
+    }).join("")}</div>
+  </section>`;
+}
+
+function renderShortsView() {
+  const run = state.activeRun;
+  const root = $("#shorts-view-panel");
+  if (!root) return;
+  if (!run) {
+    root.innerHTML = `<div class="empty-pipeline"><span class="empty-orbit">▣</span><h3>No parent lesson selected</h3><p>Open a completed lesson run from Production or Runs, then return here. Shorts never share the lesson model map or pipeline controls.</p></div>`;
+    return;
+  }
+  const data = state.activeShorts || {};
+  const candidates = data.candidates?.candidates || [];
+  const shorts = data.shorts || [];
+  const selected = selectedShort(data);
+  if (selected?.run?.short_id) state.selectedShortId = selected.run.short_id;
+  const analyzing = Boolean(data.analysis_process_active);
+  const shortWorking = Boolean(selected?.run?.process_active || shortActiveStatuses.has(selected?.run?.status));
+  const parentReady = Number(run.current_step || 0) >= 7 || ["completed", "rendered"].includes(run.status);
+  const item = selected?.run || {};
+  const script = selected?.script || {};
+  const manifest = selected?.manifest || {};
+  const shortId = item.short_id || "";
+  const step = Number(item.current_step || 0);
+  const previewUrl = selected?.preview_url || null;
+  root.innerHTML = `
+    <div class="shorts-view-shell">
+      <header class="shorts-view-header">
+        <div>
+          <p class="eyebrow">Separate portrait productions</p>
+          <h2>Shorts workspace</h2>
+          <span class="run-id">Parent · ${escapeHtml(run.id)} · ${escapeHtml(run.topic || "")}</span>
+        </div>
+        <div class="run-header-actions">
+          <button class="secondary-button" id="shorts-refresh">Refresh</button>
+          <button class="secondary-button" id="shorts-open-parent">Open parent lesson</button>
+          ${statusPill(run.status)}
+        </div>
+      </header>
+      ${!parentReady ? `<div class="alert">Parent lesson should reach Review/Approval before Short analysis. You can still inspect existing Shorts.</div>` : ""}
+      ${shortsModelMarkup(data, analyzing || shortWorking)}
+      <div class="shorts-toolbar">
+        <div><strong>Generate standalone Short ideas</strong><small>Uses approved narration, audio, claims, beats, and reel code. Parent lesson artifacts are never modified.</small></div>
+        <button class="primary-button" id="analyze-shorts" ${analyzing || !parentReady ? "disabled" : ""}>${analyzing ? "Analyzing…" : "Analyze for Shorts"}</button>
+      </div>
+      ${candidates.length ? `<div class="short-candidate-grid">${candidates.map(entry => `<article class="short-candidate"><header><span>${escapeHtml(entry.archetype)}</span><b>${Number(entry.scores?.overall_score || 0)}/100</b></header><h3>${escapeHtml(entry.working_title)}</h3><p>${escapeHtml(entry.hook)}</p><div class="short-meta"><span>${Number(entry.target_duration_seconds).toFixed(0)}s</span><span>${Number(entry.scores?.audio_reuse_score || 0)}% audio reuse</span><span>${escapeHtml((entry.source_segments || []).map(x => x.reel_id).join(", "))}</span></div>${entry.warnings?.length ? `<small class="short-warning">${escapeHtml(entry.warnings.join(" · "))}</small>` : ""}<button class="secondary-button create-short" data-candidate-id="${escapeHtml(entry.candidate_id)}" ${analyzing ? "disabled" : ""}>Create Short</button></article>`).join("")}</div>` : `<p class="artifact-empty shorts-empty">Analyze this completed lesson to create 3–5 grounded ideas.</p>`}
+      <div class="shorts-main-grid">
+        <aside class="short-run-nav">
+          <div class="panel-heading compact"><div><p class="eyebrow">Created Shorts</p><h3>${shorts.length} child runs</h3></div></div>
+          ${shorts.length ? shorts.map(wrapper => {
+            const meta = wrapper.run || {};
+            return `<button type="button" class="short-nav-item${meta.short_id === shortId ? " is-selected" : ""}" data-select-short="${escapeHtml(meta.short_id)}"><span>${escapeHtml(meta.short_id)}</span><strong>${escapeHtml(wrapper.script?.title || meta.short_id)}</strong><small>${escapeHtml(meta.status || "created")} · step ${Number(meta.current_step || 0)}/9</small></button>`;
+          }).join("") : `<p class="artifact-empty">No Shorts created yet.</p>`}
+        </aside>
+        <section class="short-detail-panel">
+          ${shortId ? `
+            <header class="short-detail-header">
+              <div><span>${escapeHtml(shortId)}</span><h3>${escapeHtml(script.title || shortId)}</h3></div>
+              ${statusPill(item.status || "created")}
+            </header>
+            <div class="short-stepper"><span style="width:${Math.min(100, step / 9 * 100)}%"></span></div>
+            <div class="short-detail-layout">
+              <div class="preview-shell short-preview-shell">
+                <div class="preview-toolbar"><span>LIVE PORTRAIT PREVIEW · NO MP4 RENDER</span>${previewUrl ? `<a href="${escapeHtml(previewUrl)}" target="_blank" rel="noreferrer">OPEN EDITOR ↗</a>` : "LOCAL EDITOR"}</div>
+                ${previewUrl
+                  ? `<iframe class="preview-frame short-preview-frame" src="${escapeHtml(previewUrl)}" title="Short live preview" allow="autoplay"></iframe>`
+                  : `<div class="preview-placeholder preview-launch short-preview-placeholder"><span>Start the live Motion Canvas player for this portrait Short. This does not encode an MP4.</span><button class="primary-button preview-short" data-short-id="${escapeHtml(shortId)}" ${step < 7 || shortWorking ? "disabled" : ""}>Start live preview</button></div>`}
+              </div>
+              <div class="short-side">
+                <div class="short-panels">
+                  <section><b>Script</b>${(script.lines || []).map(line => `<p><i>${escapeHtml(line.audio_source)}</i>${escapeHtml(line.text)}</p>`).join("") || "<p class=\"artifact-empty\">No script lines yet.</p>"}</section>
+                  <section><b>Portrait output</b><small>${manifest.profile?.width || 1080}×${manifest.profile?.height || 1920} · ${Number(manifest.duration || 0).toFixed(1)}s</small>${item.error ? `<p class="short-warning">${escapeHtml(item.error)}</p>` : ""}</section>
+                </div>
+                <div class="button-row short-actions">
+                  <button class="primary-button generate-short" data-short-id="${escapeHtml(shortId)}" ${shortWorking ? "disabled" : ""}>Generate / resume</button>
+                  <button class="secondary-button preview-short" data-short-id="${escapeHtml(shortId)}" ${step < 7 || shortWorking ? "disabled" : ""}>Live preview</button>
+                  <button class="secondary-button render-short" data-short-id="${escapeHtml(shortId)}" ${step < 7 || shortWorking ? "disabled" : ""}>Render MP4</button>
+                  ${item.status === "rendered" ? `<a class="secondary-button" href="${artifactUrl(run.id, `shorts/${shortId}/motion_canvas/final.mp4`)}" target="_blank">Open MP4 ↗</a>` : ""}
+                  <button class="danger-button stop-short" data-short-id="${escapeHtml(shortId)}" ${shortWorking ? "" : "disabled"}>Stop</button>
+                  <button class="danger-button delete-short" data-short-id="${escapeHtml(shortId)}" ${shortWorking ? "disabled" : ""}>Delete</button>
+                </div>
+                <pre class="log-box short-log" data-short-log="${escapeHtml(shortId)}">Loading Short log…</pre>
+              </div>
+            </div>
+          ` : `<div class="empty-pipeline"><span class="empty-orbit">▣</span><h3>Select or create a Short</h3><p>Candidates appear after analysis. Each Short keeps its own log, preview, and render path.</p></div>`}
+        </section>
+      </div>
+      <div class="short-analysis-footer">
+        <div><b>Short production cost</b><strong>${formatUsd(data.cost_summary?.estimated_cost_usd)}</strong><small>${formatNumber(data.cost_summary?.calls)} model calls · ${formatNumber(data.cost_summary?.total_tokens)} tokens</small></div>
+        <pre id="shorts-analysis-log" class="log-box">Loading analysis log…</pre>
+      </div>
+    </div>`;
+  if (data.analysis_log != null) {
+    const box = $("#shorts-analysis-log");
+    if (box) { box.textContent = data.analysis_log || "No analysis log yet."; box.scrollTop = box.scrollHeight; }
+  }
+  loadShortLogs(run.id);
+  manageShortsPolling();
+}
+
+function collectShortTaskModels() {
+  return Object.fromEntries($$("[data-short-model-task]").map(row => [row.dataset.shortModelTask, {
+    provider: $(".short-task-provider", row).value,
+    model: $(".short-task-model", row).value,
+    ...($(".short-task-provider", row).value === "codex" ? {reasoning_effort: $(".short-task-reasoning", row).value} : {})
+  }]));
+}
+
 
 function collectTaskModels() {
   return Object.fromEntries($$("[data-model-task]").map(row => [row.dataset.modelTask, { provider: $(".task-provider", row).value, model: $(".task-model", row).value, ...($(".task-provider", row).value === "codex" ? {reasoning_effort: $(".task-reasoning", row).value} : {}) }]));
@@ -353,19 +501,57 @@ function renderPipeline() {
       </div>
     </div>
     <div class="run-intelligence">${modelMapMarkup(run, working)}${costMarkup(artifacts)}</div>
-    <div id="chapter-workspace-root">${chapterWorkspaceMarkup(run, working)}</div>`;
+    <div id="chapter-workspace-root">${chapterWorkspaceMarkup(run, working)}</div>
+    <div class="shorts-entry-card"><div><p class="eyebrow">Derivative portrait productions</p><h3>Shorts live in a separate workspace</h3><p>Lesson model map, logs, and preview stay here. Open Shorts for analysis, Short-only models, generation, live portrait preview, and MP4 render.</p></div><button class="primary-button" id="open-shorts-workspace">Open Shorts workspace</button></div>`;
   loadLogs(run.id);
   managePolling();
+}
+
+async function loadShortLogs(runId) {
+  if (!runId) return;
+  try {
+    const analysis = await request(`/api/runs/${encodeURIComponent(runId)}/shorts/logs`);
+    const box = $("#shorts-analysis-log");
+    if (box) {
+      box.textContent = analysis.log || "No analysis log yet.";
+      box.scrollTop = box.scrollHeight;
+    }
+    if (state.activeShorts) state.activeShorts.analysis_process_active = Boolean(analysis.process_active);
+  } catch { /* surfaced by refresh */ }
+  for (const box of $$("[data-short-log]")) {
+    try {
+      const payload = await request(`/api/runs/${encodeURIComponent(runId)}/shorts/${encodeURIComponent(box.dataset.shortLog)}/logs`);
+      box.textContent = payload.log || "No Short generation log yet.";
+      box.scrollTop = box.scrollHeight;
+    } catch {
+      box.textContent = "Log unavailable.";
+    }
+  }
+}
+
+async function refreshShorts(runId = state.activeRunId, { render = true } = {}) {
+  if (!runId) return;
+  const payload = await request(`/api/runs/${encodeURIComponent(runId)}/shorts`);
+  state.activeShorts = payload;
+  if (render && state.view === "shorts") renderShortsView();
 }
 
 async function selectRun(runId, switchView = true) {
   clearError();
   try {
-    const payload = await request(`/api/runs/${encodeURIComponent(runId)}`);
-    if (state.activeRunId !== runId) state.selectedChapterId = null;
+    const [payload, shortsPayload] = await Promise.all([
+      request(`/api/runs/${encodeURIComponent(runId)}`),
+      request(`/api/runs/${encodeURIComponent(runId)}/shorts`)
+    ]);
+    if (state.activeRunId !== runId) {
+      state.selectedChapterId = null;
+      state.selectedShortId = null;
+    }
     state.activeRunId = runId;
     state.activeRun = payload.run;
+    state.activeShorts = shortsPayload;
     renderPipeline();
+    if (state.view === "shorts") renderShortsView();
     if (switchView) {
       switchViewTo("production");
       if (state.activeRun.topic_ref && state.selectedTopicRef !== state.activeRun.topic_ref) await selectTopic(state.activeRun.topic_ref, true, false);
@@ -398,6 +584,35 @@ function managePolling() {
       }
     } catch (error) { clearInterval(state.pollTimer); showError(error); }
   }, 1800);
+}
+
+function shortsWorkActive(data = state.activeShorts) {
+  if (!data) return false;
+  if (data.analysis_process_active) return true;
+  return (data.shorts || []).some(item => item.run?.process_active || shortActiveStatuses.has(item.run?.status));
+}
+
+function manageShortsPolling() {
+  clearInterval(state.shortsPollTimer);
+  state.shortsPollTimer = null;
+  if (state.view !== "shorts" || !state.activeRunId || !shortsWorkActive()) return;
+  state.shortsPollTimer = setInterval(async () => {
+    if (!state.activeRunId || state.view !== "shorts") return;
+    try {
+      await refreshShorts(state.activeRunId, { render: true });
+      await loadShortLogs(state.activeRunId);
+      if (!shortsWorkActive()) {
+        clearInterval(state.shortsPollTimer);
+        state.shortsPollTimer = null;
+        await refreshShorts(state.activeRunId, { render: true });
+        await loadShortLogs(state.activeRunId);
+      }
+    } catch (error) {
+      clearInterval(state.shortsPollTimer);
+      state.shortsPollTimer = null;
+      showError(error);
+    }
+  }, 1500);
 }
 
 function renderCurriculum() {
@@ -487,9 +702,20 @@ function switchViewTo(view) {
   state.view = view;
   $$(".nav-item").forEach(item => item.classList.toggle("is-active", item.dataset.view === view));
   $$(".view").forEach(item => item.classList.toggle("is-active", item.id === `view-${view}`));
-  const titles = { production: ["Motion Canvas lesson engine", "Production workspace"], curriculum: ["Coverage control", "Curriculum map"], runs: ["Production history", "Runs and outputs"] };
-  $("#view-eyebrow").textContent = titles[view][0]; $("#view-title").textContent = titles[view][1];
+  const titles = {
+    production: ["Motion Canvas lesson engine", "Production workspace"],
+    shorts: ["Portrait Shorts engine", "Shorts workspace"],
+    curriculum: ["Coverage control", "Curriculum map"],
+    runs: ["Production history", "Runs and outputs"]
+  };
+  $("#view-eyebrow").textContent = titles[view][0];
+  $("#view-title").textContent = titles[view][1];
   history.replaceState(null, "", `#${view}`);
+  if (view === "shorts") renderShortsView();
+  else {
+    clearInterval(state.shortsPollTimer);
+    state.shortsPollTimer = null;
+  }
 }
 
 function productionPayload(execute) {
@@ -567,6 +793,162 @@ document.addEventListener("click", async event => {
   const topic = event.target.closest(".topic-item"); if (topic) return selectTopic(topic.dataset.topic);
   const runOpen = event.target.closest(".run-open"); if (runOpen) return selectRun(runOpen.dataset.run);
   if (event.target.closest("#refresh-button")) return boot();
+  if (event.target.closest("#open-shorts-workspace")) {
+    switchViewTo("shorts");
+    return;
+  }
+  if (event.target.closest("#shorts-open-parent")) {
+    switchViewTo("production");
+    return;
+  }
+  if (event.target.closest("#shorts-refresh")) {
+    try {
+      await refreshShorts(state.activeRunId, { render: true });
+      await loadShortLogs(state.activeRunId);
+      toast("Shorts refreshed.");
+    } catch (error) { showError(error); }
+    return;
+  }
+  const selectShort = event.target.closest("[data-select-short]");
+  if (selectShort) {
+    state.selectedShortId = selectShort.dataset.selectShort;
+    renderShortsView();
+    return;
+  }
+  if (event.target.closest("#analyze-shorts")) {
+    const button = event.target.closest("button");
+    setBusy(button, true, "Starting…");
+    try {
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/analyze`, {
+        method: "POST",
+        body: JSON.stringify({ confirm_paid_api: true })
+      });
+      toast("Short analysis started. Live log updates below.");
+      await refreshShorts(state.activeRunId, { render: true });
+      manageShortsPolling();
+    } catch (error) {
+      showError(error);
+      setBusy(button, false);
+      await loadShortLogs(state.activeRunId);
+    }
+    return;
+  }
+  if (event.target.closest("#save-shorts-models")) {
+    const button = event.target.closest("button");
+    setBusy(button, true, "Saving…");
+    try {
+      const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/models`, {
+        method: "POST",
+        body: JSON.stringify({ task_models: collectShortTaskModels() })
+      });
+      state.activeShorts.models = response.models;
+      renderShortsView();
+      toast("Shorts model map saved.");
+    } catch (error) {
+      showError(error);
+      setBusy(button, false);
+    }
+    return;
+  }
+  const createShort = event.target.closest(".create-short");
+  if (createShort) {
+    const used = new Set((state.activeShorts?.registry?.shorts || []).map(x => x.short_id));
+    let number = 1;
+    while (used.has(`short_${String(number).padStart(3, "0")}`)) number += 1;
+    const shortId = `short_${String(number).padStart(3, "0")}`;
+    setBusy(createShort, true, "Creating…");
+    try {
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts`, {
+        method: "POST",
+        body: JSON.stringify({ candidate_id: createShort.dataset.candidateId, short_id: shortId, confirm_paid_api: true })
+      });
+      state.selectedShortId = shortId;
+      await refreshShorts(state.activeRunId, { render: true });
+      toast(`${shortId} created.`);
+    } catch (error) {
+      showError(error);
+      setBusy(createShort, false);
+    }
+    return;
+  }
+  const generateShort = event.target.closest(".generate-short");
+  if (generateShort) {
+    setBusy(generateShort, true, "Starting…");
+    try {
+      state.selectedShortId = generateShort.dataset.shortId;
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(generateShort.dataset.shortId)}/execute`, {
+        method: "POST",
+        body: JSON.stringify({ from_step: 4, stop_after_step: 7, confirm_paid_api: true })
+      });
+      toast("Short generation started. Logs update live.");
+      await refreshShorts(state.activeRunId, { render: true });
+      manageShortsPolling();
+    } catch (error) {
+      showError(error);
+      setBusy(generateShort, false);
+    }
+    return;
+  }
+  const previewShort = event.target.closest(".preview-short");
+  if (previewShort) {
+    const button = event.target.closest("button");
+    setBusy(button, true, "Starting player…");
+    try {
+      state.selectedShortId = previewShort.dataset.shortId;
+      const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(previewShort.dataset.shortId)}/preview`, {
+        method: "POST",
+        body: "{}"
+      });
+      if (state.activeShorts?.shorts) {
+        state.activeShorts.shorts = state.activeShorts.shorts.map(item => {
+          if (item.run?.short_id !== previewShort.dataset.shortId) return item;
+          return { ...item, preview_url: response.preview?.url || item.preview_url };
+        });
+      }
+      renderShortsView();
+      toast("Live portrait preview started. No MP4 render was launched.");
+    } catch (error) {
+      showError(error);
+      setBusy(button, false);
+    }
+    return;
+  }
+  const renderShort = event.target.closest(".render-short");
+  if (renderShort) {
+    try {
+      const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(renderShort.dataset.shortId)}/render`, {
+        method: "POST",
+        body: JSON.stringify({ quality: "high", fps: 30, workers: 1 })
+      });
+      state.renderQueue = response.queue;
+      toast("Short added to the shared render queue.");
+      manageQueuePolling();
+    } catch (error) { showError(error); }
+    return;
+  }
+  const stopShortButton = event.target.closest(".stop-short");
+  if (stopShortButton) {
+    try {
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(stopShortButton.dataset.shortId)}/stop`, {
+        method: "POST",
+        body: "{}"
+      });
+      await refreshShorts(state.activeRunId, { render: true });
+      toast("Short stop requested.");
+    } catch (error) { showError(error); }
+    return;
+  }
+  const deleteShortButton = event.target.closest(".delete-short");
+  if (deleteShortButton) {
+    if (!window.confirm(`Delete ${deleteShortButton.dataset.shortId}? The parent lesson is unaffected.`)) return;
+    try {
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(deleteShortButton.dataset.shortId)}`, { method: "DELETE" });
+      if (state.selectedShortId === deleteShortButton.dataset.shortId) state.selectedShortId = null;
+      await refreshShorts(state.activeRunId, { render: true });
+      toast("Short deleted; parent lesson preserved.");
+    } catch (error) { showError(error); }
+    return;
+  }
   if (event.target.closest("#runs-refresh")) return refreshRuns();
   if (event.target.closest("#queue-selected-renders")) {
     const runIds = $$(".render-run-select:checked").map(input => input.value);
@@ -705,8 +1087,9 @@ document.addEventListener("change", event => {
     $(".task-model", row).innerHTML = available.map(model => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
     $(".task-reasoning", row).disabled = event.target.value !== "codex";
   }
+  if(event.target.classList.contains("short-task-provider")){const row=event.target.closest("[data-short-model-task]");const provider=event.target.value;const models=JSON.parse(row.dataset.providerModels||"{}");const options=JSON.parse(row.dataset.providerModelOptions||"{}");$(".short-task-model",row).innerHTML=(options[provider]||[models[provider]]).filter(Boolean).map(model=>`<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");$(".short-task-reasoning",row).disabled=provider!=="codex";}
 });
 
 const initialView = location.hash.replace("#", "");
-if (["production", "curriculum", "runs"].includes(initialView)) switchViewTo(initialView);
+if (["production", "shorts", "curriculum", "runs"].includes(initialView)) switchViewTo(initialView);
 boot();

@@ -1,0 +1,1 @@
+Analyze the supplied parent narration, immutable timeline, beats, and reel manifest. Return candidates with hooks, payoffs, exact claim IDs, source paragraphs/reels/beats, reuse modes, warnings, and 0–100 component scores.

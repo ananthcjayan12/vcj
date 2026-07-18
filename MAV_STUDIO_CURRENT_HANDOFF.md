@@ -1371,3 +1371,6 @@ For a new coding agent:
 [ ] Avoid full renders unless requested
 [ ] Keep video output even if optional audio/inspection fails
 ```
+# Shorts derivative subsystem
+
+Approved Motion Canvas lessons can now own isolated child runs under `shorts/`. The subsystem includes candidate/script schemas, audio reuse EDLs, source hashing, caption exports, a native portrait presentation library, manifest-driven render profiles, CLI commands, and separate Studio API routes/process keys. Existing profile-less manifests remain landscape and parent reels/timelines are never modified. See `SHORTS_PIPELINE_README.md` for operation and constraints.

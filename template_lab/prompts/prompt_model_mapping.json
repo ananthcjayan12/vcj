@@ -171,6 +171,48 @@
       "env_var": "MAV_DIRECT_HTML_REPAIR_MODEL",
       "prompt_files": ["direct_html_repair.system.txt", "direct_html_design_system.txt"]
     },
+    "short_candidate_analysis": {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash",
+      "provider_models": {"gemini": "gemini-3.5-flash", "anthropic": "claude-sonnet-5", "moonshot": "kimi-k2.7-code", "zai": "glm-5.2"},
+      "provider_model_options": {"gemini": ["gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"], "anthropic": ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5"], "moonshot": ["kimi-k2.7-code"], "zai": ["glm-5.2"]},
+      "max_tokens": 64000,
+      "provider_env_var": "MAV_SHORT_CANDIDATE_ANALYSIS_PROVIDER",
+      "env_var": "MAV_SHORT_CANDIDATE_ANALYSIS_MODEL",
+      "prompt_files": ["short_candidate_analysis.system.txt", "short_candidate_analysis.user.txt"]
+    },
+    "short_script_writing": {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash",
+      "provider_models": {"gemini": "gemini-3.5-flash", "anthropic": "claude-sonnet-5", "moonshot": "kimi-k2.7-code", "zai": "glm-5.2"},
+      "provider_model_options": {"gemini": ["gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"], "anthropic": ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5"], "moonshot": ["kimi-k2.7-code"], "zai": ["glm-5.2"]},
+      "max_tokens": 12000,
+      "provider_env_var": "MAV_SHORT_SCRIPT_WRITING_PROVIDER",
+      "env_var": "MAV_SHORT_SCRIPT_WRITING_MODEL",
+      "prompt_files": ["short_script_writing.system.txt", "short_script_writing.user.txt"]
+    },
+    "short_motion_canvas_adapter": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {"moonshot": "kimi-k2.7-code", "gemini": "gemini-3.5-flash", "anthropic": "claude-sonnet-5", "zai": "glm-5.2"},
+      "provider_model_options": {"moonshot": ["kimi-k2.7-code"], "gemini": ["gemini-3.5-flash", "gemini-3.1-pro-preview"], "anthropic": ["claude-sonnet-5", "claude-opus-4-8"], "zai": ["glm-5.2"]},
+      "max_tokens": 64000,
+      "timeout_seconds": 2400,
+      "provider_env_var": "MAV_SHORT_MOTION_CANVAS_ADAPTER_PROVIDER",
+      "env_var": "MAV_SHORT_MOTION_CANVAS_ADAPTER_MODEL",
+      "prompt_files": ["../shorts/prompts/portrait_adapter.system.txt"]
+    },
+    "short_motion_canvas_repair": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {"moonshot": "kimi-k2.7-code", "gemini": "gemini-3.5-flash", "anthropic": "claude-sonnet-5", "zai": "glm-5.2"},
+      "provider_model_options": {"moonshot": ["kimi-k2.7-code"], "gemini": ["gemini-3.5-flash", "gemini-3.1-pro-preview"], "anthropic": ["claude-sonnet-5", "claude-opus-4-8"], "zai": ["glm-5.2"]},
+      "max_tokens": 64000,
+      "timeout_seconds": 2400,
+      "provider_env_var": "MAV_SHORT_MOTION_CANVAS_REPAIR_PROVIDER",
+      "env_var": "MAV_SHORT_MOTION_CANVAS_REPAIR_MODEL",
+      "prompt_files": ["../shorts/prompts/portrait_repair.system.txt"]
+    },
     "direct_html_review": {
       "provider": "gemini",
       "model": "gemini-3.5-flash",

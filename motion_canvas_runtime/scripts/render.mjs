@@ -16,6 +16,8 @@ const videoMode = process.argv.includes('--video');
 const previewMode = process.argv.includes('--preview') || !videoMode;
 const manifestPath = path.join(RUN_ROOT, 'manifest.json');
 const runManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
+const defaultProfile = {id: 'lesson_landscape', width: 1920, height: 1080, fps: 30, background: '#07111f'};
+const profile = {...defaultProfile, ...(runManifest.profile || {})};
 
 function visualSourceFiles() {
   const files = [
@@ -25,6 +27,9 @@ function visualSourceFiles() {
     path.join(ROOT, 'src', 'render-host.ts'),
     path.join(ROOT, 'src', 'project.ts'),
   ];
+  for (const key of ['scene_file', 'cues_file']) {
+    if (runManifest[key]) files.push(path.resolve(RUN_ROOT, runManifest[key]));
+  }
   for (const directory of ['chapters', 'shots', 'reels']) {
     const root = path.join(RUN_ROOT, directory);
     if (!fs.existsSync(root)) continue;
@@ -145,17 +150,18 @@ function isIgnorableConsoleError(message) {
 }
 
 try {
-  const url = `http://127.0.0.1:${port}/render.html`;
+  const profileQuery = new URLSearchParams({profile: profile.id, width: String(profile.width), height: String(profile.height), fps: String(profile.fps)});
+  const url = `http://127.0.0.1:${port}/render.html?${profileQuery}`;
   renderLog('Starting local render host');
   await waitForServer(url);
-  renderLog('Launching headless browser at 1920×1080');
+  renderLog(`Launching headless browser at ${profile.width}×${profile.height}`);
   browser = await puppeteer.launch({
     executablePath: findChrome(),
     headless: true,
     args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
   });
   const page = await browser.newPage();
-  await page.setViewport({width: 1920, height: 1080, deviceScaleFactor: 1});
+  await page.setViewport({width: profile.width, height: profile.height, deviceScaleFactor: 1});
   page.on('console', message => {
     if (message.type() !== 'error') return;
     consoleTasks.push(
@@ -211,7 +217,8 @@ try {
 
   if (previewMode) {
     const previewFiles = [];
-    for (const [index, ratio] of [0, .25, .5, .75, 1].entries()) {
+    const sampleRatios = [0, .10, .25, .50, .75, .90, 1];
+    for (const [index, ratio] of sampleRatios.entries()) {
       const target = path.join(
         PREVIEW_ROOT,
         `${String(index).padStart(2, '0')}-${Math.round(ratio * 100)}.png`,
@@ -219,20 +226,20 @@ try {
       await capture(duration * ratio, target);
       previewFiles.push(target);
     }
-    const first = fs.readFileSync(previewFiles[2]);
+    const first = fs.readFileSync(previewFiles[sampleRatios.indexOf(.50)]);
     const deterministicTarget = path.join(PREVIEW_ROOT, 'deterministic-repeat.png');
     await capture(duration * .5, deterministicTarget);
     const deterministic = first.equals(fs.readFileSync(deterministicTarget));
     const composites = [];
     for (const [index, file] of previewFiles.entries()) {
       composites.push({
-        input: await sharp(file).resize(480, 270).png().toBuffer(),
+        input: await sharp(file).resize({width: 480, height: Math.round(480 * profile.height / profile.width), fit: 'contain', background: profile.background}).png().toBuffer(),
         left: index * 480,
         top: 0,
       });
     }
     await sharp({
-      create: {width: 2400, height: 270, channels: 4, background: '#07111f'},
+      create: {width: previewFiles.length * 480, height: Math.round(480 * profile.height / profile.width), channels: 4, background: profile.background},
     }).composite(composites).png().toFile(path.join(PREVIEW_ROOT, 'contact-sheet.png'));
     await Promise.all(consoleTasks);
     const hasIgnoredHmrError = consoleErrors.some(isIgnorableConsoleError);
@@ -250,7 +257,7 @@ try {
         expectedDuration,
         timelineDelta,
         timelineStable,
-        sampledTimes: [0, .25, .5, .75, 1].map(ratio => duration * ratio),
+        sampledTimes: sampleRatios.map(ratio => duration * ratio),
         deterministic,
         consoleErrors: actionableConsoleErrors,
         ignoredConsoleErrors,
@@ -261,7 +268,7 @@ try {
   }
 
   if (videoMode) {
-    const audio = path.join(RUN_ROOT, 'voiceover.mp3');
+    const audio = runManifest.audio_path ? path.resolve(RUN_ROOT, runManifest.audio_path) : path.join(RUN_ROOT, 'voiceover.mp3');
     const hasAudioSource = fs.existsSync(audio) && fs.statSync(audio).size > 0;
     fs.mkdirSync(FRAME_ROOT, {recursive: true});
     const frameCount = Math.ceil(duration * fps);
