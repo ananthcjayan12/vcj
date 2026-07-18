@@ -5,12 +5,17 @@ import {SharedWebGLContext} from '@motion-canvas/core/lib/app/SharedWebGLContext
 import {ReadOnlyTimeEvents} from '@motion-canvas/core/lib/scenes/timeEvents';
 import {Vector2} from '@motion-canvas/core';
 import project from './project';
+import {resolveRenderProfile} from './render-profile';
 
-const FPS = 30; const SIZE = new Vector2(1920, 1080); const playback = new PlaybackManager();
+let rawProfile = {};
+try {rawProfile = await fetch('/render-profile.json', {cache: 'no-store'}).then(response => response.ok ? response.json() : {});} catch {}
+const PROFILE = resolveRenderProfile(rawProfile); const FPS = PROFILE.fps; const SIZE = new Vector2(PROFILE.width, PROFILE.height); const playback = new PlaybackManager();
 const status = new PlaybackStatus(playback); const logger = project.logger!; const sharedWebGLContext = new SharedWebGLContext(logger);
 const scenes = project.scenes.map(description => new description.klass({...description, meta: description.meta.clone(), logger, playback: status, size: SIZE, resolutionScale: 1, timeEventsClass: ReadOnlyTimeEvents, sharedWebGLContext, experimentalFeatures: project.experimentalFeatures}));
 playback.setup(scenes); playback.fps = FPS; playback.state = PlaybackState.Rendering;
-const stage = new Stage(); stage.configure({size: SIZE, resolutionScale: 1, background: '#07111f'}); stage.finalBuffer.id = 'robot-canvas'; document.body.append(stage.finalBuffer);
+const stage = new Stage(); stage.configure({size: SIZE, resolutionScale: 1, background: PROFILE.background}); stage.finalBuffer.id = 'robot-canvas';
+stage.finalBuffer.style.width = `${PROFILE.width}px`; stage.finalBuffer.style.height = `${PROFILE.height}px`;
+document.body.append(stage.finalBuffer);
 let initialized = false;
 async function initialize() {if (initialized) return; await playback.recalculate(); await playback.reset(); initialized = true;}
 async function seek(timeSeconds: number) {await initialize(); const frame = Math.max(0, Math.min(playback.duration, Math.round(timeSeconds * FPS))); await playback.reset(); await playback.seek(frame); await stage.render(playback.currentScene, playback.previousScene); return {frame, durationFrames: playback.duration};}

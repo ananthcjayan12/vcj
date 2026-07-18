@@ -1,0 +1,16 @@
+Create the narrative treatment for this selected concept.
+
+SELECTED CANDIDATE
+{candidate_json}
+
+TOPIC AND AUDIENCE
+{topic}
+{audience}
+
+SUPPORTED SOURCE EXCERPTS AND FACTS
+{source_json}
+
+DIRECTOR OVERRIDE
+{instruction}
+
+Return only: {"title":"...","treatment":"...","source_paragraph_ids":["..."],"source_claim_ids":["..."]}

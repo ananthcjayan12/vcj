@@ -1,0 +1,22 @@
+Write the final Reel voiceover from this approved treatment.
+
+TOPIC / AUDIENCE
+{topic}
+{audience}
+
+SELECTED CONCEPT
+{candidate_json}
+
+NARRATIVE TREATMENT
+{treatment_json}
+
+SUPPORTED SOURCE
+{source_json}
+
+TARGET
+{target_duration_seconds} seconds; maximum {maximum_words} spoken words.
+
+DIRECTOR OVERRIDE
+{instruction}
+
+Return only the requested narration JSON with sequential paragraph ids.

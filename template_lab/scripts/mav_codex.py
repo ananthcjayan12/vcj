@@ -86,10 +86,13 @@ def call_codex_text(*, task: str, system: str, user: str, max_tokens: int | None
     )
     with tempfile.TemporaryDirectory(prefix="mav-codex-") as directory:
         output = Path(directory) / "response.txt"
+        isolated_cwd = directory if task.startswith("reel_") else str(Path(__file__).resolve().parents[2])
         command = [
             codex, "exec", "-", "--ephemeral", "--sandbox", "read-only", "--color", "never",
-            "--output-last-message", str(output), "--cd", str(Path(__file__).resolve().parents[2]),
+            "--output-last-message", str(output), "--cd", isolated_cwd,
         ]
+        if task.startswith("reel_"):
+            command.append("--skip-git-repo-check")
         if model:
             command.extend(["--model", model])
         command.extend(["--config", f'model_reasoning_effort="{reasoning}"'])

@@ -18,10 +18,35 @@ DEFAULT_BATCH_SIZE = 2
 DEFAULT_WORKERS = 2
 MOTION_CANVAS_MAX_TOKENS = 64_000
 MOTION_CANVAS_FPS = 30
+RENDER_PROFILES = {
+    "lesson_landscape": {"name": "lesson_landscape", "width": 1920, "height": 1080, "fps": 30, "background": "#07111f"},
+    "reel_portrait": {"name": "reel_portrait", "width": 1080, "height": 1920, "fps": 30, "background": "#07111f"},
+}
 SHOT_TARGET_SECONDS = 10.0
 SHOT_MIN_SECONDS = 5.0
 SHOT_MAX_SECONDS = 15.0
 RUNTIME_ROOT = Path(__file__).resolve().parents[2] / "motion_canvas_runtime"
+
+
+def resolve_render_profile(value: str | dict[str, Any] | None = None) -> dict[str, Any]:
+    """Resolve a render profile while preserving landscape defaults for old manifests."""
+    name = value.get("name") if isinstance(value, dict) else value
+    name = str(name or "lesson_landscape")
+    if name not in RENDER_PROFILES:
+        raise RuntimeError(f"Unsupported Motion Canvas render profile: {name}")
+    profile = dict(RENDER_PROFILES[name])
+    if isinstance(value, dict):
+        for key in ("width", "height", "fps", "background"):
+            if value.get(key) is not None:
+                profile[key] = value[key]
+    if int(profile["width"]) <= 0 or int(profile["height"]) <= 0 or int(profile["fps"]) <= 0:
+        raise RuntimeError("Render profile dimensions and fps must be positive")
+    return profile
+
+
+def render_profile_fingerprint(value: str | dict[str, Any] | None = None) -> str:
+    profile = resolve_render_profile(value)
+    return hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _now() -> str:
@@ -324,7 +349,8 @@ def _apply_frame_aligned_timing(manifest: dict[str, Any]) -> dict[str, Any]:
 def _enforce_manifest_duration(source: str, chapter: dict[str, Any]) -> str:
     """Keep generated scene duration equal to its cumulative frame-aligned slot."""
     expected = float(chapter.get("render_duration", chapter.get("duration", 0)))
-    pattern = r"(\bconst\s+CHAPTER_DURATION\s*=\s*)(\d+(?:\.\d+)?)(\s*;)"
+    duration_name = "SHOT_DURATION" if str(chapter.get("scene_id", "")).startswith("shot_") else "CHAPTER_DURATION"
+    pattern = rf"(\bconst\s+{duration_name}\s*=\s*)(\d+(?:\.\d+)?)(\s*;)"
     matches = list(re.finditer(pattern, source))
     if not matches:
         if str(chapter.get("scene_id", "")).startswith(("shot_", "reel_")):
@@ -351,7 +377,7 @@ def _enforce_manifest_duration(source: str, chapter: dict[str, Any]) -> str:
     rendered = f"{expected:.12f}".rstrip("0").rstrip(".")
     aligned = re.sub(pattern, rf"\g<1>{rendered}\g<3>", source, count=1)
     if str(chapter.get("scene_id", "")).startswith(("shot_", "reel_")) and not re.search(
-        r"yield\*\s+progress\(1,\s*CHAPTER_DURATION,\s*linear\)", aligned
+        rf"yield\*\s+progress\(1,\s*{duration_name},\s*linear\)", aligned
     ):
         raise RuntimeError(f"{chapter['scene_id']} must end on the immutable master-clock duration")
     return aligned
@@ -431,10 +457,13 @@ def prepare(run_path: Path, narration: dict[str, Any] | None = None, *, batch_si
         members = chapters[offset:offset + batch_size]
         batches.append({"id": f"batch_{len(batches)+1:02d}", "chapter_ids": [item["scene_id"] for item in members], "status": "pending"})
     root = run_path / "motion_canvas"
+    input_payload = _load(run_path / "input.json") if (run_path / "input.json").exists() else {}
+    render_profile = resolve_render_profile(input_payload.get("render_profile"))
     manifest = {
         "version": "2.0" if timeline else "1.0", "created_at": _now(), "source_audio": str(audio_path.resolve()),
         "source_timestamps": str(timestamps_path.resolve()), "preview_duration": cutoff,
-        "batch_size": batch_size, "batches": batches,
+        "batch_size": batch_size, "batches": batches, "content_format": input_payload.get("content_format", "lesson"),
+        "render_profile": render_profile, "render_profile_fingerprint": render_profile_fingerprint(render_profile),
     }
     if timeline:
         manifest.update({
@@ -463,12 +492,34 @@ def _batch_prompt(
     instruction: str = "",
 ) -> tuple[str, str]:
     prompt_root = Path(__file__).with_name("prompts")
-    system = (prompt_root / "batch.system.txt").read_text(encoding="utf-8")
-    approved = (prompt_root / "approved-api.md").read_text(encoding="utf-8")
+    portrait = manifest.get("content_format") == "reel" or resolve_render_profile(manifest.get("render_profile"))["name"] == "reel_portrait"
+    system = (prompt_root / ("reel_batch.system.txt" if portrait else "batch.system.txt")).read_text(encoding="utf-8")
+    approved = (prompt_root / ("reel-approved-api.md" if portrait else "approved-api.md")).read_text(encoding="utf-8")
     chapter_by_id = {chapter["scene_id"]: chapter for chapter in _timeline_units(manifest)}
-    chapters = [chapter_by_id[chapter_id] for chapter_id in batch["chapter_ids"]]
+    all_units = _timeline_units(manifest)
+    plan_by_id = {str(item.get("id")): item for item in manifest.get("shot_plan") or []}
+    chapters = []
+    for chapter_id in batch["chapter_ids"]:
+        chapter = dict(chapter_by_id[chapter_id])
+        if portrait:
+            index = next(i for i, item in enumerate(all_units) if item["scene_id"] == chapter_id)
+            chapter["description"] = str(plan_by_id.get(chapter_id, {}).get("description") or "")
+            chapter["previous_shot_description"] = str(plan_by_id.get(all_units[index - 1]["scene_id"], {}).get("description") or "") if index else "Opening shot; no previous visual."
+            chapter["next_shot_description"] = str(plan_by_id.get(all_units[index + 1]["scene_id"], {}).get("description") or "") if index + 1 < len(all_units) else "Final payoff; no next visual."
+        chapters.append(chapter)
     markers = "\n".join(f"=== {chapter['scene_id']}.tsx ===" for chapter in chapters)
-    user = (
+    if portrait:
+        profile = resolve_render_profile(manifest.get("render_profile"))
+        user = (
+            "OUTPUT MARKERS\nReturn these markers in this exact order, each followed by its complete TSX file:\n"
+            f"{markers}\n\nPORTRAIT PROFILE\n{json.dumps(profile, separators=(',', ':'))}\n\n"
+            f"APPROVED API\n{approved}\n\nIMMUTABLE SHOTS WITH ADJACENT CONTEXT\n{json.dumps(chapters, ensure_ascii=False, separators=(',', ':'))}\n\n"
+            "Every requested file is a new native portrait shot. Use SHOT_DURATION equal to render_duration exactly. "
+            "The supplied local word cues own semantic timing. Preserve persistent objects/colors described by adjacent context; never use or infer parent-lesson visuals."
+            + (f"\n\nDIRECTOR OVERRIDE\n{instruction}" if instruction else "")
+        )
+    else:
+        user = (
         "OUTPUT MARKERS\nReturn these markers in this exact order, each followed by its complete TSX file:\n"
         f"{markers}\n\nFIXED VISUAL THEME\nCanvas 1920x1080; background #07111f; panel #0e1d31; text #eaf3ff; muted #91a8c5; "
         "cyan #46d9ff; amber #ffc857; coral #ff6b6b; minimum important text 30px. Motion Canvas origin is the CENTER at (0,0), "
@@ -490,7 +541,7 @@ def _batch_prompt(
     return system, user
 
 
-def _validate_chapter_source(content: str, chapter_id: str) -> None:
+def _validate_chapter_source(content: str, chapter_id: str, *, portrait: bool = False) -> None:
     if not content or "```" in content or "from 'http" in content or 'from "http' in content:
         raise RuntimeError(f"Unsafe or empty chapter: {chapter_id}")
     if "makeScene2D" in content:
@@ -506,8 +557,12 @@ def _validate_chapter_source(content: str, chapter_id: str) -> None:
                     f"{chapter_id} must pass TwoColumnComparison left/right TextItem objects; "
                     "put placement and opacity on a wrapping Layout"
                 )
-        if "../../presentation" not in content:
-            raise RuntimeError(f"{chapter_id} must use the fixed presentation components")
+        required_presentation = "../../reel-presentation" if portrait else "../../presentation"
+        forbidden_presentation = "../../presentation" if portrait else "../../reel-presentation"
+        if required_presentation not in content:
+            raise RuntimeError(f"{chapter_id} must use the fixed presentation components from {required_presentation}")
+        if forbidden_presentation in content:
+            raise RuntimeError(f"{chapter_id} imports components from the wrong render profile")
         if f"./{chapter_id}.cues" not in content:
             raise RuntimeError(f"{chapter_id} must import its deterministic CUES module")
         for raw_text in re.findall(r"<Txt\b[\s\S]*?\btext=[\"']([^\"']+)[\"'][\s\S]*?/?>", content):
@@ -515,9 +570,12 @@ def _validate_chapter_source(content: str, chapter_id: str) -> None:
                 raise RuntimeError(f"{chapter_id} uses raw Txt for prose: {raw_text!r}")
             if re.search(r"\\(?:text|frac|dfrac|sqrt|vec|mathbf|mathrm|quad|Rightarrow|uparrow|downarrow)\b", raw_text):
                 raise RuntimeError(f"{chapter_id} exposes LaTeX through raw Txt; use EquationCard instead: {raw_text!r}")
+        minimum_size, maximum_size = (42, 84) if portrait else (26, 32)
         for size in re.findall(r"<Txt\b[\s\S]*?\bfontSize=\{(\d+)\}[\s\S]*?/?>", content):
-            if int(size) < 26 or int(size) > 32:
-                raise RuntimeError(f"{chapter_id} raw diagram-label fontSize must be 26-32")
+            if int(size) < minimum_size or int(size) > maximum_size:
+                raise RuntimeError(
+                    f"{chapter_id} raw diagram-label fontSize must be {minimum_size}-{maximum_size}"
+                )
 
 
 def _normalize_chapter_source(content: str) -> str:
@@ -567,12 +625,12 @@ def _extract_response(response: str, chapter_ids: list[str]) -> dict[str, str]:
     return files
 
 
-def parse_response(response: str, chapter_ids: list[str]) -> dict[str, str]:
+def parse_response(response: str, chapter_ids: list[str], *, portrait: bool = False) -> dict[str, str]:
     files = _extract_response(response, chapter_ids)
     for chapter_id in chapter_ids:
         name = f"{chapter_id}.tsx"
         files[name] = _normalize_chapter_source(files[name])
-        _validate_chapter_source(files[name], chapter_id)
+        _validate_chapter_source(files[name], chapter_id, portrait=portrait)
     return files
 
 
@@ -638,8 +696,9 @@ def _repair_chapter_with_model(
         from mav_models import call_model_text
         model_call = call_model_text
     prompt_root = Path(__file__).with_name("prompts")
-    system = (prompt_root / "repair.system.txt").read_text(encoding="utf-8")
-    approved = (prompt_root / "approved-api.md").read_text(encoding="utf-8")
+    portrait = manifest.get("content_format") == "reel"
+    system = (prompt_root / ("reel_repair.system.txt" if portrait else "repair.system.txt")).read_text(encoding="utf-8")
+    approved = (prompt_root / ("reel-approved-api.md" if portrait else "approved-api.md")).read_text(encoding="utf-8")
     source = chapter_path.read_text(encoding="utf-8")
     user = (
         f"Return exactly this marker and a complete corrected file:\n=== {chapter_id}.tsx ===\n\n"
@@ -651,13 +710,16 @@ def _repair_chapter_with_model(
     last_error: Exception | None = None
     for attempt in range(4):
         try:
-            response = model_call(task="motion_canvas_repair", system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
+            response = model_call(task="reel_motion_canvas_repair" if portrait else "motion_canvas_repair", system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
             if not response:
                 raise RuntimeError("Model returned no repair response")
-            repaired = parse_response(response, [chapter_id])[f"{chapter_id}.tsx"]
+            repaired = parse_response(response, [chapter_id], portrait=portrait)[f"{chapter_id}.tsx"]
             unit = next((item for item in _timeline_units(manifest) if item["scene_id"] == chapter_id), None)
             if unit is not None:
                 repaired = _enforce_manifest_duration(repaired, unit)
+            if portrait:
+                from reels.validation import validate_portrait_tsx
+                validate_portrait_tsx(repaired, chapter_id)
             _validate_cue_references(root, repaired, chapter_id)
             _write(chapter_path, repaired)
             response_path = root / "responses" / f"qa-repair-{chapter_id}-{time.time_ns()}.txt"
@@ -732,14 +794,15 @@ def generate(
 
     def repair_chapter(chapter_id: str, source: str, error: str) -> str:
         prompt_root = Path(__file__).with_name("prompts")
-        system = (prompt_root / "repair.system.txt").read_text(encoding="utf-8")
-        approved = (prompt_root / "approved-api.md").read_text(encoding="utf-8")
+        portrait = manifest.get("content_format") == "reel"
+        system = (prompt_root / ("reel_repair.system.txt" if portrait else "repair.system.txt")).read_text(encoding="utf-8")
+        approved = (prompt_root / ("reel-approved-api.md" if portrait else "approved-api.md")).read_text(encoding="utf-8")
         user = (
             f"Return exactly this marker and a complete corrected file:\n=== {chapter_id}.tsx ===\n\n"
             f"VALIDATION ERROR\n{error}\n\nAPPROVED API\n{approved}\n\nCURRENT SOURCE\n{source}"
         )
-        response = call_with_backoff(task="motion_canvas_repair", system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
-        repaired = parse_response(response, [chapter_id])[f"{chapter_id}.tsx"]
+        response = call_with_backoff(task="reel_motion_canvas_repair" if portrait else "motion_canvas_repair", system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
+        repaired = parse_response(response, [chapter_id], portrait=portrait)[f"{chapter_id}.tsx"]
         repaired = _enforce_manifest_duration(repaired, chapter_by_id[chapter_id])
         _write(root / "responses" / f"repair-{chapter_id}.txt", response)
         return repaired
@@ -751,7 +814,10 @@ def generate(
             name = f"{chapter_id}.tsx"
             source = _enforce_manifest_duration(extracted[name], chapter_by_id[chapter_id])
             try:
-                _validate_chapter_source(source, chapter_id)
+                _validate_chapter_source(source, chapter_id, portrait=manifest.get("content_format") == "reel")
+                if manifest.get("content_format") == "reel":
+                    from reels.validation import validate_portrait_tsx
+                    validate_portrait_tsx(source, chapter_id)
                 _validate_cue_references(root, source, chapter_id)
             except Exception as exc:
                 try:
@@ -795,7 +861,7 @@ def generate(
         if missing_ids:
             request_batch = {**batch, "chapter_ids": missing_ids}
             system, user = _batch_prompt(root, manifest, request_batch, instruction=instruction)
-            response = call_with_backoff(system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
+            response = call_with_backoff(task="reel_motion_canvas_batch" if manifest.get("content_format") == "reel" else "motion_canvas_batch", system=system, user=user, max_tokens=MOTION_CANVAS_MAX_TOKENS)
             _write(response_path, response)
             new_installed, errors = install_response(response, missing_ids)
             installed.extend(new_installed)
@@ -907,6 +973,8 @@ def _sync_runtime(run_path: Path) -> None:
     scenes_temporary.replace(scenes_target)
     (RUNTIME_ROOT / "public").mkdir(parents=True, exist_ok=True)
     shutil.copy2(root / "voiceover.mp3", RUNTIME_ROOT / "public" / "voiceover.mp3")
+    profile = resolve_render_profile(manifest.get("render_profile"))
+    _write_json(RUNTIME_ROOT / "public" / "render-profile.json", profile)
 
 
 def prepare_runtime_preview(run_path: Path) -> None:

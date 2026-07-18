@@ -53,10 +53,12 @@ TOPIC_REF_RE = re.compile(r"^\d+(?:\.\d+){1,2}$")
 SCENE_ID_RE = re.compile(r"^scene_\d{2,3}$")
 CHAPTER_ID_RE = re.compile(r"^chapter_\d{2,3}$")
 MOTION_UNIT_ID_RE = re.compile(r"^(?:chapter|shot|reel|beat)_\d{2,3}$")
-MODEL_PROVIDERS = {"configured", "gemini", "anthropic", "codex"}
+MODEL_PROVIDERS = {"configured", "gemini", "anthropic", "zai", "moonshot", "codex", "grok"}
 AUDIO_PROVIDERS = {"gemini", "elevenlabs"}
 CODEX_MODELS = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini")
+GROK_MODELS = ("grok-4.5",)
 CODEX_REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
+GROK_REASONING_EFFORTS = ("low", "medium", "high")
 RENDER_QUALITIES = {"draft", "standard", "high"}
 
 _processes: dict[str, subprocess.Popen[str]] = {}
@@ -104,24 +106,29 @@ def _run_dir(run_id: str) -> Path:
 
 def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
+    shared_catalog = {
+        str(provider): [str(model) for model in models]
+        for provider, models in (payload.get("model_catalog") or {}).items()
+        if isinstance(models, list) and models
+    }
     tasks = []
-    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair"}
-    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "motion_canvas_batch": 5, "motion_canvas_repair": 5, "reel_candidate_analysis": 1, "reel_story_structure": 1, "reel_script_writing": 2, "reel_shot_planning": 6, "reel_motion_canvas_batch": 7, "reel_motion_canvas_repair": 8}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair", "reel_candidate_analysis": "Reel concepts", "reel_story_structure": "Reel treatment", "reel_script_writing": "Reel script", "reel_shot_planning": "Portrait shot plan", "reel_motion_canvas_batch": "Portrait shot coder", "reel_motion_canvas_repair": "Portrait shot repair"}
+    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair", "reel_candidate_analysis", "reel_story_structure", "reel_script_writing", "reel_shot_planning", "reel_motion_canvas_batch", "reel_motion_canvas_repair"}
     for task, config in payload.get("tasks", {}).items():
         if task not in retained_tasks:
             continue
         provider_models = dict(config.get("provider_models") or {})
         provider_models.setdefault(str(config.get("provider")), str(config.get("model")))
         configured_options = config.get("provider_model_options") or {}
-        provider_model_options = {
-            provider: list(configured_options.get(provider) or [model])
-            for provider, model in provider_models.items()
-        }
-        if task in {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}:
-            provider_models["codex"] = CODEX_MODELS[0]
-            provider_model_options["codex"] = list(CODEX_MODELS)
-        tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "reasoning_efforts": list(CODEX_REASONING_EFFORTS), "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
+        provider_model_options = {}
+        for provider, options in shared_catalog.items():
+            provider_model_options[provider] = list(options)
+            configured_default = provider_models.get(provider)
+            provider_models[provider] = configured_default if configured_default in options else options[0]
+        for provider, model in list(provider_models.items()):
+            provider_model_options.setdefault(provider, list(configured_options.get(provider) or [model]))
+        tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "reasoning_efforts": list(CODEX_REASONING_EFFORTS), "provider_reasoning_efforts": {"codex": list(CODEX_REASONING_EFFORTS), "grok": list(GROK_REASONING_EFFORTS)}, "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
     tasks.append({"task": "audio_generation", "label": labels["audio_generation"], "step": 3, "provider": "gemini", "model": os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview"), "provider_models": {"gemini": "gemini-3.1-flash-tts-preview", "elevenlabs": os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3")}, "prompt_files": [], "max_tokens": None})
     return {"version": payload.get("version"), "tasks": sorted(tasks, key=lambda item: (item.get("step") or 99, item["task"]))}
 
@@ -142,10 +149,11 @@ def _validate_task_models(value: Any) -> dict[str, dict[str, str]]:
         allowed = catalog[task].get("provider_model_options") or {key: [item] for key, item in catalog[task]["provider_models"].items()}
         if provider not in allowed or model not in allowed[provider]:
             raise ValueError(f"Unsupported model selection for {task}: {provider}:{model}")
-        if provider == "codex" and reasoning not in CODEX_REASONING_EFFORTS:
-            raise ValueError(f"Unsupported Codex reasoning effort for {task}: {reasoning}")
+        allowed_reasoning = GROK_REASONING_EFFORTS if provider == "grok" else CODEX_REASONING_EFFORTS
+        if provider in {"codex", "grok"} and reasoning not in allowed_reasoning:
+            raise ValueError(f"Unsupported reasoning effort for {task}: {reasoning}")
         overrides[task] = {"provider": provider, "model": model}
-        if provider == "codex":
+        if provider in {"codex", "grok"}:
             overrides[task]["reasoning_effort"] = reasoning
     return overrides
 
@@ -275,9 +283,12 @@ def dashboard_payload() -> dict[str, Any]:
         },
         "providers": {
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
+            "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
             "elevenlabs": bool(os.getenv("ELEVENLABS_API_KEY")),
             "zai": bool(os.getenv("ZAI_API_KEY") or os.getenv("ZHIPU_API_KEY") or os.getenv("BIGMODEL_API_KEY")),
             "moonshot": bool(os.getenv("MOONSHOT_API_KEY")),
+            "codex": bool(shutil.which("codex")),
+            "grok": bool(os.getenv("XAI_API_KEY") or shutil.which("grok")),
         },
     }
 
@@ -303,6 +314,12 @@ def topic_detail(topic_ref: str) -> dict[str, Any]:
 
 
 def _infer_step(run_path: Path) -> int:
+    input_payload = _read_json(run_path / "input.json", {}) or {}
+    if input_payload.get("content_format") == "reel":
+        markers = ((1, "reel_treatment.json"), (2, "narration.json"), (3, "audio_generation.json"),
+                   (4, "audio_timing.json"), (5, "reel_timeline.json"), (6, "reel_shot_plan.json"),
+                   (7, "motion_canvas/generation-report.json"), (8, "motion_canvas/robot-report.json"))
+        return max((step for step, marker in markers if (run_path / marker).exists()), default=0)
     markers = (
         (1, "input.json"),
         (2, "narration.json"),
@@ -341,6 +358,8 @@ def _synthesized_meta(run_path: Path) -> dict[str, Any]:
         "created_at": datetime.fromtimestamp(run_path.stat().st_ctime, timezone.utc).isoformat(),
         "updated_at": datetime.fromtimestamp(run_path.stat().st_mtime, timezone.utc).isoformat(),
         "settings": {"animation_mode": MOTION_CANVAS_MODE},
+        "content_format": input_payload.get("content_format", "lesson"),
+        "parent_run_id": input_payload.get("parent_run_id"),
         "error": None,
     }
 
@@ -355,6 +374,9 @@ def _normalized_meta(run_path: Path, meta: dict[str, Any]) -> dict[str, Any]:
         normalized["topic_ref"] = topic_ref
     normalized.setdefault("topic", input_payload.get("topic") or summary.get("topic") or run_path.name)
     normalized.setdefault("objective_ids", input_payload.get("objective_ids", []))
+    normalized.setdefault("content_format", input_payload.get("content_format", "lesson"))
+    if input_payload.get("parent_run_id"):
+        normalized.setdefault("parent_run_id", input_payload.get("parent_run_id"))
     if not normalized.get("facts_path") and TOPIC_REF_RE.fullmatch(topic_ref):
         facts_path = TOPICS_ROOT / topic_ref / "facts.json"
         if facts_path.exists():
@@ -494,12 +516,21 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "motion_canvas/scenes.ts", "motion_canvas/validation.json",
         "motion_canvas/robot-report.json", "motion_canvas/preview/contact-sheet.png",
         "motion_canvas/final.mp4",
+        "reel_candidate.json", "reel_treatment.json", "reel_timeline.json", "reel_shot_plan.json",
+        "motion_canvas/preview/shot-contact-sheet.png",
     ):
         if (run_path / relative).exists():
             files.append(relative)
     return {
         "files": files,
         "animation_mode": animation_mode,
+        "content_format": meta.get("content_format", "lesson"),
+        "render_profile": motion_manifest.get("render_profile", "lesson_landscape"),
+        "reel_candidate": _read_json(run_path / "reel_candidate.json", {}) or {},
+        "reel_treatment": _read_json(run_path / "reel_treatment.json", {}) or {},
+        "reel_narration": _read_json(run_path / "narration.json", {}) or {} if meta.get("content_format") == "reel" else {},
+        "reel_shot_plan": _read_json(run_path / "reel_shot_plan.json", {}) or {},
+        "shot_contact_sheet_url": f"/artifacts/runs/{run_id}/motion_canvas/preview/shot-contact-sheet.png" if (run_path / "motion_canvas" / "preview" / "shot-contact-sheet.png").exists() else None,
         "scenes": scenes,
         "chapters": chapters,
         "timeline_mode": motion_manifest.get("timeline_mode", "legacy_chapters"),
@@ -639,10 +670,10 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         prefix = f"MAV_{task.upper()}"
         env[f"{prefix}_PROVIDER"] = selection["provider"]
         env[f"{prefix}_MODEL"] = selection["model"]
-        if selection["provider"] == "codex":
+        if selection["provider"] in {"codex", "grok"}:
             env[f"{prefix}_REASONING_EFFORT"] = selection.get("reasoning_effort", "low")
     motion_selection = task_models.get("motion_canvas_batch")
-    if motion_selection and motion_selection["provider"] == "codex":
+    if motion_selection and motion_selection["provider"] in {"codex", "grok"}:
         # Subscription-backed Codex runs are intentionally conservative; the
         # normal batch cache still preserves every successful result.
         concurrency = min(int(settings.get("scene_concurrency", 1)), 2)
@@ -786,6 +817,138 @@ def execute_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         _save_meta(meta)
     command, env = build_generation_command(meta, payload)
     return _start_process(run_id, command, env, mode="generation", target_step=int(payload.get("stop_after_step", 8)))
+
+
+def reels_payload() -> dict[str, Any]:
+    runs = list_runs()
+    lessons = []
+    children_by_parent: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for run in runs:
+        input_payload = _read_json(_run_dir(run["id"]) / "input.json", {}) or {}
+        if (
+            run.get("content_format") == "reel"
+            and run.get("parent_run_id")
+            and input_payload.get("reel_pipeline_version") == "native-portrait-v2"
+        ):
+            children_by_parent[str(run["parent_run_id"])].append(run)
+    for run in runs:
+        if run.get("content_format", "lesson") != "lesson" or not (_run_dir(run["id"]) / "narration.json").exists():
+            continue
+        candidates = _read_json(_run_dir(run["id"]) / "reel_candidates.json", {}) or {}
+        native_candidates = candidates.get("candidates", []) if candidates.get("reel_pipeline_version") == "native-portrait-v2" else []
+        lessons.append({"parent": run, "candidates": native_candidates, "children": children_by_parent.get(run["id"], [])})
+    return {"lessons": lessons, "reel_count": sum(len(item["children"]) for item in lessons)}
+
+
+def _reel_task_env(task_models: Any) -> dict[str, str]:
+    selections = _validate_task_models(task_models)
+    env = os.environ.copy()
+    for task, selection in selections.items():
+        if task == "audio_generation":
+            env["GEMINI_TTS_MODEL" if selection["provider"] == "gemini" else "ELEVENLABS_MODEL_ID"] = selection["model"]
+            continue
+        prefix = f"MAV_{task.upper()}"
+        env[f"{prefix}_PROVIDER"] = selection["provider"]
+        env[f"{prefix}_MODEL"] = selection["model"]
+        if selection["provider"] in {"codex", "grok"}:
+            env[f"{prefix}_REASONING_EFFORT"] = selection.get("reasoning_effort", "high")
+    return env
+
+
+def analyze_parent_reels(parent_run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if not bool(payload.get("confirm_paid_api")):
+        raise PermissionError("Reel concept analysis requires paid/API confirmation")
+    parent = _load_meta(parent_run_id)
+    if parent.get("content_format", "lesson") != "lesson" or not (_run_dir(parent_run_id) / "narration.json").exists():
+        raise RuntimeError("Reels require an approved parent lesson narration")
+    command = [PYTHON_EXECUTABLE, str(TEMPLATE_LAB_ROOT / "scripts" / "mav_reel.py"), "analyze", "--parent-run-id", parent_run_id,
+               "--candidate-count", str(max(3, min(int(payload.get("candidate_count", 4)), 5))), "--confirm-paid-api"]
+    result = subprocess.run(command, cwd=REPO_ROOT, env=_reel_task_env(payload.get("task_models", {})), capture_output=True, text=True, timeout=2400)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout)[-4000:])
+    return {"candidates": _read_json(_run_dir(parent_run_id) / "reel_candidates.json", {}) or {}, "reels": reels_payload()}
+
+
+def create_reel_run(parent_run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    from template_lab.reels.pipeline import create_reel
+    candidate_id = str(payload.get("candidate_id") or "")
+    reel_run_id = str(payload.get("reel_run_id") or f"{parent_run_id}--reel-{int(time.time())}")
+    input_payload = create_reel(parent_run_id, candidate_id, reel_run_id)
+    parent = _load_meta(parent_run_id)
+    settings = {
+        "duration": float(input_payload.get("target_duration_seconds", 38)), "model_provider": "configured",
+        "audio_provider": str(payload.get("audio_provider") or "gemini"), "scene_concurrency": 2,
+        "confirm_paid_api": True, "task_models": _validate_task_models(payload.get("task_models")),
+        "animation_mode": MOTION_CANVAS_MODE, "render_profile": "reel_portrait",
+    }
+    meta = {"id": reel_run_id, "topic_ref": parent.get("topic_ref", ""), "topic": input_payload["topic"],
+            "objective_ids": [], "facts_path": parent.get("facts_path", ""), "content_format": "reel",
+            "parent_run_id": parent_run_id, "status": "created", "current_step": 0,
+            "created_at": _now(), "updated_at": _now(), "settings": settings, "error": None}
+    _save_meta(meta); _append_log(reel_run_id, f"Native portrait Reel linked to {parent_run_id} from {candidate_id}")
+    return run_detail(reel_run_id)
+
+
+def execute_reel_run(reel_run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    meta = _load_meta(reel_run_id)
+    if meta.get("content_format") != "reel":
+        raise RuntimeError("This endpoint accepts only native Reel runs")
+    from_step, stop_after = int(payload.get("from_step", 1)), int(payload.get("stop_after_step", 8))
+    if not 1 <= from_step <= stop_after <= 8:
+        raise ValueError("Reel steps must satisfy 1 <= from <= stop <= 8")
+    if not bool(payload.get("confirm_paid_api", meta.get("settings", {}).get("confirm_paid_api"))):
+        raise PermissionError("Reel generation requires paid/API confirmation")
+    command = [PYTHON_EXECUTABLE, str(TEMPLATE_LAB_ROOT / "scripts" / "mav_reel.py"), "generate", "--reel-run-id", reel_run_id,
+               "--from-step", str(from_step), "--stop-after-step", str(stop_after), "--use-model", "--confirm-paid-api",
+               "--audio-provider", str(payload.get("audio_provider") or meta.get("settings", {}).get("audio_provider", "gemini"))]
+    instruction = str(payload.get("instruction") or "").strip()
+    if instruction: command += ["--instruction", instruction]
+    if payload.get("force_paid_api"): command.append("--force-paid-api")
+    env = _reel_task_env(payload.get("task_models", meta.get("settings", {}).get("task_models", {})))
+    env["MAV_MOTION_CANVAS_WORKERS"] = str(max(1, min(int(payload.get("scene_concurrency", 2)), 3)))
+    return _start_process(reel_run_id, command, env, mode="generation", target_step=stop_after)
+
+
+def regenerate_reel_shot(reel_run_id: str, shot_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if not re.fullmatch(r"shot_\d{3}", shot_id):
+        raise ValueError("Invalid Reel shot id")
+    meta = _load_meta(reel_run_id)
+    command = [PYTHON_EXECUTABLE, str(TEMPLATE_LAB_ROOT / "scripts" / "mav_reel.py"), "regenerate-shot", "--reel-run-id", reel_run_id,
+               "--shot-id", shot_id, "--instruction", str(payload.get("instruction") or "Make the physical change clearer and more dynamic while preserving timing."), "--confirm-paid-api"]
+    return _start_process(reel_run_id, command, _reel_task_env(payload.get("task_models", meta.get("settings", {}).get("task_models", {}))), mode="generation", target_step=8)
+
+
+def update_reel_script(reel_run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    from template_lab.reels.schemas import validate_narration
+    from template_lab.reels.source import load_parent_source
+    from template_lab.reels.validation import invalidate
+    run_path = _run_dir(reel_run_id); input_payload = _read_json(run_path / "input.json", {}) or {}
+    source = load_parent_source(_run_dir(str(input_payload.get("parent_run_id"))))
+    paragraphs = payload.get("paragraphs")
+    if not isinstance(paragraphs, list):
+        raise ValueError("paragraphs must be a list of spoken text blocks")
+    current = _read_json(run_path / "narration.json", {}) or {}
+    narration = {**current, "paragraphs": [{"id": f"paragraph_{index:02d}", "text": str(text).strip()} for index, text in enumerate(paragraphs, 1)]}
+    narration = validate_narration(narration, source)
+    invalidate(run_path, "narration")
+    _write_json(run_path / "narration.json", narration)
+    (run_path / "narration.txt").write_text("\n\n".join(item["text"] for item in narration["paragraphs"]) + "\n", encoding="utf-8")
+    (run_path / "narration_elevenlabs.txt").write_text(narration["elevenlabs_narration"] + "\n", encoding="utf-8")
+    meta = _load_meta(reel_run_id); meta.update({"status": "paused", "current_step": 2, "error": None}); _save_meta(meta)
+    return run_detail(reel_run_id)
+
+
+def update_reel_shot(reel_run_id: str, shot_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    from template_lab.reels.validation import invalidate
+    if not re.fullmatch(r"shot_\d{3}", shot_id): raise ValueError("Invalid Reel shot id")
+    run_path = _run_dir(reel_run_id); plan = _read_json(run_path / "reel_shot_plan.json", {}) or {}
+    shot = next((item for item in plan.get("shots") or [] if item.get("id") == shot_id), None)
+    description = str(payload.get("description") or "").strip()
+    if not shot or len(description.split()) < 12: raise ValueError("A detailed shot description of at least 12 words is required")
+    shot["description"] = description; _write_json(run_path / "reel_shot_plan.json", plan)
+    invalidate(run_path, "shot_tsx", shot_id=shot_id)
+    meta = _load_meta(reel_run_id); meta.update({"status": "paused", "current_step": 6, "error": None}); _save_meta(meta)
+    return run_detail(reel_run_id)
 
 
 def _render_settings(payload: dict[str, Any]) -> dict[str, Any]:
@@ -977,7 +1140,8 @@ def enqueue_render_runs(run_ids: list[str], payload: dict[str, Any]) -> dict[str
         active_ids = {str(item.get("run_id")) for item in queue["entries"] if item.get("status") in {"queued", "running"}}
         for run_id in requested:
             meta = _load_meta(run_id)
-            if int(meta.get("current_step", 0)) < 7:
+            required_step = 8 if meta.get("content_format") == "reel" else 7
+            if int(meta.get("current_step", 0)) < required_step:
                 raise RuntimeError(f"{run_id} must complete preview/QA before MP4 rendering")
             if run_id in active_ids:
                 continue
@@ -1330,6 +1494,8 @@ class StudioHandler(BaseHTTPRequestHandler):
                 return self._json(_read_json(ASSETS_PATH, {"scenes": []}))
             if path == "/api/runs":
                 return self._json({"runs": list_runs()})
+            if path == "/api/reels":
+                return self._json(reels_payload())
             if path == "/api/render-queue":
                 return self._json({"queue": render_queue_payload()})
             if path == "/api/model-map":
@@ -1370,6 +1536,24 @@ class StudioHandler(BaseHTTPRequestHandler):
             body = self._body()
             if path == "/api/runs":
                 return self._json({"run": create_run(body)}, 201)
+            match = re.fullmatch(r"/api/runs/([^/]+)/reels/analyze", path)
+            if match:
+                return self._json(analyze_parent_reels(match.group(1), body))
+            match = re.fullmatch(r"/api/runs/([^/]+)/reels", path)
+            if match:
+                return self._json({"run": create_reel_run(match.group(1), body)}, 201)
+            match = re.fullmatch(r"/api/reels/([^/]+)/execute", path)
+            if match:
+                return self._json({"run": execute_reel_run(match.group(1), body)}, 202)
+            match = re.fullmatch(r"/api/reels/([^/]+)/script", path)
+            if match:
+                return self._json({"run": update_reel_script(match.group(1), body)})
+            match = re.fullmatch(r"/api/reels/([^/]+)/shots/([^/]+)", path)
+            if match:
+                return self._json({"run": update_reel_shot(match.group(1), match.group(2), body)})
+            match = re.fullmatch(r"/api/reels/([^/]+)/shots/([^/]+)/regenerate", path)
+            if match:
+                return self._json({"run": regenerate_reel_shot(match.group(1), match.group(2), body)}, 202)
             if path == "/api/render-queue":
                 queue = enqueue_render_runs(list(body.get("run_ids") or []), body)
                 return self._json({"queue": queue}, 202)

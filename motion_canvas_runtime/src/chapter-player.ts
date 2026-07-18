@@ -17,7 +17,13 @@ audio.preload = 'auto';
 const ready = async () => {
   while (!window.__motionCanvasRobotReady) await new Promise(resolve => setTimeout(resolve, 25));
   const canvas = document.querySelector('canvas');
-  if (canvas) stage.append(canvas);
+  if (canvas) {
+    try {
+      const profile = await fetch('/render-profile.json', {cache: 'no-store'}).then(response => response.json());
+      canvas.style.aspectRatio = `${Number(profile.width || 1920)} / ${Number(profile.height || 1080)}`;
+    } catch {}
+    stage.append(canvas);
+  }
   await window.MotionCanvasRobot.seek(visualStart);
 };
 

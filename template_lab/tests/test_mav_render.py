@@ -8,10 +8,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from mav_render import HYPERFRAMES_BIN, _hyperframes_command, _hyperframes_env, _write_hyperframes_composition
+from mav_render import HYPERFRAMES_BIN, _hyperframes_command, _hyperframes_env, _validate_render_dimensions, _write_hyperframes_composition
 
 
 class MavRenderTest(unittest.TestCase):
+    def test_reel_render_rejects_non_portrait_dimensions(self) -> None:
+        probe = {"streams": [{"codec_type": "video", "width": 1920, "height": 1080}]}
+        with self.assertRaisesRegex(RuntimeError, "1080x1920"):
+            _validate_render_dimensions({"content_format": "reel"}, probe)
+        _validate_render_dimensions({"content_format": "lesson"}, probe)
+
     def test_hyperframes_env_disables_streaming_encode(self) -> None:
         self.assertEqual(_hyperframes_env()["PRODUCER_ENABLE_STREAMING_ENCODE"], "false")
 

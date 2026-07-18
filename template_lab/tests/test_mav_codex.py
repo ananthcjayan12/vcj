@@ -4,13 +4,33 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from mav_codex import _binary, _strict_output_schema
+from mav_codex import _binary, _strict_output_schema, call_codex_text
 from motion_canvas.pipeline import _normalize_chapter_source, _validate_chapter_source, _validate_cue_references
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 class CodexDiscoveryTest(unittest.TestCase):
+    def test_reel_task_runs_outside_repository(self) -> None:
+        captured = {}
+
+        def complete(command, **_kwargs):
+            captured["command"] = command
+            Path(command[command.index("--output-last-message") + 1]).write_text("answer")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch("mav_codex._binary", return_value="/tmp/codex"), \
+             patch("mav_codex._login_status"), \
+             patch("mav_codex.subprocess.run", side_effect=complete), \
+             patch("mav_codex.record_model_usage"):
+            self.assertEqual(call_codex_text(task="reel_script_writing", system="system", user="user"), "answer")
+        command = captured["command"]
+        self.assertNotIn(str(REPOSITORY_ROOT), command[command.index("--cd") + 1])
+        self.assertIn("--skip-git-repo-check", command)
+
     def test_explicit_executable_is_preferred_without_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             executable = Path(directory) / "codex"

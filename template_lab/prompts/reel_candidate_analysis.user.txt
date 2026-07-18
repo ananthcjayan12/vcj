@@ -1,0 +1,24 @@
+Discover {candidate_count} standalone Reel concepts from the approved source below.
+
+TOPIC
+{topic}
+
+AUDIENCE
+{audience}
+
+DESIRED DURATION
+{duration_guidance}
+
+APPROVED PARENT NARRATION JSON
+{narration_json}
+
+GROUNDED FACTS
+{grounded_facts_json}
+
+VALID PARENT PARAGRAPH IDS
+{paragraph_ids_json}
+
+VALID CLAIM IDS
+{claim_ids_json}
+
+Return only: {"candidates":[{"id":"candidate_01","title":"...","idea":"...","opening":"...","ending":"...","source_paragraph_ids":["..."],"source_claim_ids":["..."]}]}

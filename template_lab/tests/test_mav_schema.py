@@ -149,7 +149,8 @@ class MavSchemaTest(unittest.TestCase):
             self.assertEqual(models[task]["env_var"], env_var)
             self.assertEqual(models[task]["max_tokens"], max_tokens)
             self.assertTrue(models[task]["prompt_files"])
-        self.assertEqual(set(models), set(expected))
+        self.assertTrue(set(expected).issubset(models))
+        self.assertTrue({"reel_candidate_analysis", "reel_story_structure", "reel_script_writing", "reel_shot_planning", "reel_motion_canvas_batch", "reel_motion_canvas_repair"}.issubset(models))
 
         with patch.dict("os.environ", {}, clear=True):
             self.assertEqual(model_config_for_task("script_structure").provider, "gemini")

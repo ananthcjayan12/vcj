@@ -23,7 +23,7 @@ DEFAULT_ANTHROPIC_RETRY_BASE_SECONDS = 2.0
 ANTHROPIC_RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 529}
 ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 MOONSHOT_CHAT_COMPLETIONS_URL = "https://api.moonshot.ai/v1/chat/completions"
-SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot", "codex"}
+SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot", "codex", "grok"}
 GEMINI_JSON_SCHEMA_KEYS = {
     "$id",
     "$defs",
@@ -70,11 +70,31 @@ def load_env() -> None:
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def _prompt_model_mapping() -> dict[str, Any]:
+def _prompt_model_payload() -> dict[str, Any]:
     if not PROMPT_MODEL_MAPPING_PATH.exists():
         return {}
-    payload = json.loads(PROMPT_MODEL_MAPPING_PATH.read_text(encoding="utf-8"))
-    return payload.get("tasks", {})
+    return json.loads(PROMPT_MODEL_MAPPING_PATH.read_text(encoding="utf-8"))
+
+
+def _prompt_model_mapping() -> dict[str, Any]:
+    payload = _prompt_model_payload()
+    catalog = payload.get("model_catalog") or {}
+    normalized: dict[str, Any] = {}
+    for task, raw_config in (payload.get("tasks") or {}).items():
+        config = dict(raw_config)
+        provider_models = dict(config.get("provider_models") or {})
+        provider_options = {}
+        for provider, models in catalog.items():
+            options = [str(model) for model in models if str(model).strip()]
+            if not options:
+                continue
+            configured_default = provider_models.get(provider)
+            provider_models[provider] = configured_default if configured_default in options else options[0]
+            provider_options[provider] = options
+        config["provider_models"] = provider_models
+        config["provider_model_options"] = provider_options
+        normalized[task] = config
+    return normalized
 
 
 def configured_models() -> dict[str, Any]:
@@ -139,6 +159,8 @@ def _raise_if_model_provider_mismatch(model: str, provider: str, source: str) ->
         raise RuntimeError(f"{source}={model!r} does not look like a Claude model while provider is anthropic")
     if provider == "zai" and not normalized.startswith("glm-"):
         raise RuntimeError(f"{source}={model!r} does not look like a Z.AI GLM model while provider is zai")
+    if provider == "grok" and not normalized.startswith("grok-"):
+        raise RuntimeError(f"{source}={model!r} does not look like an xAI Grok model while provider is grok")
 
 
 def _positive_int(value: Any, label: str) -> int:
@@ -287,6 +309,13 @@ def provider_available(provider: str) -> bool:
             return True
         except RuntimeError:
             return False
+    if normalized == "grok":
+        from mav_grok import _binary, _login_status
+        try:
+            _login_status(_binary())
+            return True
+        except RuntimeError:
+            return False
     return bool(_api_key_for_provider(normalized))
 
 
@@ -368,6 +397,9 @@ def call_model_json(
     if resolved.provider == "codex":
         from mav_codex import call_codex_json
         return call_codex_json(task=task, system=system, user=user, max_tokens=max_tokens, output_schema=output_schema)
+    if resolved.provider == "grok":
+        from mav_grok import call_grok_json
+        return call_grok_json(task=task, system=system, user=user, max_tokens=max_tokens, output_schema=output_schema)
     if not provider_available(resolved.provider):
         raise RuntimeError(
             f"{resolved.provider.title()} provider selected for {task}, but {_api_key_hint(resolved.provider)} is not set"
@@ -395,6 +427,9 @@ def call_model_text(
     if resolved.provider == "codex":
         from mav_codex import call_codex_text
         return call_codex_text(task=task, system=system, user=user, max_tokens=max_tokens)
+    if resolved.provider == "grok":
+        from mav_grok import call_grok_text
+        return call_grok_text(task=task, system=system, user=user, max_tokens=max_tokens)
     if not provider_available(resolved.provider):
         raise RuntimeError(
             f"{resolved.provider.title()} provider selected for {task}, but {_api_key_hint(resolved.provider)} is not set"

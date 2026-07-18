@@ -30,6 +30,14 @@ DEFAULT_GEMINI_TTS_PROMPT_PREFIX = (
     "Physics teacher: curious and engaging, never rushed or theatrical. Pause naturally around "
     "questions, equations, and important conclusions. Do not add, remove, or rewrite words.\n\n"
 )
+DEFAULT_REEL_GEMINI_TTS_PROMPT_PREFIX = (
+    "Perform the following vertical educational Reel voiceover exactly as written. Use a youthful, premium, "
+    "high-energy presenter voice: aggressive forward momentum, fast and enthusiastic, crisp consonants, confident "
+    "curiosity, and strong payoff emphasis. Aim around 175 to 195 spoken words per minute. Keep micro-pauses short. "
+    "Never sound slow, sleepy, theatrical, robotic, or like a patient classroom lecture. Scientific terms must remain "
+    "precise. Do not add, remove, or rewrite words. Interpret bracketed performance directions naturally without "
+    "speaking the brackets.\n\n"
+)
 GEMINI_TTS_SAMPLE_RATE = 24000
 GEMINI_TTS_CHANNELS = 1
 GEMINI_TTS_SAMPLE_WIDTH = 2
@@ -82,22 +90,23 @@ def is_live_audio_provider(provider: str) -> bool:
     return provider in SUPPORTED_AUDIO_PROVIDERS
 
 
-def _audio_provider_config(provider: str) -> AudioProviderConfig:
+def _audio_provider_config(provider: str, *, content_format: str = "lesson") -> AudioProviderConfig:
     load_env()
     if provider == ELEVENLABS_AUDIO_PROVIDER:
         return AudioProviderConfig(
             provider=provider,
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID", ""),
+            voice_id=os.getenv("ELEVENLABS_REEL_VOICE_ID" if content_format == "reel" else "ELEVENLABS_VOICE_ID", os.getenv("ELEVENLABS_VOICE_ID", "")),
             model_id=os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3"),
             output_format=os.getenv("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128"),
         )
     if provider == GEMINI_AUDIO_PROVIDER:
         return AudioProviderConfig(
             provider=provider,
-            voice_id=os.getenv("GEMINI_TTS_VOICE", DEFAULT_GEMINI_TTS_VOICE),
+            voice_id=os.getenv("MAV_REEL_TTS_VOICE", "Puck") if content_format == "reel" else os.getenv("GEMINI_TTS_VOICE", DEFAULT_GEMINI_TTS_VOICE),
             model_id=os.getenv("GEMINI_TTS_MODEL", DEFAULT_GEMINI_TTS_MODEL),
             output_format="mp3_from_wav_24000",
-            prompt_prefix=os.getenv("GEMINI_TTS_PROMPT_PREFIX", DEFAULT_GEMINI_TTS_PROMPT_PREFIX),
+            prompt_prefix=(os.getenv("MAV_REEL_TTS_PROMPT_PREFIX", DEFAULT_REEL_GEMINI_TTS_PROMPT_PREFIX)
+                           if content_format == "reel" else os.getenv("GEMINI_TTS_PROMPT_PREFIX", DEFAULT_GEMINI_TTS_PROMPT_PREFIX)),
             language_code=os.getenv("GEMINI_TTS_LANGUAGE_CODE", ""),
         )
     raise RuntimeError(f"Unsupported audio provider {provider!r}")
@@ -121,10 +130,10 @@ def estimate_audio_duration(narration: dict[str, Any], target: float) -> float:
     return max(target - 3.0, min(target + 3.0, estimated))
 
 
-def _call_elevenlabs_with_timestamps(text: str) -> dict[str, Any]:
+def _call_elevenlabs_with_timestamps(text: str, *, content_format: str = "lesson") -> dict[str, Any]:
     load_env()
     api_key = os.getenv("ELEVENLABS_API_KEY") or os.getenv("XI_API_KEY")
-    voice_id = os.getenv("ELEVENLABS_VOICE_ID")
+    voice_id = os.getenv("ELEVENLABS_REEL_VOICE_ID" if content_format == "reel" else "ELEVENLABS_VOICE_ID") or os.getenv("ELEVENLABS_VOICE_ID")
     if not api_key or not voice_id:
         raise RuntimeError("ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID are required for live audio")
     model_id = os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3")
@@ -135,8 +144,9 @@ def _call_elevenlabs_with_timestamps(text: str) -> dict[str, Any]:
         "text": text,
         "model_id": model_id,
         "voice_settings": {
-            "stability": float(os.getenv("ELEVENLABS_STABILITY", "0.5")),
+            "stability": float(os.getenv("ELEVENLABS_REEL_STABILITY", "0.28") if content_format == "reel" else os.getenv("ELEVENLABS_STABILITY", "0.5")),
             "similarity_boost": float(os.getenv("ELEVENLABS_SIMILARITY_BOOST", "0.75")),
+            **({"style": float(os.getenv("ELEVENLABS_REEL_STYLE", "0.7")), "use_speaker_boost": True} if content_format == "reel" else {}),
         },
     }
     request = urllib.request.Request(
@@ -343,6 +353,7 @@ def generate_audio(
     use_elevenlabs: bool = False,
     use_gemini_tts: bool = False,
     audio_provider: str | None = None,
+    content_format: str = "lesson",
 ) -> dict[str, Any]:
     run_path.mkdir(parents=True, exist_ok=True)
     chunks_dir = run_path / "audio_chunks"
@@ -354,7 +365,7 @@ def generate_audio(
         use_elevenlabs=use_elevenlabs,
         use_gemini_tts=use_gemini_tts,
     )
-    config = _audio_provider_config(provider)
+    config = _audio_provider_config(provider, content_format=content_format)
     key = _cache_key(text, config)
     audio_path = run_path / "voiceover.mp3"
     gemini_wav_path = run_path / "voiceover.wav"
@@ -378,7 +389,7 @@ def generate_audio(
         if not chapter_reused:
             (chapter_dir / "narration.txt").write_text(chapter_text, encoding="utf-8")
             if provider == ELEVENLABS_AUDIO_PROVIDER:
-                response = _call_elevenlabs_with_timestamps(chapter_text)
+                response = _call_elevenlabs_with_timestamps(chapter_text, content_format=content_format)
                 source_path.write_bytes(base64.b64decode(response["audio_base64"]))
                 _convert_audio_to_wav(source_path, wav_path)
                 alignment_payload = {"alignment": response.get("alignment"), "normalized_alignment": response.get("normalized_alignment")}
@@ -417,7 +428,7 @@ def generate_audio(
     if alignment_path.exists():
         alignment_path.unlink()
     audio_manifest = {
-        "version": "2.0", "strategy": "chapter_tts", "provider": provider, "model_id": config.model_id,
+        "version": "2.0", "strategy": "chapter_tts", "content_format": content_format, "provider": provider, "model_id": config.model_id,
         "voice_id": config.voice_id, "sample_rate": GEMINI_TTS_SAMPLE_RATE, "chapters": chapter_records,
         "audio_duration_seconds": round(absolute_time, 3),
         "mp3_container_duration_seconds": round(ffprobe_duration(audio_path) or absolute_time, 3),
@@ -441,6 +452,7 @@ def generate_audio(
         "audio_duration_seconds": round(actual_duration, 3),
         "has_alignment": any((chunks_dir / item["id"] / "alignment.json").exists() for item in chapter_records),
         "strategy": "chapter_tts",
+        "content_format": content_format,
         "audio_manifest": "audio_chunks/manifest.json",
         "chunks": chapter_records,
     }

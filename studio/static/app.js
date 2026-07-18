@@ -2,6 +2,8 @@ const state = {
   dashboard: null,
   runs: [],
   renderQueue: {entries: [], summary: {}},
+  reels: {lessons: [], reel_count: 0},
+  modelMap: {tasks: []},
   selectedTopicRef: null,
   topicDetail: null,
   activeRunId: null,
@@ -10,6 +12,7 @@ const state = {
   selectedBeatId: null,
   pollTimer: null,
   queueTimer: null,
+  reelTimer: null,
   view: "production"
 };
 
@@ -23,6 +26,7 @@ const activeStatuses = new Set(["running", "rendering"]);
 const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Visual reels", "Compile & QA", "Review", "Approval"];
 const stepsForRun = () => motionCanvasSteps;
 const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"]);
+const reelModelTaskIds = ["reel_candidate_analysis", "reel_story_structure", "reel_script_writing", "reel_shot_planning", "reel_motion_canvas_batch", "reel_motion_canvas_repair"];
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -172,7 +176,8 @@ function modelMapMarkup(run, working) {
     const prompts = task.prompt_files?.length ? task.prompt_files.join(" · ") : "Voice synthesis (no text prompt file)";
     const modelOptions = task.provider_model_options?.[current.provider] || [task.provider_models[current.provider]];
     const reasoning = current.reasoning_effort || "low";
-    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}"><span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(provider === "codex" ? "Codex CLI (ChatGPT)" : provider)}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select><select class="task-reasoning" ${working || current.provider !== "codex" ? "disabled" : ""}>${(task.reasoning_efforts || ["low"]).map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select></article>`;
+    const reasoningOptions = task.provider_reasoning_efforts?.[current.provider] || ["low"];
+    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}" data-provider-reasoning-options="${escapeHtml(JSON.stringify(task.provider_reasoning_efforts || {}))}"><span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(modelProviderLabel(provider))}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select><select class="task-reasoning" ${working || !["codex", "grok"].includes(current.provider) ? "disabled" : ""}>${reasoningOptions.map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select></article>`;
   }).join("")}</div><p class="model-map-note">Changes are saved to this run and applied on its next execution. Past usage records keep the model that actually produced them.</p></section>`;
 }
 
@@ -184,23 +189,28 @@ function costMarkup(artifacts) {
 }
 
 function collectTaskModels() {
-  return Object.fromEntries($$("[data-model-task]").map(row => [row.dataset.modelTask, { provider: $(".task-provider", row).value, model: $(".task-model", row).value, ...($(".task-provider", row).value === "codex" ? {reasoning_effort: $(".task-reasoning", row).value} : {}) }]));
+  return Object.fromEntries($$("[data-model-task]").map(row => [row.dataset.modelTask, { provider: $(".task-provider", row).value, model: $(".task-model", row).value, ...(["codex", "grok"].includes($(".task-provider", row).value) ? {reasoning_effort: $(".task-reasoning", row).value} : {}) }]));
 }
 
 async function boot() {
   clearError();
   try {
-    const [dashboard, runsPayload, queuePayload] = await Promise.all([
-      request("/api/dashboard"), request("/api/runs"), request("/api/render-queue")
+    const [dashboard, runsPayload, queuePayload, reelsPayload, modelMap] = await Promise.all([
+      request("/api/dashboard"), request("/api/runs"), request("/api/render-queue"), request("/api/reels"), request("/api/model-map")
     ]);
     state.dashboard = dashboard;
     state.runs = runsPayload.runs || [];
     state.renderQueue = await hydrateRenderQueueLogs(queuePayload.queue || {entries: [], summary: {}});
+    state.reels = reelsPayload;
+    state.modelMap = modelMap;
     state.selectedTopicRef = state.selectedTopicRef || dashboard.next_topic?.ref || dashboard.topics?.[0]?.ref;
     renderChrome();
     renderDashboard();
     renderCurriculum();
     renderRuns();
+    renderReelModelMap();
+    renderReels();
+    manageReelPolling();
     manageQueuePolling();
     if (state.selectedTopicRef) await selectTopic(state.selectedTopicRef, false);
     if (state.activeRunId) await selectRun(state.activeRunId, false);
@@ -209,7 +219,7 @@ async function boot() {
 
 function renderChrome() {
   $("#run-count").textContent = state.runs.length;
-  const providerLabels = { gemini: "Gemini", elevenlabs: "ElevenLabs", zai: "Z.AI", moonshot: "Moonshot" };
+  const providerLabels = { gemini: "Gemini", elevenlabs: "ElevenLabs", zai: "Z.AI", moonshot: "Moonshot", grok: "Grok CLI" };
   $("#provider-dots").innerHTML = Object.entries(state.dashboard.providers || {}).map(([key, ready]) =>
     `<span class="provider-dot${ready ? " is-ready" : ""}">${escapeHtml(providerLabels[key] || key)} ${ready ? "●" : "○"}</span>`
   ).join("");
@@ -225,6 +235,92 @@ function renderDashboard() {
   ].join("");
   $("#topic-count").textContent = `${summary.topic_count} topics`;
   renderTopicList();
+}
+
+function modelProviderLabel(provider) {
+  return ({gemini: "Gemini", anthropic: "Claude", zai: "Z.AI / GLM", moonshot: "Moonshot / Kimi", codex: "Codex CLI", grok: "Grok CLI"})[provider] || provider;
+}
+
+function renderReelModelMap() {
+  const root = $("#reel-model-map");
+  if (!root) return;
+  const byTask = Object.fromEntries((state.modelMap?.tasks || []).map(task => [task.task, task]));
+  root.innerHTML = reelModelTaskIds.map(taskId => {
+    const task = byTask[taskId];
+    if (!task) return "";
+    const providers = Object.keys(task.provider_model_options || task.provider_models || {});
+    const currentProvider = providers.includes(task.provider) ? task.provider : providers[0];
+    const options = task.provider_model_options?.[currentProvider] || [task.provider_models?.[currentProvider]];
+    const currentModel = options.includes(task.model) ? task.model : options[0];
+    const prompts = task.prompt_files?.length ? task.prompt_files.join(" · ") : "Model task";
+    const reasoningOptions = task.provider_reasoning_efforts?.[currentProvider] || ["low"];
+    return `<article class="model-map-row reel-model-row" data-reel-model-task="${escapeHtml(taskId)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}" data-provider-reasoning-options="${escapeHtml(JSON.stringify(task.provider_reasoning_efforts || {}))}">
+      <span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div>
+      <select class="reel-task-provider">${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === currentProvider ? "selected" : ""}>${escapeHtml(modelProviderLabel(provider))}</option>`).join("")}</select>
+      <select class="reel-task-model">${options.map(model => `<option value="${escapeHtml(model)}" ${model === currentModel ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select>
+      <select class="reel-task-reasoning" ${!["codex", "grok"].includes(currentProvider) ? "disabled" : ""}>${reasoningOptions.map(effort => `<option value="${escapeHtml(effort)}" ${effort === "high" ? "selected" : ""}>${escapeHtml(effort)} reasoning</option>`).join("")}</select>
+    </article>`;
+  }).join("");
+}
+
+function reelTaskModels() {
+  return Object.fromEntries($$("[data-reel-model-task]").map(row => {
+    const provider = $(".reel-task-provider", row).value;
+    return [row.dataset.reelModelTask, {
+      provider,
+      model: $(".reel-task-model", row).value,
+      ...(["codex", "grok"].includes(provider) ? {reasoning_effort: $(".reel-task-reasoning", row).value} : {})
+    }];
+  }));
+}
+
+async function refreshReels() {
+  state.reels = await request("/api/reels");
+  renderReels();
+  manageReelPolling();
+}
+
+function manageReelPolling() {
+  clearTimeout(state.reelTimer);
+  if ((state.reels.lessons || []).some(group => (group.children || []).some(run => activeStatuses.has(run.status) || run.process_active))) {
+    state.reelTimer = setTimeout(() => refreshReels().catch(showError), 2200);
+  }
+}
+
+function renderReels() {
+  const root = $("#reels-root");
+  if (!root) return;
+  const lessons = state.reels?.lessons || [];
+  root.innerHTML = lessons.map(group => {
+    const parent = group.parent;
+    const candidates = group.candidates || [];
+    return `<article class="reel-parent">
+      <header><div><p class="eyebrow">Approved source lesson</p><h3>${escapeHtml(parent.topic)}</h3><small>${escapeHtml(parent.id)} · narration only; parent TSX is excluded</small></div><button class="primary-button reel-analyze" data-parent-run="${escapeHtml(parent.id)}">${candidates.length ? "Regenerate concepts" : "Analyze narration"}</button></header>
+      ${candidates.length ? `<div class="reel-candidates">${candidates.map(candidate => `<article class="reel-candidate"><span>${escapeHtml(candidate.id)}</span><h4>${escapeHtml(candidate.title)}</h4><p>${escapeHtml(candidate.idea)}</p><blockquote>${escapeHtml(candidate.opening)}</blockquote><small>Payoff: ${escapeHtml(candidate.ending)}</small><button class="secondary-button reel-create" data-parent-run="${escapeHtml(parent.id)}" data-candidate-id="${escapeHtml(candidate.id)}">Create native Reel</button></article>`).join("")}</div>` : `<p class="reel-empty">Generate 3–5 standalone concepts from approved narration and grounded facts.</p>`}
+      ${group.children?.length ? `<div class="reel-children">${group.children.map(reelRunMarkup).join("")}</div>` : ""}
+    </article>`;
+  }).join("") || `<div class="loading-card">Complete a lesson narration to make it eligible for native Reel creation.</div>`;
+}
+
+function reelRunMarkup(run) {
+  const artifacts = run.artifacts || {};
+  const narration = artifacts.reel_narration || {};
+  const shots = artifacts.reel_shot_plan?.shots || [];
+  const working = activeStatuses.has(run.status) || run.process_active;
+  const next = Math.min(8, Number(run.current_step || 0) + 1);
+  const narrationText = (narration.paragraphs || []).map(item => item.text).join(" ");
+  const units = artifacts.chapters || [];
+  const finalUnit = units[units.length - 1] || {};
+  const verticalPreviewUrl = artifacts.preview_url ? chapterPlayerUrl(artifacts.preview_url, {scene_id: "reel", absolute_start: 0, absolute_end: finalUnit.absolute_end || 0, render_absolute_start: 0, render_absolute_end: finalUnit.render_absolute_end || finalUnit.absolute_end || 0}) : null;
+  return `<section class="reel-run-card" data-reel-run="${escapeHtml(run.id)}">
+    <div class="reel-phone">${artifacts.mp4_url ? `<video controls playsinline src="${escapeHtml(artifacts.mp4_url)}"></video>` : verticalPreviewUrl ? `<iframe src="${escapeHtml(verticalPreviewUrl)}" title="Live portrait Reel preview" allow="autoplay"></iframe>` : artifacts.shot_contact_sheet_url ? `<img src="${escapeHtml(artifacts.shot_contact_sheet_url)}" alt="Portrait shot contact sheet">` : `<div><strong>9:16</strong><span>1080 × 1920</span></div>`}</div>
+    <div class="reel-run-copy"><header><div><p class="eyebrow">Linked Reel · ${statusPill(run.status)}</p><h3>${escapeHtml(artifacts.reel_candidate?.title || run.topic)}</h3><small>${escapeHtml(run.id)} · step ${run.current_step || 0}/8</small></div></header>
+      ${artifacts.reel_treatment?.treatment ? `<p class="reel-treatment">${escapeHtml(artifacts.reel_treatment.treatment)}</p>` : ""}
+      ${narrationText ? `<details open><summary>Fast Reel narration · ${Number(narration.spoken_word_count || 0)} words</summary><p>${escapeHtml(narrationText)}</p>${artifacts.files?.includes("voiceover.mp3") ? `<audio controls src="${artifactUrl(run.id, "voiceover.mp3")}"></audio>` : ""}<div class="button-row"><button class="secondary-button reel-edit-script" data-reel-run="${escapeHtml(run.id)}">Edit script</button><button class="secondary-button reel-regenerate-script" data-reel-run="${escapeHtml(run.id)}">Regenerate with instruction</button></div></details>` : ""}
+      ${shots.length ? `<details><summary>Portrait shot plan · ${shots.length} shots</summary><div class="reel-shot-list">${shots.map(shot => `<article><strong>${escapeHtml(shot.id)}</strong><p>${escapeHtml(shot.description)}</p><div class="button-row"><button class="secondary-button reel-edit-shot" data-reel-run="${escapeHtml(run.id)}" data-shot-id="${escapeHtml(shot.id)}">Edit</button><button class="secondary-button reel-regenerate-shot" data-reel-run="${escapeHtml(run.id)}" data-shot-id="${escapeHtml(shot.id)}">Regenerate</button></div></article>`).join("")}</div><button class="secondary-button reel-regenerate-plan" data-reel-run="${escapeHtml(run.id)}">Regenerate all with instruction</button></details>` : ""}
+      <div class="button-row"><button class="primary-button reel-generate" data-reel-run="${escapeHtml(run.id)}" data-from-step="${next}" ${working || next > 8 ? "disabled" : ""}>${next > 8 ? "Generation complete" : `Run step ${next}`}</button><button class="secondary-button reel-generate-all" data-reel-run="${escapeHtml(run.id)}" data-from-step="${next}" ${working || next > 8 ? "disabled" : ""}>Resume to preview</button><button class="secondary-button reel-preview" data-reel-run="${escapeHtml(run.id)}" ${working || Number(run.current_step || 0) < 8 ? "disabled" : ""}>Open vertical preview</button><button class="secondary-button reel-render" data-reel-run="${escapeHtml(run.id)}" ${working || Number(run.current_step || 0) < 8 ? "disabled" : ""}>Render 1080×1920</button></div>
+    </div>
+  </section>`;
 }
 
 function renderTopicList() {
@@ -296,10 +392,10 @@ function renderTopicDetail() {
       <div class="form-grid">
         <label class="field"><span>Run ID</span><input id="run-id-input" value="${escapeHtml(runDefault)}"></label>
         <label class="field"><span>Duration</span><select id="duration-input"><option value="300">5 minutes</option><option value="480" selected>8 minutes</option><option value="600">10 minutes</option><option value="720">12 minutes</option></select></label>
-        <label class="field"><span>Script generator / model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><optgroup label="Codex CLI (ChatGPT)"><option value="codex:gpt-5.6-sol">GPT-5.6-Sol</option><option value="codex:gpt-5.6-terra">GPT-5.6-Terra</option><option value="codex:gpt-5.6-luna">GPT-5.6-Luna</option><option value="codex:gpt-5.5">GPT-5.5</option><option value="codex:gpt-5.4">GPT-5.4</option><option value="codex:gpt-5.4-mini">GPT-5.4-Mini</option></optgroup><option value="configured">Configured</option></select></label>
+        <label class="field"><span>Script generator / model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><optgroup label="Codex CLI (ChatGPT)"><option value="codex:gpt-5.6-sol">GPT-5.6-Sol</option><option value="codex:gpt-5.6-terra">GPT-5.6-Terra</option><option value="codex:gpt-5.6-luna">GPT-5.6-Luna</option><option value="codex:gpt-5.5">GPT-5.5</option><option value="codex:gpt-5.4">GPT-5.4</option><option value="codex:gpt-5.4-mini">GPT-5.4-Mini</option></optgroup><option value="grok:grok-4.5">Grok 4.5 CLI (xAI)</option><option value="configured">Configured</option></select></label>
         <label class="field"><span>Script reasoning</span><select id="script-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Voice</span><select id="audio-provider"><option value="gemini">Gemini TTS</option><option value="elevenlabs">ElevenLabs</option></select></label>
-        <label class="field"><span>Visual reel generator</span><select id="chapter-provider"><option value="moonshot">Kimi K2.7 Code</option><option value="codex">Codex CLI (ChatGPT)</option></select></label>
+        <label class="field"><span>Visual reel generator</span><select id="chapter-provider"><option value="moonshot">Kimi K2.7 Code</option><option value="codex">Codex CLI (ChatGPT)</option><option value="grok">Grok 4.5 CLI (xAI)</option></select></label>
         <label class="field"><span>Codex model</span><select id="codex-model" disabled><option value="gpt-5.6-sol">GPT-5.6-Sol</option><option value="gpt-5.6-terra">GPT-5.6-Terra</option><option value="gpt-5.6-luna">GPT-5.6-Luna</option><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.4-mini">GPT-5.4-Mini</option></select></label>
         <label class="field"><span>Chapter reasoning</span><select id="chapter-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Chapter workers</span><select id="scene-concurrency"><option>1</option><option selected>2</option><option>4</option></select></label>
@@ -487,7 +583,7 @@ function switchViewTo(view) {
   state.view = view;
   $$(".nav-item").forEach(item => item.classList.toggle("is-active", item.dataset.view === view));
   $$(".view").forEach(item => item.classList.toggle("is-active", item.id === `view-${view}`));
-  const titles = { production: ["Motion Canvas lesson engine", "Production workspace"], curriculum: ["Coverage control", "Curriculum map"], runs: ["Production history", "Runs and outputs"] };
+  const titles = { production: ["Motion Canvas lesson engine", "Production workspace"], reels: ["Native vertical studio", "Reels & YouTube Shorts"], curriculum: ["Coverage control", "Curriculum map"], runs: ["Production history", "Runs and outputs"] };
   $("#view-eyebrow").textContent = titles[view][0]; $("#view-title").textContent = titles[view][1];
   history.replaceState(null, "", `#${view}`);
 }
@@ -495,24 +591,24 @@ function switchViewTo(view) {
 function productionPayload(execute) {
   const chapterProvider = $("#chapter-provider").value;
   const scriptSelection = $("#model-provider").value;
-  const scriptProvider = scriptSelection.startsWith("codex:") ? "codex" : scriptSelection;
-  const scriptModel = scriptProvider === "codex" ? scriptSelection.split(":", 2)[1] : null;
+  const scriptProvider = scriptSelection.includes(":") ? scriptSelection.split(":", 2)[0] : scriptSelection;
+  const scriptModel = ["codex", "grok"].includes(scriptProvider) ? scriptSelection.split(":", 2)[1] : null;
   const taskModels = {
     motion_canvas_batch: {
       provider: chapterProvider,
-      model: chapterProvider === "codex" ? $("#codex-model").value : "kimi-k2.7-code",
-      ...(chapterProvider === "codex" ? {reasoning_effort: $("#chapter-reasoning").value} : {})
+      model: chapterProvider === "codex" ? $("#codex-model").value : chapterProvider === "grok" ? "grok-4.5" : "kimi-k2.7-code",
+      ...(["codex", "grok"].includes(chapterProvider) ? {reasoning_effort: $("#chapter-reasoning").value} : {})
     },
-    motion_canvas_repair: {provider: "codex", model: $("#codex-model").value, reasoning_effort: "high"}
+    motion_canvas_repair: {provider: chapterProvider, model: chapterProvider === "codex" ? $("#codex-model").value : chapterProvider === "grok" ? "grok-4.5" : "kimi-k2.7-code", ...(["codex", "grok"].includes(chapterProvider) ? {reasoning_effort: "high"} : {})}
   };
-  if (scriptProvider === "codex") {
-    for (const task of ["script_structure", "script_writing"]) taskModels[task] = {provider: "codex", model: scriptModel, reasoning_effort: $("#script-reasoning").value};
+  if (["codex", "grok"].includes(scriptProvider)) {
+    for (const task of ["script_structure", "script_writing"]) taskModels[task] = {provider: scriptProvider, model: scriptModel, reasoning_effort: $("#script-reasoning").value};
   }
   return {
     topic_ref: state.selectedTopicRef,
     run_id: $("#run-id-input").value.trim(),
     duration: Number($("#duration-input").value),
-    model_provider: $("#model-provider").value,
+    model_provider: ["codex", "grok"].includes(scriptProvider) ? "configured" : $("#model-provider").value,
     audio_provider: $("#audio-provider").value,
     animation_mode: "motion-canvas",
     scene_concurrency: Number($("#scene-concurrency").value),
@@ -568,6 +664,99 @@ document.addEventListener("click", async event => {
   const runOpen = event.target.closest(".run-open"); if (runOpen) return selectRun(runOpen.dataset.run);
   if (event.target.closest("#refresh-button")) return boot();
   if (event.target.closest("#runs-refresh")) return refreshRuns();
+  if (event.target.closest("#reels-refresh")) return refreshReels();
+  const analyzeReels = event.target.closest(".reel-analyze");
+  if (analyzeReels) {
+    setBusy(analyzeReels, true, "Discovering concepts…");
+    try {
+      await request(`/api/runs/${encodeURIComponent(analyzeReels.dataset.parentRun)}/reels/analyze`, {method: "POST", body: JSON.stringify({candidate_count: 4, confirm_paid_api: true, task_models: reelTaskModels()})});
+      await refreshReels(); toast("Standalone Reel concepts generated from narration and facts.");
+    } catch (error) { showError(error); setBusy(analyzeReels, false); }
+    return;
+  }
+  const createReel = event.target.closest(".reel-create");
+  if (createReel) {
+    const group = (state.reels.lessons || []).find(item => item.parent.id === createReel.dataset.parentRun);
+    const sequence = String((group?.children?.length || 0) + 1).padStart(3, "0");
+    const reelRunId = `${createReel.dataset.parentRun}--reel-${sequence}`;
+    setBusy(createReel, true, "Creating…");
+    try {
+      await request(`/api/runs/${encodeURIComponent(createReel.dataset.parentRun)}/reels`, {method: "POST", body: JSON.stringify({candidate_id: createReel.dataset.candidateId, reel_run_id: reelRunId, audio_provider: $("#reel-audio-provider").value, task_models: reelTaskModels()})});
+      await refreshReels(); toast(`Created linked portrait run ${reelRunId}.`);
+    } catch (error) { showError(error); setBusy(createReel, false); }
+    return;
+  }
+  const generateReel = event.target.closest(".reel-generate, .reel-generate-all");
+  if (generateReel) {
+    const fromStep = Number(generateReel.dataset.fromStep);
+    const stopAfter = generateReel.classList.contains("reel-generate-all") ? 8 : fromStep;
+    setBusy(generateReel, true, "Starting…");
+    try {
+      await request(`/api/reels/${encodeURIComponent(generateReel.dataset.reelRun)}/execute`, {method: "POST", body: JSON.stringify({from_step: fromStep, stop_after_step: stopAfter, confirm_paid_api: true, audio_provider: $("#reel-audio-provider").value, task_models: reelTaskModels()})});
+      toast(`Reel generation started from step ${fromStep}.`); await refreshReels();
+    } catch (error) { showError(error); setBusy(generateReel, false); }
+    return;
+  }
+  const previewReel = event.target.closest(".reel-preview");
+  if (previewReel) {
+    setBusy(previewReel, true, "Starting…");
+    try {
+      const response = await request(`/api/runs/${encodeURIComponent(previewReel.dataset.reelRun)}/preview`, {method: "POST", body: "{}"});
+      window.open(response.preview.url, "_blank", "noopener"); await refreshReels();
+    } catch (error) { showError(error); setBusy(previewReel, false); }
+    return;
+  }
+  const renderReel = event.target.closest(".reel-render");
+  if (renderReel) {
+    try { await request(`/api/runs/${encodeURIComponent(renderReel.dataset.reelRun)}/render`, {method: "POST", body: JSON.stringify({quality: "high", fps: 30, workers: 1})}); toast("Portrait MP4 added to the render queue."); await refreshReels(); }
+    catch (error) { showError(error); }
+    return;
+  }
+  const regenerateShot = event.target.closest(".reel-regenerate-shot");
+  if (regenerateShot) {
+    const instruction = window.prompt("Director instruction for this shot (timing and narration stay locked):", "Make the physical change more obvious, faster, and visually striking. Keep labels minimal.");
+    if (instruction == null) return;
+    try { await request(`/api/reels/${encodeURIComponent(regenerateShot.dataset.reelRun)}/shots/${encodeURIComponent(regenerateShot.dataset.shotId)}/regenerate`, {method: "POST", body: JSON.stringify({instruction, confirm_paid_api: true, task_models: reelTaskModels()})}); toast(`${regenerateShot.dataset.shotId} regeneration started.`); await refreshReels(); }
+    catch (error) { showError(error); }
+    return;
+  }
+  const editScript = event.target.closest(".reel-edit-script");
+  if (editScript) {
+    const group = (state.reels.lessons || []).flatMap(item => item.children || []).find(item => item.id === editScript.dataset.reelRun);
+    const current = (group?.artifacts?.reel_narration?.paragraphs || []).map(item => item.text).join("\n\n");
+    const revised = window.prompt("Edit the Reel narration. Separate visual paragraphs with a blank line:", current);
+    if (revised == null) return;
+    const paragraphs = revised.split(/\n\s*\n/).map(text => text.trim()).filter(Boolean);
+    try { await request(`/api/reels/${encodeURIComponent(editScript.dataset.reelRun)}/script`, {method: "POST", body: JSON.stringify({paragraphs})}); await refreshReels(); toast("Reel script saved; audio and all visual timing were invalidated."); }
+    catch (error) { showError(error); }
+    return;
+  }
+  const regenerateScript = event.target.closest(".reel-regenerate-script");
+  if (regenerateScript) {
+    const instruction = window.prompt("Script director instruction:", "Make the opening more surprising and the delivery faster. Show the unexpected result before explaining it.");
+    if (instruction == null) return;
+    try { await request(`/api/reels/${encodeURIComponent(regenerateScript.dataset.reelRun)}/execute`, {method: "POST", body: JSON.stringify({from_step: 2, stop_after_step: 2, force_paid_api: true, instruction, confirm_paid_api: true, task_models: reelTaskModels()})}); await refreshReels(); toast("Reel script regeneration started."); }
+    catch (error) { showError(error); }
+    return;
+  }
+  const editShot = event.target.closest(".reel-edit-shot");
+  if (editShot) {
+    const group = (state.reels.lessons || []).flatMap(item => item.children || []).find(item => item.id === editShot.dataset.reelRun);
+    const shot = (group?.artifacts?.reel_shot_plan?.shots || []).find(item => item.id === editShot.dataset.shotId);
+    const description = window.prompt("Edit this portrait shot description:", shot?.description || "");
+    if (description == null) return;
+    try { await request(`/api/reels/${encodeURIComponent(editShot.dataset.reelRun)}/shots/${encodeURIComponent(editShot.dataset.shotId)}`, {method: "POST", body: JSON.stringify({description})}); await refreshReels(); toast(`${editShot.dataset.shotId} updated; only that shot and downstream render caches were invalidated.`); }
+    catch (error) { showError(error); }
+    return;
+  }
+  const regeneratePlan = event.target.closest(".reel-regenerate-plan");
+  if (regeneratePlan) {
+    const instruction = window.prompt("Shot-plan director instruction:", "Keep the same physical objects throughout. Avoid cards. Use stronger motion, brighter contrast, and clearer visual payoff.");
+    if (instruction == null) return;
+    try { await request(`/api/reels/${encodeURIComponent(regeneratePlan.dataset.reelRun)}/execute`, {method: "POST", body: JSON.stringify({from_step: 6, stop_after_step: 6, force_paid_api: true, instruction, confirm_paid_api: true, task_models: reelTaskModels()})}); await refreshReels(); toast("Portrait shot-plan regeneration started."); }
+    catch (error) { showError(error); }
+    return;
+  }
   if (event.target.closest("#queue-selected-renders")) {
     const runIds = $$(".render-run-select:checked").map(input => input.value);
     if (!runIds.length) return showError(new Error("Select at least one completed run to render."));
@@ -692,10 +881,10 @@ document.addEventListener("change", event => {
   if (event.target.classList.contains("topic-status-select")) updateCoverage(event.target);
   if (event.target.id === "chapter-provider") {
     $("#codex-model").disabled = event.target.value !== "codex";
-    $("#chapter-reasoning").disabled = event.target.value !== "codex";
+    $("#chapter-reasoning").disabled = !["codex", "grok"].includes(event.target.value);
   }
   if (event.target.id === "model-provider") {
-    $("#script-reasoning").disabled = !event.target.value.startsWith("codex:");
+    $("#script-reasoning").disabled = !event.target.value.includes(":");
   }
   if (event.target.classList.contains("task-provider")) {
     const row = event.target.closest("[data-model-task]");
@@ -703,10 +892,22 @@ document.addEventListener("change", event => {
     const options = JSON.parse(row.dataset.providerModelOptions || "{}");
     const available = options[event.target.value] || [models[event.target.value]];
     $(".task-model", row).innerHTML = available.map(model => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
-    $(".task-reasoning", row).disabled = event.target.value !== "codex";
+    const reasoningOptions = JSON.parse(row.dataset.providerReasoningOptions || "{}")[event.target.value] || ["low"];
+    $(".task-reasoning", row).innerHTML = reasoningOptions.map(effort => `<option value="${escapeHtml(effort)}">${escapeHtml(effort)} reasoning</option>`).join("");
+    $(".task-reasoning", row).disabled = !["codex", "grok"].includes(event.target.value);
+  }
+  if (event.target.classList.contains("reel-task-provider")) {
+    const row = event.target.closest("[data-reel-model-task]");
+    const models = JSON.parse(row.dataset.providerModels || "{}");
+    const options = JSON.parse(row.dataset.providerModelOptions || "{}");
+    const available = options[event.target.value] || [models[event.target.value]];
+    $(".reel-task-model", row).innerHTML = available.map(model => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
+    const reasoningOptions = JSON.parse(row.dataset.providerReasoningOptions || "{}")[event.target.value] || ["low"];
+    $(".reel-task-reasoning", row).innerHTML = reasoningOptions.map(effort => `<option value="${escapeHtml(effort)}" ${effort === "high" ? "selected" : ""}>${escapeHtml(effort)} reasoning</option>`).join("");
+    $(".reel-task-reasoning", row).disabled = !["codex", "grok"].includes(event.target.value);
   }
 });
 
 const initialView = location.hash.replace("#", "");
-if (["production", "curriculum", "runs"].includes(initialView)) switchViewTo(initialView);
+if (["production", "reels", "curriculum", "runs"].includes(initialView)) switchViewTo(initialView);
 boot();

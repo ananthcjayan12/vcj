@@ -111,7 +111,9 @@ def build_input(args: argparse.Namespace) -> dict[str, Any]:
         "facts": pipeline_inputs["facts"],
         "physics_context": pipeline_inputs.get("physics_context", {}),
         "narrative_mode": pipeline_inputs.get("narrative_mode") or "concept_mastery",
+        "content_format": "lesson",
         "animation_mode": getattr(args, "animation_mode", LEGACY_MODE),
+        "render_profile": "lesson_landscape",
     }
 
 
@@ -195,7 +197,7 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
     else:
         input_payload = _read_cached_json(path / "input.json", "input payload")
         metadata_updated = False
-        for key in ("topic_ref", "objective_ids"):
+        for key in ("topic_ref", "objective_ids", "content_format", "render_profile"):
             if not input_payload.get(key) and initial_payload.get(key):
                 input_payload[key] = initial_payload[key]
                 metadata_updated = True

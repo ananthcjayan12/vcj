@@ -1,0 +1,21 @@
+Plan the portrait animation for the immutable shots below.
+
+NARRATIVE TREATMENT
+{treatment_json}
+
+FINAL REEL NARRATION
+{narration_json}
+
+IMMUTABLE SHOT/PARAGRAPH MAPPING (timing is intentionally omitted)
+{shot_mapping_json}
+
+GROUNDED FACTS AND CLAIMS
+{source_json}
+
+PORTRAIT DESIGN PROFILE
+{profile_json}
+
+DIRECTOR OVERRIDE
+{instruction}
+
+Return exactly one shot-plan item for each supplied shot id, in order. Return strict JSON only.

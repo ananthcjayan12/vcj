@@ -137,6 +137,15 @@ def _probe_media(path: Path, *, require_audio: bool = True) -> dict[str, Any]:
     return payload
 
 
+def _validate_render_dimensions(input_payload: dict[str, Any], probe: dict[str, Any]) -> None:
+    if input_payload.get("content_format") != "reel":
+        return
+    video = next((item for item in probe.get("streams", []) if item.get("codec_type") == "video"), {})
+    dimensions = (int(video.get("width") or 0), int(video.get("height") or 0))
+    if dimensions != (1080, 1920):
+        raise RuntimeError(f"Native Reel render must be 1080x1920, got {dimensions[0]}x{dimensions[1]}")
+
+
 def _write_hyperframes_composition(composition_path: Path) -> Path:
     """Create a render-only composition that lets FFmpeg own audio muxing."""
     return write_render_copy(composition_path)
@@ -268,6 +277,10 @@ def render_mp4(
                 probe = _probe_media(output_path, require_audio=False)
                 stream_types = {item.get("codec_type") for item in probe.get("streams", [])}
                 audio_attached = "audio" in stream_types
+                input_payload = read_json(run_path / "input.json") if (run_path / "input.json").exists() else {}
+                _validate_render_dimensions(input_payload, probe)
+            except RuntimeError:
+                raise
             except Exception as exc:
                 print(
                     f"[render] WARNING: Could not inspect the completed Motion Canvas MP4: {exc}",

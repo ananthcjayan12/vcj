@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, topic_detail, update_run_models
+from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, _validate_task_models, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, topic_detail, update_run_models
 
 
 class StudioPayloadTest(unittest.TestCase):
@@ -39,7 +39,8 @@ class StudioPayloadTest(unittest.TestCase):
         self.assertEqual(payload["summary"]["topic_count"], 58)
         self.assertEqual(payload["summary"]["objective_count"], 324)
         self.assertEqual(payload["summary"]["scene_count"], 41)
-        self.assertEqual(payload["next_topic"]["ref"], "1.1")
+        self.assertIn(payload["next_topic"]["ref"], {item["ref"] for item in payload["topics"]})
+        self.assertFalse(payload["next_topic"]["complete"])
 
     def test_topic_detail_uses_aggregate_assessment_evidence(self) -> None:
         payload = topic_detail("1.1")
@@ -92,7 +93,27 @@ class StudioPayloadTest(unittest.TestCase):
 
     def test_model_map_covers_all_paid_pipeline_tasks(self) -> None:
         tasks = {item["task"] for item in model_map_payload()["tasks"]}
-        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"})
+        self.assertTrue({"script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"}.issubset(tasks))
+        self.assertTrue({"reel_candidate_analysis", "reel_story_structure", "reel_script_writing", "reel_shot_planning", "reel_motion_canvas_batch", "reel_motion_canvas_repair"}.issubset(tasks))
+        grok_tasks = [item for item in model_map_payload()["tasks"] if item["task"].startswith("reel_")]
+        self.assertTrue(all(item["provider_models"].get("grok") == "grok-4.5" for item in grok_tasks))
+
+    def test_every_model_is_available_for_every_pipeline_task(self) -> None:
+        model_tasks = [item for item in model_map_payload()["tasks"] if item["task"] != "audio_generation"]
+        reel_tasks = [item for item in model_tasks if item["task"].startswith("reel_")]
+        expected_providers = {"gemini", "anthropic", "zai", "moonshot", "codex", "grok"}
+        self.assertEqual(len(reel_tasks), 6)
+        for task in model_tasks:
+            self.assertEqual(set(task["provider_model_options"]), expected_providers)
+            for provider, models in task["provider_model_options"].items():
+                for model in models:
+                    with self.subTest(task=task["task"], provider=provider, model=model):
+                        selection = {task["task"]: {"provider": provider, "model": model, "reasoning_effort": "high"}}
+                        self.assertEqual(_validate_task_models(selection)[task["task"]]["model"], model)
+        with self.assertRaisesRegex(ValueError, "reasoning effort"):
+            _validate_task_models({"reel_script_writing": {"provider": "grok", "model": "grok-4.5", "reasoning_effort": "xhigh"}})
+        codex = _validate_task_models({"reel_script_writing": {"provider": "codex", "model": "gpt-5.6-sol", "reasoning_effort": "xhigh"}})
+        self.assertEqual(codex["reel_script_writing"]["reasoning_effort"], "xhigh")
 
     def test_codex_cli_model_can_be_selected_for_motion_canvas_only(self) -> None:
         meta = {"id": "physics-1-1-command-test", "facts_path": "video_engine/topics/1.1/facts.json", "settings": {"duration": 480, "model_provider": "gemini", "audio_provider": "gemini", "scene_concurrency": 4, "task_models": {"motion_canvas_batch": {"provider": "codex", "model": "gpt-5.6-sol", "reasoning_effort": "high"}}}}
@@ -316,7 +337,8 @@ class StudioHttpTest(unittest.TestCase):
     def test_model_map_api(self) -> None:
         with urllib.request.urlopen(f"{self.base}/api/model-map", timeout=5) as response:
             payload = json.load(response)
-        self.assertEqual(len(payload["tasks"]), 5)
+        self.assertGreaterEqual(len(payload["tasks"]), 11)
+        self.assertIn("reel_candidate_analysis", {item["task"] for item in payload["tasks"]})
 
     def test_static_application(self) -> None:
         with urllib.request.urlopen(f"{self.base}/", timeout=5) as response:

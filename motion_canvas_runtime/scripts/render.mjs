@@ -16,14 +16,23 @@ const videoMode = process.argv.includes('--video');
 const previewMode = process.argv.includes('--preview') || !videoMode;
 const manifestPath = path.join(RUN_ROOT, 'manifest.json');
 const runManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
+const PROFILES = {
+  lesson_landscape: {name: 'lesson_landscape', width: 1920, height: 1080, fps: 30, background: '#07111f'},
+  reel_portrait: {name: 'reel_portrait', width: 1080, height: 1920, fps: 30, background: '#07111f'},
+};
+const profileName = runManifest.render_profile?.name || runManifest.render_profile || 'lesson_landscape';
+const renderProfile = {...(PROFILES[profileName] || PROFILES.lesson_landscape), ...(typeof runManifest.render_profile === 'object' ? runManifest.render_profile : {})};
 
 function visualSourceFiles() {
   const files = [
     manifestPath,
     path.join(RUN_ROOT, 'scenes.ts'),
     path.join(ROOT, 'src', 'presentation.tsx'),
+    path.join(ROOT, 'src', 'reel-presentation.tsx'),
+    path.join(ROOT, 'src', 'render-profile.ts'),
     path.join(ROOT, 'src', 'render-host.ts'),
     path.join(ROOT, 'src', 'project.ts'),
+    path.join(ROOT, 'render.html'),
   ];
   for (const directory of ['chapters', 'shots', 'reels']) {
     const root = path.join(RUN_ROOT, directory);
@@ -37,7 +46,7 @@ function visualSourceFiles() {
 
 function renderFingerprint({fps, duration, frameCount}) {
   const hash = crypto.createHash('sha256');
-  hash.update(JSON.stringify({version: 1, fps, duration, frameCount}));
+  hash.update(JSON.stringify({version: 2, fps, duration, frameCount, renderProfile}));
   for (const file of visualSourceFiles()) {
     hash.update(path.relative(ROOT, file));
     hash.update(fs.readFileSync(file));
@@ -148,14 +157,14 @@ try {
   const url = `http://127.0.0.1:${port}/render.html`;
   renderLog('Starting local render host');
   await waitForServer(url);
-  renderLog('Launching headless browser at 1920×1080');
+  renderLog(`Launching headless browser at ${renderProfile.width}×${renderProfile.height}`);
   browser = await puppeteer.launch({
     executablePath: findChrome(),
     headless: true,
     args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
   });
   const page = await browser.newPage();
-  await page.setViewport({width: 1920, height: 1080, deviceScaleFactor: 1});
+  await page.setViewport({width: renderProfile.width, height: renderProfile.height, deviceScaleFactor: 1});
   page.on('console', message => {
     if (message.type() !== 'error') return;
     consoleTasks.push(
@@ -211,29 +220,42 @@ try {
 
   if (previewMode) {
     const previewFiles = [];
-    for (const [index, ratio] of [0, .25, .5, .75, 1].entries()) {
+    const units = runManifest.shots || runManifest.reels || runManifest.chapters || [];
+    const sampleTimes = profileName === 'reel_portrait'
+      ? [...new Set([0, Math.min(.3, duration), ...units.flatMap(unit => {
+          const start = Number(unit.render_absolute_start ?? unit.absolute_start ?? 0);
+          const end = Number(unit.render_absolute_end ?? unit.absolute_end ?? start);
+          return [(start + end) / 2, Math.max(start, end - 1 / Number(renderProfile.fps || 30))];
+        }), Math.max(0, duration - 1 / Number(renderProfile.fps || 30))])].sort((a, b) => a - b)
+      : [0, .25, .5, .75, 1].map(ratio => duration * ratio);
+    for (const [index, at] of sampleTimes.entries()) {
       const target = path.join(
         PREVIEW_ROOT,
-        `${String(index).padStart(2, '0')}-${Math.round(ratio * 100)}.png`,
+        `${String(index).padStart(2, '0')}-${Math.round(at * 1000)}ms.png`,
       );
-      await capture(duration * ratio, target);
+      await capture(Math.min(duration, at), target);
       previewFiles.push(target);
     }
-    const first = fs.readFileSync(previewFiles[2]);
+    const deterministicIndex = Math.floor(previewFiles.length / 2);
+    const first = fs.readFileSync(previewFiles[deterministicIndex]);
     const deterministicTarget = path.join(PREVIEW_ROOT, 'deterministic-repeat.png');
-    await capture(duration * .5, deterministicTarget);
+    await capture(sampleTimes[deterministicIndex], deterministicTarget);
     const deterministic = first.equals(fs.readFileSync(deterministicTarget));
     const composites = [];
     for (const [index, file] of previewFiles.entries()) {
       composites.push({
-        input: await sharp(file).resize(480, 270).png().toBuffer(),
-        left: index * 480,
+        input: await sharp(file).resize(profileName === 'reel_portrait' ? 216 : 480, profileName === 'reel_portrait' ? 384 : 270).png().toBuffer(),
+        left: index * (profileName === 'reel_portrait' ? 216 : 480),
         top: 0,
       });
     }
     await sharp({
-      create: {width: 2400, height: 270, channels: 4, background: '#07111f'},
+      create: {width: previewFiles.length * (profileName === 'reel_portrait' ? 216 : 480), height: profileName === 'reel_portrait' ? 384 : 270, channels: 4, background: renderProfile.background},
     }).composite(composites).png().toFile(path.join(PREVIEW_ROOT, 'contact-sheet.png'));
+    if (profileName === 'reel_portrait') {
+      await sharp({create: {width: previewFiles.length * 216, height: 384, channels: 4, background: renderProfile.background}})
+        .composite(composites).png().toFile(path.join(PREVIEW_ROOT, 'shot-contact-sheet.png'));
+    }
     await Promise.all(consoleTasks);
     const hasIgnoredHmrError = consoleErrors.some(isIgnorableConsoleError);
     const ignoredConsoleErrors = consoleErrors.filter(
@@ -250,7 +272,8 @@ try {
         expectedDuration,
         timelineDelta,
         timelineStable,
-        sampledTimes: [0, .25, .5, .75, 1].map(ratio => duration * ratio),
+        sampledTimes: sampleTimes,
+        renderProfile,
         deterministic,
         consoleErrors: actionableConsoleErrors,
         ignoredConsoleErrors,

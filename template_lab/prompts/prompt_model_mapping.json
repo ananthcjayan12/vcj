@@ -1,6 +1,14 @@
 {
   "version": "3.0",
-  "description": "Model tasks used by the legacy V3 and direct-HTML lesson pipelines.",
+  "description": "Shared model catalog and per-task defaults for all lesson and Reel pipeline tasks.",
+  "model_catalog": {
+    "gemini": ["gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    "anthropic": ["claude-sonnet-5", "claude-opus-4-8", "claude-fable-5", "claude-haiku-4-5"],
+    "zai": ["glm-5.2"],
+    "moonshot": ["kimi-k2.7-code"],
+    "codex": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"],
+    "grok": ["grok-4.5"]
+  },
   "tasks": {
     "script_structure": {
       "provider": "gemini",
@@ -170,6 +178,68 @@
       "provider_env_var": "MAV_DIRECT_HTML_REPAIR_PROVIDER",
       "env_var": "MAV_DIRECT_HTML_REPAIR_MODEL",
       "prompt_files": ["direct_html_repair.system.txt", "direct_html_design_system.txt"]
+    },
+    "reel_candidate_analysis": {
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "provider_models": {"gemini": "gemini-3.1-pro-preview", "anthropic": "claude-sonnet-5", "codex": "gpt-5.6-sol", "grok": "grok-4.5"},
+      "provider_model_options": {"grok": ["grok-4.5"]},
+      "max_tokens": 12000,
+      "provider_env_var": "MAV_REEL_CANDIDATE_ANALYSIS_PROVIDER",
+      "env_var": "MAV_REEL_CANDIDATE_ANALYSIS_MODEL",
+      "prompt_files": ["reel_candidate_analysis.system.txt", "reel_candidate_analysis.user.txt"]
+    },
+    "reel_story_structure": {
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "provider_models": {"gemini": "gemini-3.1-pro-preview", "anthropic": "claude-sonnet-5", "codex": "gpt-5.6-sol", "grok": "grok-4.5"},
+      "provider_model_options": {"grok": ["grok-4.5"]},
+      "max_tokens": 12000,
+      "provider_env_var": "MAV_REEL_STORY_STRUCTURE_PROVIDER",
+      "env_var": "MAV_REEL_STORY_STRUCTURE_MODEL",
+      "prompt_files": ["reel_story_structure.system.txt", "reel_story_structure.user.txt"]
+    },
+    "reel_script_writing": {
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "provider_models": {"gemini": "gemini-3.1-pro-preview", "anthropic": "claude-sonnet-5", "codex": "gpt-5.6-sol", "grok": "grok-4.5"},
+      "provider_model_options": {"grok": ["grok-4.5"]},
+      "max_tokens": 12000,
+      "provider_env_var": "MAV_REEL_SCRIPT_WRITING_PROVIDER",
+      "env_var": "MAV_REEL_SCRIPT_WRITING_MODEL",
+      "prompt_files": ["reel_script_writing.system.txt", "reel_script_writing.user.txt"]
+    },
+    "reel_shot_planning": {
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "provider_models": {"gemini": "gemini-3.1-pro-preview", "anthropic": "claude-sonnet-5", "codex": "gpt-5.6-sol", "grok": "grok-4.5"},
+      "provider_model_options": {"grok": ["grok-4.5"]},
+      "max_tokens": 18000,
+      "provider_env_var": "MAV_REEL_SHOT_PLANNING_PROVIDER",
+      "env_var": "MAV_REEL_SHOT_PLANNING_MODEL",
+      "prompt_files": ["reel_shot_planning.system.txt", "reel_shot_planning.user.txt"]
+    },
+    "reel_motion_canvas_batch": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {"moonshot": "kimi-k2.7-code", "codex": "gpt-5.6-sol", "grok": "grok-4.5"},
+      "provider_model_options": {"grok": ["grok-4.5"]},
+      "max_tokens": 64000,
+      "timeout_seconds": 2400,
+      "provider_env_var": "MAV_REEL_MOTION_CANVAS_BATCH_PROVIDER",
+      "env_var": "MAV_REEL_MOTION_CANVAS_BATCH_MODEL",
+      "prompt_files": ["../motion_canvas/prompts/reel_batch.system.txt"]
+    },
+    "reel_motion_canvas_repair": {
+      "provider": "moonshot",
+      "model": "kimi-k2.7-code",
+      "provider_models": {"moonshot": "kimi-k2.7-code", "codex": "gpt-5.6-sol", "grok": "grok-4.5"},
+      "provider_model_options": {"grok": ["grok-4.5"]},
+      "max_tokens": 64000,
+      "timeout_seconds": 2400,
+      "provider_env_var": "MAV_REEL_MOTION_CANVAS_REPAIR_PROVIDER",
+      "env_var": "MAV_REEL_MOTION_CANVAS_REPAIR_MODEL",
+      "prompt_files": ["../motion_canvas/prompts/reel_repair.system.txt"]
     },
     "direct_html_review": {
       "provider": "gemini",

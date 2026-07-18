@@ -18,6 +18,7 @@
 
         <nav class="nav-list" aria-label="Studio navigation">
           <button class="nav-item is-active" data-view="production"><span>⌁</span><b>Production</b></button>
+          <button class="nav-item" data-view="reels"><span>▯</span><b>Reels</b></button>
           <button class="nav-item" data-view="curriculum"><span>◫</span><b>Curriculum</b></button>
           <button class="nav-item" data-view="runs"><span>↻</span><b>Runs</b><em id="run-count">0</em></button>
         </nav>
@@ -69,6 +70,17 @@
               </section>
             </div>
           </div>
+        </section>
+
+        <section class="view" id="view-reels">
+          <section class="panel reels-studio">
+            <div class="panel-heading"><div><p class="eyebrow">Native 9:16 production</p><h2>Reels & YouTube Shorts</h2></div><button class="secondary-button" id="reels-refresh">Refresh</button></div>
+            <div class="reel-toolbar">
+              <label class="field"><span>Fast Reel voice</span><select id="reel-audio-provider"><option value="gemini">Gemini · Puck energetic</option><option value="elevenlabs">ElevenLabs · Reel voice</option></select></label>
+            </div>
+            <section class="reel-model-map"><div class="model-map-heading"><div><p class="eyebrow">Per-task routing</p><h3>Choose any model independently for every Reel task</h3></div></div><div id="reel-model-map" class="model-map-list"></div></section>
+            <div id="reels-root"><div class="loading-card">Loading eligible lessons and linked Reels…</div></div>
+          </section>
         </section>
 
         <section class="view" id="view-curriculum">

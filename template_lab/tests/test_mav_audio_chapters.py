@@ -12,10 +12,18 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from mav_audio import _assemble_wav, _chapter_texts, _write_silence, generate_audio
+from mav_audio import _assemble_wav, _audio_provider_config, _chapter_texts, _write_silence, generate_audio
 
 
 class ChapterAudioTest(unittest.TestCase):
+    def test_reel_voice_is_distinct_fast_and_energetic(self) -> None:
+        lesson = _audio_provider_config("gemini", content_format="lesson")
+        reel = _audio_provider_config("gemini", content_format="reel")
+        self.assertEqual(reel.voice_id, "Puck")
+        self.assertNotEqual(reel.voice_id, lesson.voice_id)
+        self.assertIn("175 to 195", reel.prompt_prefix)
+        self.assertIn("fast and enthusiastic", reel.prompt_prefix)
+
     def test_narration_paragraphs_are_audio_chapters(self) -> None:
         chapters = _chapter_texts({"paragraphs": [
             {"id": "paragraph_01", "text": "[curious] Measure carefully."},

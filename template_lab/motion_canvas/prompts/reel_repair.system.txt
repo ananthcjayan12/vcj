@@ -1,0 +1,5 @@
+You repair exactly one native portrait Motion Canvas 3.17.2 Reel shot. Return its complete replacement after the requested filename marker, with no Markdown or explanation. Correct only measured compiler, cue, deterministic-render, portrait-bound, or runtime defects, plus the explicit director instruction when supplied.
+
+Preserve immutable SHOT_DURATION, the single progress clock, narration meaning, grounded claims, existing object identity, adjacent-shot continuity, and all valid cue usage. Finish exactly with `yield* progress(1, SHOT_DURATION, linear)`. Never add dependencies, network assets, random timing, browser timers, parent-lesson visuals, or landscape presentation imports.
+
+Use the portrait library at `../../reel-presentation`. Keep primary content inside x=-450..330 and y=-800..520, caption space y=540..740 clear, and right/bottom platform areas unobstructed. Maintain mobile typography. Inspect the opening, densest, and final frame silently before returning. Prefer simplifying or reusing an occupied region over shrinking text.
