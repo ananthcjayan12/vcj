@@ -8,52 +8,126 @@ from .constants import PORTRAIT_HEIGHT, PORTRAIT_WIDTH, SHORT_FPS
 
 
 def write_manifest(root: Path, parent_run_id: str, short_id: str, duration: float) -> dict[str, Any]:
-    motion = root / "motion_canvas"; motion.mkdir(parents=True, exist_ok=True)
-    manifest = {"version": "1.0", "content_type": "short", "short_id": short_id, "parent_run_id": parent_run_id,
-                "profile": {"id": "short_portrait", "width": PORTRAIT_WIDTH, "height": PORTRAIT_HEIGHT, "fps": SHORT_FPS, "background": "#07111f"},
-                "duration": duration, "render_duration": duration, "render_frames": round(duration*SHORT_FPS),
-                "audio_path": "../audio/voiceover.mp3", "scene_file": f"{short_id}.tsx", "cues_file": f"{short_id}.cues.ts",
-                "source_provenance": "../source_provenance.json"}
-    (motion / "manifest.json").write_text(json.dumps(manifest, indent=2)+"\n", encoding="utf-8")
+    motion = root / "motion_canvas"
+    motion.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "version": "1.0",
+        "content_type": "short",
+        "short_id": short_id,
+        "parent_run_id": parent_run_id,
+        "profile": {
+            "id": "short_portrait",
+            "width": PORTRAIT_WIDTH,
+            "height": PORTRAIT_HEIGHT,
+            "fps": SHORT_FPS,
+            "background": "#07111f",
+        },
+        "duration": duration,
+        "render_duration": duration,
+        "render_frames": round(duration * SHORT_FPS),
+        "audio_path": "../audio/voiceover.mp3",
+        "scene_file": f"{short_id}.tsx",
+        "cues_file": f"{short_id}.cues.ts",
+        "source_provenance": "../source_provenance.json",
+    }
+    (motion / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest
 
 
 def write_cues(root: Path, short_id: str, timestamps: dict[str, Any], duration: float) -> None:
     words = timestamps.get("words") or []
-    content = "export const SHORT_DURATION = " + repr(duration) + ";\nexport const SHORT_WORDS = " + json.dumps(words, indent=2) + " as const;\n"
+    content = (
+        "export const SHORT_DURATION = "
+        + repr(duration)
+        + ";\nexport const SHORT_WORDS = "
+        + json.dumps(words, indent=2)
+        + " as const;\n"
+    )
     (root / "motion_canvas" / f"{short_id}.cues.ts").write_text(content, encoding="utf-8")
 
 
 def write_native_scene(root: Path, short_id: str, script: dict[str, Any], timestamps: dict[str, Any]) -> Path:
-    """Create a deterministic native portrait fallback scene; model adapters may replace it."""
-    import json
-    lines = [str(line.get("text", "")) for line in script.get("lines") or []]
+    """Deterministic native 1080×1920 fallback. Model adapters may replace it."""
+    lines = [str(line.get("text", "")).strip() for line in script.get("lines") or [] if str(line.get("text", "")).strip()]
+    roles = [str(line.get("role", "line")) for line in script.get("lines") or [] if str(line.get("text", "")).strip()]
+    title = str(script.get("title") or short_id)
     duration = float(timestamps.get("audio_duration_seconds") or script.get("target_duration_seconds") or 40)
-    breaks = [0.0] + [duration * i / max(1, len(lines)) for i in range(1, len(lines))] + [duration]
-    source = f"""import {{makeScene2D, Rect, Txt}} from '@motion-canvas/2d';
-import {{all, createRef, waitFor}} from '@motion-canvas/core';
-import {{CaptionSafeArea, PortraitTextCard, ShortHook}} from '../short-presentation';
+    if not lines:
+        lines = [title]
+        roles = ["hook"]
+    breaks = [0.0]
+    for index in range(1, len(lines)):
+        breaks.append(duration * index / len(lines))
+    breaks.append(duration)
+    source = f"""import {{makeScene2D, Rect, Txt, Layout}} from '@motion-canvas/2d';
+import {{createSignal, linear}} from '@motion-canvas/core';
+import {{
+  CaptionSafeArea,
+  DiagramStage,
+  ProgressBar,
+  ShortHook,
+  ShortSubtitle,
+  ShortTitle,
+}} from '../short-presentation';
 import {{SHORT_DURATION}} from './{short_id}.cues';
 
 const LINES = {json.dumps(lines)};
+const ROLES = {json.dumps(roles)};
 const BREAKS = {json.dumps(breaks)};
+const TITLE = {json.dumps(title)};
 
 export default makeScene2D(function* (view) {{
-  const text = createRef<Txt>();
-  const caption = createRef<Txt>();
+  const progress = createSignal(0);
+  const time = () => progress() * SHORT_DURATION;
+  const index = () => {{
+    const t = time();
+    for (let i = 0; i < BREAKS.length - 1; i++) {{
+      if (t < BREAKS[i + 1]) return i;
+    }}
+    return Math.max(0, LINES.length - 1);
+  }};
+  const line = () => LINES[Math.min(index(), LINES.length - 1)] || '';
+  const role = () => ROLES[Math.min(index(), ROLES.length - 1)] || 'line';
+
   view.fill('#07111f');
-  view.add(<Rect layout direction={{'column'}} gap={{60}} width={{940}} height={{1510}} alignItems={{'center'}} justifyContent={{'center'}}>
-    <Txt ref={{text}} text={{LINES[0] || ''}} width={{940}} fontSize={{72}} fontWeight={{800}} fill={{'#ffffff'}} textAlign={{'center'}} textWrap />
-    <Rect width={{180}} height={{8}} radius={{8}} fill={{'#46d9ff'}} />
-  </Rect>);
-  view.add(<Rect y={{745}} width={{940}} minHeight={{120}} padding={{24}} radius={{28}} fill={{'#07111fcc'}}><Txt ref={{caption}} text={{LINES[0] || ''}} width={{880}} fontSize={{52}} fill={{'#ffffff'}} textAlign={{'center'}} textWrap /></Rect>);
-  for (let i = 0; i < LINES.length; i++) {{
-    if (i > 0) yield* all(text().text(LINES[i], .25), caption().text(LINES[i], .25));
-    yield* waitFor(Math.max(0, BREAKS[i + 1] - BREAKS[i] - (i > 0 ? .25 : 0)));
-  }}
-  if (!LINES.length) yield* waitFor(SHORT_DURATION);
+  view.add(
+    <>
+      <Rect width={{1080}} height={{1920}} fill={{'#07111f'}} />
+      <Rect y={{-820}} width={{940}} height={{170}} radius={{32}} fill={{'#0e1d31'}} stroke={{'#294563'}} lineWidth={{4}}>
+        <Layout direction={{'column'}} gap={{10}} alignItems={{'center'}} y={{0}}>
+          <ShortTitle title={{TITLE}} fontSize={{48}} />
+          <ShortSubtitle subtitle={{() => String(role()).toUpperCase()}} fontSize={{34}} />
+        </Layout>
+      </Rect>
+
+      <DiagramStage y={{-40}} width={{940}} height={{980}}>
+        <Rect width={{900}} height={{920}} radius={{40}} fill={{'#0a1728'}} stroke={{'#294563'}} lineWidth={{4}} />
+        <ShortHook
+          text={{() => (line().length > 90 ? line().slice(0, 88) + '…' : line())}}
+          fontSize={{56}}
+          y={{-40}}
+          width={{820}}
+        />
+        <Rect y={{320}} width={{220}} height={{10}} radius={{8}} fill={{'#46d9ff'}} />
+      </DiagramStage>
+
+      <CaptionSafeArea y={{780}}>
+        <Rect width={{960}} minHeight={{200}} padding={{28}} radius={{32}} fill={{'#07111fee'}} stroke={{'#294563'}} lineWidth={{3}}>
+          <Txt text={{line}} width={{900}} fontSize={{40}} fontWeight={{650}} fill={{'#ffffff'}} textAlign={{'center'}} textWrap />
+        </Rect>
+      </CaptionSafeArea>
+
+      <ProgressBar y={{930}} width={{960}} progress={{progress}} accent={{'#46d9ff'}} />
+    </>,
+  );
+
+  yield* progress(1, SHORT_DURATION, linear);
 }});
 """
-    path = root / "motion_canvas" / f"{short_id}.tsx"; path.write_text(source, encoding="utf-8")
-    (root / "motion_canvas" / "scenes.ts").write_text(f"import shortScene from './{short_id}?scene';\nexport const scenes = [shortScene];\n", encoding="utf-8")
+    path = root / "motion_canvas" / f"{short_id}.tsx"
+    path.write_text(source, encoding="utf-8")
+    (root / "motion_canvas" / "scenes.ts").write_text(
+        f"import shortScene from './{short_id}?scene';\nexport const scenes = [shortScene];\n",
+        encoding="utf-8",
+    )
     return path

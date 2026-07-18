@@ -21,6 +21,7 @@ def main() -> int:
         if paid: p.add_argument("--confirm-paid-api", action="store_true")
         return p
     analyze = parent("analyze", paid=True)
+    analyze.add_argument("--use-local-fallback", action="store_true", help="Skip model discovery and emit deterministic local ideas only")
     create = parent("create", paid=True); create.add_argument("--candidate-id", required=True); create.add_argument("--short-id", required=True)
     generate = parent("generate", paid=True); generate.add_argument("--short-id", required=True); generate.add_argument("--from-step", type=int, default=1); generate.add_argument("--stop-after-step", type=int, default=7)
     for flag in ("script", "audio", "visual", "captions", "render"): generate.add_argument(f"--force-{flag}", action="store_true")
@@ -29,7 +30,8 @@ def main() -> int:
     args = parser.parse_args(); pipeline = ShortsPipeline(LAB_ROOT/"runs", args.parent_run_id)
     if args.command in {"analyze", "create", "generate"} and not args.confirm_paid_api:
         parser.error(f"{args.command} may invoke paid services; pass --confirm-paid-api")
-    if args.command == "analyze": result = pipeline.analyze(use_model=True)
+    if args.command == "analyze":
+        result = pipeline.analyze(use_model=not args.use_local_fallback, use_fallback=bool(args.use_local_fallback))
     elif args.command == "create": result = pipeline.create(args.candidate_id, args.short_id, use_model=True)
     elif args.command == "generate":
         force = {name for name in ("script", "audio", "visual", "captions", "render") if getattr(args, f"force_{name}")}

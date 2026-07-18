@@ -247,6 +247,15 @@ function renderShortsView() {
   const shortId = item.short_id || "";
   const step = Number(item.current_step || 0);
   const previewUrl = selected?.preview_url || null;
+  const shortSteps = [
+    { id: 4, label: "Audio" },
+    { id: 5, label: "Timing" },
+    { id: 6, label: "Captions" },
+    { id: 7, label: "Portrait" },
+    { id: 8, label: "Preview" },
+    { id: 9, label: "Render" }
+  ];
+  const resumeFrom = Math.min(7, Math.max(4, step >= 7 ? 7 : Math.max(4, step || 4)));
   root.innerHTML = `
     <div class="shorts-view-shell">
       <header class="shorts-view-header">
@@ -283,6 +292,14 @@ function renderShortsView() {
               ${statusPill(item.status || "created")}
             </header>
             <div class="short-stepper"><span style="width:${Math.min(100, step / 9 * 100)}%"></span></div>
+            <div class="shorts-stepper" role="toolbar" aria-label="Short production steps">
+              ${shortSteps.map(entry => {
+                const done = step >= entry.id || (entry.id === 8 && previewUrl) || (entry.id === 9 && item.status === "rendered");
+                const current = shortWorking && step === entry.id;
+                const runnable = entry.id >= 4 && entry.id <= 7;
+                return `<button type="button" class="step short-step${done ? " is-done" : ""}${current ? " is-current" : ""}" data-short-step="${entry.id}" data-short-id="${escapeHtml(shortId)}" ${shortWorking || !runnable ? "disabled" : ""} title="${runnable ? `Run step ${entry.id}: ${entry.label}` : entry.label}"><span>${done ? "✓" : entry.id}</span><b>${entry.label}</b></button>`;
+              }).join("")}
+            </div>
             <div class="short-detail-layout">
               <div class="preview-shell short-preview-shell">
                 <div class="preview-toolbar"><span>LIVE PORTRAIT PREVIEW · NO MP4 RENDER</span>${previewUrl ? `<a href="${escapeHtml(previewUrl)}" target="_blank" rel="noreferrer">OPEN EDITOR ↗</a>` : "LOCAL EDITOR"}</div>
@@ -295,8 +312,21 @@ function renderShortsView() {
                   <section><b>Script</b>${(script.lines || []).map(line => `<p><i>${escapeHtml(line.audio_source)}</i>${escapeHtml(line.text)}</p>`).join("") || "<p class=\"artifact-empty\">No script lines yet.</p>"}</section>
                   <section><b>Portrait output</b><small>${manifest.profile?.width || 1080}×${manifest.profile?.height || 1920} · ${Number(manifest.duration || 0).toFixed(1)}s</small>${item.error ? `<p class="short-warning">${escapeHtml(item.error)}</p>` : ""}</section>
                 </div>
+                <div class="run-control-card short-step-controls">
+                  <h3>Run or resume a Short stage</h3>
+                  <div class="step-control">
+                    <select id="short-step-select" ${shortWorking ? "disabled" : ""}>
+                      ${[4, 5, 6, 7].map(n => {
+                        const label = shortSteps.find(x => x.id === n)?.label || `Step ${n}`;
+                        return `<option value="${n}" ${n === resumeFrom ? "selected" : ""}>${n}. ${label}</option>`;
+                      }).join("")}
+                    </select>
+                    <button class="secondary-button short-run-step" data-short-id="${escapeHtml(shortId)}" ${shortWorking ? "disabled" : ""}>Run selected step</button>
+                    <button class="primary-button generate-short" data-short-id="${escapeHtml(shortId)}" data-from-step="${resumeFrom}" data-stop-after-step="7" ${shortWorking ? "disabled" : ""}>Resume through portrait</button>
+                  </div>
+                  <p class="control-help">After a failure, pick the failed stage and run only that step, or resume from it through portrait visuals. Preview and render stay separate.</p>
+                </div>
                 <div class="button-row short-actions">
-                  <button class="primary-button generate-short" data-short-id="${escapeHtml(shortId)}" ${shortWorking ? "disabled" : ""}>Generate / resume</button>
                   <button class="secondary-button preview-short" data-short-id="${escapeHtml(shortId)}" ${step < 7 || shortWorking ? "disabled" : ""}>Live preview</button>
                   <button class="secondary-button render-short" data-short-id="${escapeHtml(shortId)}" ${step < 7 || shortWorking ? "disabled" : ""}>Render MP4</button>
                   ${item.status === "rendered" ? `<a class="secondary-button" href="${artifactUrl(run.id, `shorts/${shortId}/motion_canvas/final.mp4`)}" target="_blank">Open MP4 ↗</a>` : ""}
@@ -871,16 +901,57 @@ document.addEventListener("click", async event => {
     }
     return;
   }
+  const shortStepButton = event.target.closest(".short-step[data-short-step]");
+  if (shortStepButton) {
+    const selected = Number(shortStepButton.dataset.shortStep);
+    if (selected < 4 || selected > 7) return;
+    setBusy(shortStepButton, true, "Starting…");
+    try {
+      state.selectedShortId = shortStepButton.dataset.shortId;
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(shortStepButton.dataset.shortId)}/execute`, {
+        method: "POST",
+        body: JSON.stringify({ from_step: selected, stop_after_step: selected, confirm_paid_api: true })
+      });
+      toast(`Short step ${selected} started.`);
+      await refreshShorts(state.activeRunId, { render: true });
+      manageShortsPolling();
+    } catch (error) {
+      showError(error);
+      setBusy(shortStepButton, false);
+    }
+    return;
+  }
+  const shortRunStep = event.target.closest(".short-run-step");
+  if (shortRunStep) {
+    const selected = Number($("#short-step-select")?.value || 4);
+    setBusy(shortRunStep, true, "Starting…");
+    try {
+      state.selectedShortId = shortRunStep.dataset.shortId;
+      await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(shortRunStep.dataset.shortId)}/execute`, {
+        method: "POST",
+        body: JSON.stringify({ from_step: selected, stop_after_step: selected, confirm_paid_api: true })
+      });
+      toast(`Short step ${selected} started.`);
+      await refreshShorts(state.activeRunId, { render: true });
+      manageShortsPolling();
+    } catch (error) {
+      showError(error);
+      setBusy(shortRunStep, false);
+    }
+    return;
+  }
   const generateShort = event.target.closest(".generate-short");
   if (generateShort) {
     setBusy(generateShort, true, "Starting…");
     try {
       state.selectedShortId = generateShort.dataset.shortId;
+      const fromStep = Number(generateShort.dataset.fromStep || $("#short-step-select")?.value || 4);
+      const stopAfter = Number(generateShort.dataset.stopAfterStep || 7);
       await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/shorts/${encodeURIComponent(generateShort.dataset.shortId)}/execute`, {
         method: "POST",
-        body: JSON.stringify({ from_step: 4, stop_after_step: 7, confirm_paid_api: true })
+        body: JSON.stringify({ from_step: fromStep, stop_after_step: stopAfter, confirm_paid_api: true })
       });
-      toast("Short generation started. Logs update live.");
+      toast(fromStep === stopAfter ? `Short step ${fromStep} started.` : `Short resumed from step ${fromStep}. Logs update live.`);
       await refreshShorts(state.activeRunId, { render: true });
       manageShortsPolling();
     } catch (error) {

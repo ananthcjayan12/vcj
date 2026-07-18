@@ -1,1 +1,19 @@
-Analyze the supplied parent narration, immutable timeline, beats, and reel manifest. Return candidates with hooks, payoffs, exact claim IDs, source paragraphs/reels/beats, reuse modes, warnings, and 0–100 component scores.
+Discover 6–8 genuinely different Short concepts from this approved lesson.
+
+Use the evidence pack as immutable ground truth.
+The final system will keep only the strongest 3–5 candidates after local grounding and diversity gates.
+
+Priorities, in order:
+1. Standalone clarity
+2. Scroll-stopping hook
+3. Satisfying payoff
+4. Distinctness from the other candidates
+5. Visual adaptability
+6. Exam usefulness
+7. Audio reuse feasibility
+
+Do not favour an idea merely because it permits more source-audio reuse.
+Do not summarise lesson sections. Find moments.
+
+EVIDENCE PACK:
+{{DISCOVERY_CONTEXT_JSON}}

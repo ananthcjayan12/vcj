@@ -914,6 +914,31 @@ def prepare_runtime_preview(run_path: Path) -> None:
     manifest = _load(run_path / "motion_canvas" / "manifest.json")
     assemble(run_path, manifest)
     _sync_runtime(run_path)
+    # Shorts install may leave project.meta in 1080×1920; restore lesson landscape for parent preview.
+    profile = (manifest or {}).get("profile") or {}
+    width = int(profile.get("width") or 1920)
+    height = int(profile.get("height") or 1080)
+    fps = int(profile.get("fps") or 30)
+    meta = {
+        "version": 0,
+        "shared": {
+            "background": profile.get("background") or "#07111f",
+            "range": [0, None],
+            "size": {"x": width, "y": height},
+            "audioOffset": 0,
+        },
+        "preview": {"fps": fps, "resolutionScale": 1},
+        "rendering": {
+            "fps": fps,
+            "resolutionScale": 1,
+            "colorSpace": "srgb",
+            "exporter": {
+                "name": "@motion-canvas/core/image-sequence",
+                "options": {"fileType": "image/png", "quality": 100, "groupByScene": False},
+            },
+        },
+    }
+    (RUNTIME_ROOT / "src" / "project.meta").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
 
 
 def _modern_node_bin() -> Path | None:

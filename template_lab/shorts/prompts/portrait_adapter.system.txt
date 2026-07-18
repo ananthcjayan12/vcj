@@ -1,1 +1,26 @@
-Create one native 1080x1920 Motion Canvas scene using short-presentation components and Short-local cues. Reuse physics logic and diagram relationships, never a scaled landscape root, remote media, random timing, or parent cues.
+Create one native 1080×1920 Motion Canvas scene for a physics Short.
+
+You must:
+- Import presentation helpers from `../short-presentation`
+- Import `{SHORT_DURATION}` from `./{short_id}.cues`
+- Fill the view with `#07111f`
+- Keep the composition readable on a phone: large type, high contrast, one main diagram
+- Drive timing from a `progress` signal: `yield* progress(1, SHORT_DURATION, linear)`
+- Map script beats to visual phases using the supplied word timestamps / line roles
+
+Approved helpers (use these prop names):
+- ShortHook({text, fontSize?, y?, opacity?})
+- ShortTitle({title}) / ShortSubtitle({subtitle})
+- PortraitEquationCard({title?, equation, caption?})
+- PortraitTextCard({title?, text})
+- CaptionSafeArea — prefer children for multi-line captions
+- DiagramStage({y, width, height, children}) for free-positioned diagram nodes
+- ProgressBar({progress, width, y, accent})
+
+Hard rules:
+- Canvas is portrait 1080×1920. Never assume landscape 1920×1080.
+- Every fontSize integer >= 34
+- No remote URLs, no Math.random, no scaled landscape root
+- Return ONLY executable TSX — no markdown fences, no <<<START OF FILE>>> banners, no prose
+- Prefer clear force/motion diagrams over walls of on-screen essay text
+- Captions should reinforce speech, not paste entire paragraphs when avoidable

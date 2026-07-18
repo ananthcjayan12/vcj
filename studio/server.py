@@ -261,7 +261,8 @@ def start_short_preview(run_id: str, short_id: str) -> dict[str, Any]:
                 _short_preview_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 _short_preview_process.kill()
-        install_short_runtime(root)
+        installed = install_short_runtime(root)
+        profile = installed.get("profile") or {"id": "short_portrait", "width": 1080, "height": 1920, "fps": 30}
         with socket.socket() as probe:
             probe.bind(("127.0.0.1", 0))
             port = int(probe.getsockname()[1])
@@ -282,7 +283,13 @@ def start_short_preview(run_id: str, short_id: str) -> dict[str, Any]:
                 text=True,
             )
         _short_preview_key = preview_key
-        _short_preview_url = f"http://127.0.0.1:{port}/"
+        query = (
+            f"profile={profile.get('id', 'short_portrait')}"
+            f"&width={int(profile.get('width', 1080))}"
+            f"&height={int(profile.get('height', 1920))}"
+            f"&fps={int(profile.get('fps', 30))}"
+        )
+        _short_preview_url = f"http://127.0.0.1:{port}/?{query}"
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         if _short_preview_process.poll() is not None:

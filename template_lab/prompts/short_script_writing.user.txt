@@ -1,1 +1,17 @@
-Compile the selected candidate into the required Short script schema. Preserve grounded claim IDs and include visual intent for each spoken line.
+Write ONE natural Short script from the selected candidate and focused evidence below.
+
+Creative north star: the candidate’s hook, promise, payoff, and rationale.
+Immutable sources: claims, source paragraphs, reusable clauses, visual evidence.
+Platform: 9:16, captions on, first line must work as on-screen text.
+
+Priorities:
+1. Hook sharpness and retention
+2. Natural spoken flow
+3. Exact grounding in claims
+4. Exact clause reuse only when it still sounds good
+5. Portrait-friendly visual intent per line
+
+Do not imitate a three-line template. Do not dump the whole lesson.
+
+SCRIPT CONTEXT:
+{{SCRIPT_CONTEXT_JSON}}
