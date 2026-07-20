@@ -556,7 +556,10 @@ def _extract_response(response: str, chapter_ids: list[str]) -> dict[str, str]:
     pattern = "|".join(re.escape(f"=== {chapter_id}.tsx ===") for chapter_id in chapter_ids)
     matches = list(re.finditer(pattern, response))
     if len(matches) != len(chapter_ids):
-        raise RuntimeError(f"Expected {len(chapter_ids)} chapter markers, found {len(matches)}")
+        preview = response[:500].replace("\n", "\\n")
+        raise RuntimeError(
+            f"Expected {len(chapter_ids)} chapter markers, found {len(matches)}; response began: {preview!r}"
+        )
     files = {}
     for index, match in enumerate(matches):
         expected = f"=== {chapter_ids[index]}.tsx ==="

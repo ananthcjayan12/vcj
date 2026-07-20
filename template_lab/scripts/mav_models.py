@@ -23,7 +23,7 @@ DEFAULT_ANTHROPIC_RETRY_BASE_SECONDS = 2.0
 ANTHROPIC_RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 529}
 ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 MOONSHOT_CHAT_COMPLETIONS_URL = "https://api.moonshot.ai/v1/chat/completions"
-SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot", "codex"}
+SUPPORTED_MODEL_PROVIDERS = {"anthropic", "gemini", "zai", "moonshot", "codex", "grok"}
 GEMINI_JSON_SCHEMA_KEYS = {
     "$id",
     "$defs",
@@ -287,6 +287,13 @@ def provider_available(provider: str) -> bool:
             return True
         except RuntimeError:
             return False
+    if normalized == "grok":
+        from mav_grok import _binary, _login_status
+        try:
+            _login_status(_binary())
+            return True
+        except RuntimeError:
+            return False
     return bool(_api_key_for_provider(normalized))
 
 
@@ -368,6 +375,9 @@ def call_model_json(
     if resolved.provider == "codex":
         from mav_codex import call_codex_json
         return call_codex_json(task=task, system=system, user=user, max_tokens=max_tokens, output_schema=output_schema)
+    if resolved.provider == "grok":
+        from mav_grok import call_grok_json
+        return call_grok_json(task=task, system=system, user=user, max_tokens=max_tokens, output_schema=output_schema)
     if not provider_available(resolved.provider):
         raise RuntimeError(
             f"{resolved.provider.title()} provider selected for {task}, but {_api_key_hint(resolved.provider)} is not set"
@@ -395,6 +405,9 @@ def call_model_text(
     if resolved.provider == "codex":
         from mav_codex import call_codex_text
         return call_codex_text(task=task, system=system, user=user, max_tokens=max_tokens)
+    if resolved.provider == "grok":
+        from mav_grok import call_grok_text
+        return call_grok_text(task=task, system=system, user=user, max_tokens=max_tokens)
     if not provider_available(resolved.provider):
         raise RuntimeError(
             f"{resolved.provider.title()} provider selected for {task}, but {_api_key_hint(resolved.provider)} is not set"

@@ -53,10 +53,12 @@ TOPIC_REF_RE = re.compile(r"^\d+(?:\.\d+){1,2}$")
 SCENE_ID_RE = re.compile(r"^scene_\d{2,3}$")
 CHAPTER_ID_RE = re.compile(r"^chapter_\d{2,3}$")
 MOTION_UNIT_ID_RE = re.compile(r"^(?:chapter|shot|reel|beat)_\d{2,3}$")
-MODEL_PROVIDERS = {"configured", "gemini", "anthropic", "codex"}
+MODEL_PROVIDERS = {"configured", "gemini", "anthropic", "codex", "grok"}
 AUDIO_PROVIDERS = {"gemini", "elevenlabs"}
 CODEX_MODELS = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini")
 CODEX_REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
+GROK_MODELS = ("grok-4.5",)
+GROK_REASONING_EFFORTS = ("low", "medium", "high")
 RENDER_QUALITIES = {"draft", "standard", "high"}
 
 _processes: dict[str, subprocess.Popen[str]] = {}
@@ -121,6 +123,8 @@ def model_map_payload() -> dict[str, Any]:
         if task in {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}:
             provider_models["codex"] = CODEX_MODELS[0]
             provider_model_options["codex"] = list(CODEX_MODELS)
+            provider_models["grok"] = GROK_MODELS[0]
+            provider_model_options["grok"] = list(GROK_MODELS)
         tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "reasoning_efforts": list(CODEX_REASONING_EFFORTS), "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
     tasks.append({"task": "audio_generation", "label": labels["audio_generation"], "step": 3, "provider": "gemini", "model": os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview"), "provider_models": {"gemini": "gemini-3.1-flash-tts-preview", "elevenlabs": os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3")}, "prompt_files": [], "max_tokens": None})
     return {"version": payload.get("version"), "tasks": sorted(tasks, key=lambda item: (item.get("step") or 99, item["task"]))}
@@ -144,8 +148,10 @@ def _validate_task_models(value: Any) -> dict[str, dict[str, str]]:
             raise ValueError(f"Unsupported model selection for {task}: {provider}:{model}")
         if provider == "codex" and reasoning not in CODEX_REASONING_EFFORTS:
             raise ValueError(f"Unsupported Codex reasoning effort for {task}: {reasoning}")
+        if provider == "grok" and reasoning not in GROK_REASONING_EFFORTS:
+            raise ValueError(f"Unsupported Grok reasoning effort for {task}: {reasoning}")
         overrides[task] = {"provider": provider, "model": model}
-        if provider == "codex":
+        if provider in {"codex", "grok"}:
             overrides[task]["reasoning_effort"] = reasoning
     return overrides
 
@@ -639,10 +645,14 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
         prefix = f"MAV_{task.upper()}"
         env[f"{prefix}_PROVIDER"] = selection["provider"]
         env[f"{prefix}_MODEL"] = selection["model"]
-        if selection["provider"] == "codex":
+        if selection["provider"] in {"codex", "grok"}:
             env[f"{prefix}_REASONING_EFFORT"] = selection.get("reasoning_effort", "low")
     motion_selection = task_models.get("motion_canvas_batch")
-    if motion_selection and motion_selection["provider"] == "codex":
+    if motion_selection and motion_selection["provider"] == "grok":
+        # Grok Build uses a local leader/session service. Serialize long
+        # headless generations so concurrent agents cannot contend for it.
+        concurrency = 1
+    elif motion_selection and motion_selection["provider"] == "codex":
         # Subscription-backed Codex runs are intentionally conservative; the
         # normal batch cache still preserves every successful result.
         concurrency = min(int(settings.get("scene_concurrency", 1)), 2)

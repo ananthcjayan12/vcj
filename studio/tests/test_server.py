@@ -102,6 +102,14 @@ class StudioPayloadTest(unittest.TestCase):
         self.assertEqual(env["MAV_MOTION_CANVAS_BATCH_REASONING_EFFORT"], "high")
         self.assertEqual(env["MAV_MOTION_CANVAS_WORKERS"], "2")
 
+    def test_supergrok_cli_model_can_be_selected_for_motion_canvas(self) -> None:
+        meta = {"id": "physics-1-1-grok-test", "facts_path": "video_engine/topics/1.1/facts.json", "settings": {"duration": 480, "model_provider": "gemini", "audio_provider": "gemini", "scene_concurrency": 4, "task_models": {"motion_canvas_batch": {"provider": "grok", "model": "grok-4.5", "reasoning_effort": "high"}, "motion_canvas_repair": {"provider": "grok", "model": "grok-4.5", "reasoning_effort": "high"}}}}
+        _command, env = build_generation_command(meta, {"from_step": 5, "stop_after_step": 5, "confirm_paid_api": True})
+        self.assertEqual(env["MAV_MOTION_CANVAS_BATCH_PROVIDER"], "grok")
+        self.assertEqual(env["MAV_MOTION_CANVAS_BATCH_MODEL"], "grok-4.5")
+        self.assertEqual(env["MAV_MOTION_CANVAS_BATCH_REASONING_EFFORT"], "high")
+        self.assertEqual(env["MAV_MOTION_CANVAS_WORKERS"], "1")
+
     def test_targeted_motion_chapter_command_preserves_the_rest_of_the_run(self) -> None:
         meta = {
             "id": "physics-1-1-command-test",

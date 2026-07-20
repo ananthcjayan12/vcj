@@ -172,7 +172,8 @@ function modelMapMarkup(run, working) {
     const prompts = task.prompt_files?.length ? task.prompt_files.join(" · ") : "Voice synthesis (no text prompt file)";
     const modelOptions = task.provider_model_options?.[current.provider] || [task.provider_models[current.provider]];
     const reasoning = current.reasoning_effort || "low";
-    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}"><span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(provider === "codex" ? "Codex CLI (ChatGPT)" : provider)}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select><select class="task-reasoning" ${working || current.provider !== "codex" ? "disabled" : ""}>${(task.reasoning_efforts || ["low"]).map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select></article>`;
+    const reasoningOptions = current.provider === "grok" ? ["low", "medium", "high"] : (task.reasoning_efforts || ["low"]);
+    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}"><span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(provider === "codex" ? "Codex CLI (ChatGPT)" : provider === "grok" ? "Grok CLI (SuperGrok)" : provider)}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select><select class="task-reasoning" ${working || !["codex", "grok"].includes(current.provider) ? "disabled" : ""}>${reasoningOptions.map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select></article>`;
   }).join("")}</div><p class="model-map-note">Changes are saved to this run and applied on its next execution. Past usage records keep the model that actually produced them.</p></section>`;
 }
 
@@ -184,7 +185,7 @@ function costMarkup(artifacts) {
 }
 
 function collectTaskModels() {
-  return Object.fromEntries($$("[data-model-task]").map(row => [row.dataset.modelTask, { provider: $(".task-provider", row).value, model: $(".task-model", row).value, ...($(".task-provider", row).value === "codex" ? {reasoning_effort: $(".task-reasoning", row).value} : {}) }]));
+  return Object.fromEntries($$("[data-model-task]").map(row => [row.dataset.modelTask, { provider: $(".task-provider", row).value, model: $(".task-model", row).value, ...(["codex", "grok"].includes($(".task-provider", row).value) ? {reasoning_effort: $(".task-reasoning", row).value} : {}) }]));
 }
 
 async function boot() {
@@ -299,8 +300,8 @@ function renderTopicDetail() {
         <label class="field"><span>Script generator / model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><optgroup label="Codex CLI (ChatGPT)"><option value="codex:gpt-5.6-sol">GPT-5.6-Sol</option><option value="codex:gpt-5.6-terra">GPT-5.6-Terra</option><option value="codex:gpt-5.6-luna">GPT-5.6-Luna</option><option value="codex:gpt-5.5">GPT-5.5</option><option value="codex:gpt-5.4">GPT-5.4</option><option value="codex:gpt-5.4-mini">GPT-5.4-Mini</option></optgroup><option value="configured">Configured</option></select></label>
         <label class="field"><span>Script reasoning</span><select id="script-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Voice</span><select id="audio-provider"><option value="gemini">Gemini TTS</option><option value="elevenlabs">ElevenLabs</option></select></label>
-        <label class="field"><span>Visual reel generator</span><select id="chapter-provider"><option value="moonshot">Kimi K2.7 Code</option><option value="codex">Codex CLI (ChatGPT)</option></select></label>
-        <label class="field"><span>Codex model</span><select id="codex-model" disabled><option value="gpt-5.6-sol">GPT-5.6-Sol</option><option value="gpt-5.6-terra">GPT-5.6-Terra</option><option value="gpt-5.6-luna">GPT-5.6-Luna</option><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.4-mini">GPT-5.4-Mini</option></select></label>
+        <label class="field"><span>Visual reel generator</span><select id="chapter-provider"><option value="moonshot">Kimi K2.7 Code</option><option value="codex">Codex CLI (ChatGPT)</option><option value="grok">Grok CLI (SuperGrok)</option></select></label>
+        <label class="field"><span>CLI model</span><select id="codex-model" disabled><option value="gpt-5.6-sol">GPT-5.6-Sol</option><option value="gpt-5.6-terra">GPT-5.6-Terra</option><option value="gpt-5.6-luna">GPT-5.6-Luna</option><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.4-mini">GPT-5.4-Mini</option></select><select id="grok-model" disabled><option value="grok-4.5">Grok 4.5</option></select></label>
         <label class="field"><span>Chapter reasoning</span><select id="chapter-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Chapter workers</span><select id="scene-concurrency"><option>1</option><option selected>2</option><option>4</option></select></label>
       </div>
@@ -500,10 +501,10 @@ function productionPayload(execute) {
   const taskModels = {
     motion_canvas_batch: {
       provider: chapterProvider,
-      model: chapterProvider === "codex" ? $("#codex-model").value : "kimi-k2.7-code",
-      ...(chapterProvider === "codex" ? {reasoning_effort: $("#chapter-reasoning").value} : {})
+      model: chapterProvider === "codex" ? $("#codex-model").value : chapterProvider === "grok" ? $("#grok-model").value : "kimi-k2.7-code",
+      ...(["codex", "grok"].includes(chapterProvider) ? {reasoning_effort: $("#chapter-reasoning").value} : {})
     },
-    motion_canvas_repair: {provider: "codex", model: $("#codex-model").value, reasoning_effort: "high"}
+    motion_canvas_repair: chapterProvider === "grok" ? {provider: "grok", model: $("#grok-model").value, reasoning_effort: "high"} : {provider: "codex", model: $("#codex-model").value, reasoning_effort: "high"}
   };
   if (scriptProvider === "codex") {
     for (const task of ["script_structure", "script_writing"]) taskModels[task] = {provider: "codex", model: scriptModel, reasoning_effort: $("#script-reasoning").value};
@@ -692,7 +693,10 @@ document.addEventListener("change", event => {
   if (event.target.classList.contains("topic-status-select")) updateCoverage(event.target);
   if (event.target.id === "chapter-provider") {
     $("#codex-model").disabled = event.target.value !== "codex";
-    $("#chapter-reasoning").disabled = event.target.value !== "codex";
+    $("#grok-model").disabled = event.target.value !== "grok";
+    $("#chapter-reasoning").disabled = !["codex", "grok"].includes(event.target.value);
+    const efforts = event.target.value === "grok" ? ["low", "medium", "high"] : ["low", "medium", "high", "xhigh", "max", "ultra"];
+    $("#chapter-reasoning").innerHTML = efforts.map(effort => `<option ${effort === "high" ? "selected" : ""}>${effort}</option>`).join("");
   }
   if (event.target.id === "model-provider") {
     $("#script-reasoning").disabled = !event.target.value.startsWith("codex:");
@@ -703,7 +707,9 @@ document.addEventListener("change", event => {
     const options = JSON.parse(row.dataset.providerModelOptions || "{}");
     const available = options[event.target.value] || [models[event.target.value]];
     $(".task-model", row).innerHTML = available.map(model => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
-    $(".task-reasoning", row).disabled = event.target.value !== "codex";
+    $(".task-reasoning", row).disabled = !["codex", "grok"].includes(event.target.value);
+    const efforts = event.target.value === "grok" ? ["low", "medium", "high"] : ["low", "medium", "high", "xhigh", "max", "ultra"];
+    $(".task-reasoning", row).innerHTML = efforts.map(effort => `<option value="${effort}">${effort} reasoning</option>`).join("");
   }
 });
 
