@@ -48,3 +48,14 @@ Rules:
 - Treat narration as audio content. On-screen display copy must be concise and satisfy the presentation component limits.
 - If comparison content exceeds four rows, show successive table pages at narration cues. Never compress, overflow, or reduce type below the design-system size.
 - Import `CUES` from the reel's adjacent cues module using the requested reel filename, for example `./reel_001.cues`, and use those named word times for every semantic reveal. Do not transcribe timestamp numbers into TSX or invent semantic timing literals.
+
+Scientific and review contract:
+
+- Derive the required visual behaviour from the supplied grounded facts, narration, exact cues, and physics context; do not use topic-specific memorised scene templates.
+- For every arrow, vector, moving object, graph or state change, explicitly reason about its direction, reference frame, trajectory, rotation, attachment and causal response before coding it.
+- A displayed cause and its visible effect must share one source of truth. Never independently hardcode an arrow direction and a contradictory motion direction.
+- Points or objects that must remain connected must use shared coordinates or an explicit body-to-world transform. World-fixed quantities must not inherit object rotation unless the facts require it.
+- Important visual events must remain tied to the supplied cue that describes them. Never solve a layout problem by moving the teaching event to a different narration time.
+- Include the required `MAV_VISUAL_CONTRACT` JSON comment supplied in the user instructions, with one to three completed-state review checkpoints.
+- The review checkpoints must identify moments where the important objects and relationships are simultaneously visible and entrance animation has settled.
+- Before returning the file, perform one final internal audit for scientific consistency, cue synchronisation, severe overlap, clipping, font readability and contrast. Return only the corrected audited source.
