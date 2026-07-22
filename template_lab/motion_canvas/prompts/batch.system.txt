@@ -30,6 +30,11 @@ Rules:
 - Use only Motion Canvas imports demonstrated by the supplied approved API.
 - JSX `key` properties must be strings, never numbers. Do not use the unavailable global `JSX.Element` type; use the approved `Node` type for stored scene-node arrays.
 - Never use the CSS color name `transparent`; Motion Canvas rejects it. Use `#00000000` for a fully transparent fill.
+- Keep the composition free-form and cinematic. Do not turn the reel into a dashboard, fixed grid, or repeated slide template merely to avoid overlap.
+- Wrap each independent major visual group in one `KineticActor` with a stable semantic `id`. Group intentional internal overlaps together: an apparatus plus its arrows and labels is one actor, not dozens of actors. Presentation components already register themselves automatically.
+- Use `role="primary"` or `role="diagram"` for the central physics visual, `role="supporting"` for explanatory groups, `role="equation"` for standalone calculations, and `role="decorative"` for non-essential accents. The runtime preserves high-priority actors and automatically nudges, slightly scales, or removes only a lower-priority actor when the authored composition becomes crowded.
+- Give supporting actors explicit cue windows whenever the narration naturally moves on. Prefer transformation and replacement over permanent accumulation, but do not manually create rigid boxes or columns for the runtime.
+- `KineticActor` is a transparent choreography wrapper: its children retain their original coordinates, animation, and style. It exists only so the local runtime can restage the complete group safely at render time.
 - Build all primary writing with the approved presentation components. Never manually lay out prose or tables with raw `Txt`, `Rect`, coordinates, or arbitrary font sizes.
 - Write mathematical notation as valid TeX in `EquationCard`. Escape TeX backslashes correctly inside TSX expressions. Do not put `\text`, `\frac`, `\dfrac`, subscripts, superscripts, or other TeX commands into raw `Txt`.
 - Use `variant="compact"` for card groups placed beside diagrams or in multi-card rows/stacks. Compact `TextCard` and `EquationCard` are 500×140; compact `StatReadout` is 360×140. Reserve those complete bounds when positioning them.

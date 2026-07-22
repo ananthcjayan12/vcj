@@ -5,9 +5,18 @@ Use only these imports unless the starter scene already demonstrates another one
 ```ts
 import {Circle, Grid, Layout, Line, Node, Rect, Txt, makeScene2D} from '@motion-canvas/2d';
 import {Vector2, all, chain, createRef, createSignal, linear, waitFor} from '@motion-canvas/core';
-import {ComparisonTable, EquationCard, SceneTitle, StatReadout, TextCard, TwoColumnComparison} from '../../presentation';
+import {ComparisonTable, EquationCard, KineticActor, SceneTitle, StatReadout, TextCard, TwoColumnComparison} from '../../presentation';
 import {CUES} from './reel_NNN.cues';
 ```
+
+Kinetic choreography contract:
+
+- `KineticActor` wraps one independent visual group without imposing a layout. Example: `<KineticActor id={'force-rig'} role={'primary'} priority={900}>...</KineticActor>`. Keep freely authored coordinates and animation inside it.
+- Group the complete apparatus, graph, force diagram, particle model, or other intentionally overlapping illustration as one actor. Never wrap every primitive separately.
+- Recommended roles are `primary`, `diagram`, `supporting`, `equation`, `readout`, and `decorative`. Higher priority actors stay closer to the authored position; lower priority actors yield first.
+- Optional capabilities are `canShift`, `canScale`, `canFade`, `maxShift`, and `minScale`. Keep the central scientific visual non-fading. Supporting and decorative groups may fade only as the runtime's final crowding fallback.
+- Presentation components register automatically, so they do not need an additional actor wrapper unless several components should move as one cluster.
+- The choreography runtime runs after every deterministic seek and before drawing. It minimally restages simultaneous actors and diagram labels; it does not fail the pipeline or replace the scene with a template.
 
 Presentation contract:
 

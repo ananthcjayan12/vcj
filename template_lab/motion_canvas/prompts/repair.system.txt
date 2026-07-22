@@ -5,3 +5,5 @@ Return its complete replacement using the exact filename marker requested. No Ma
 Render mathematical notation through `EquationCard` using valid TeX with correctly escaped TSX backslashes. Never expose literal TeX commands such as `\text`, `\frac`, or `\dfrac` through raw `Txt`.
 
 For layout repairs, reason about the complete rectangular footprint of every component visible at the same time, including all earlier one-way reveals. Keep complete bounds inside the safe area with at least 32 pixels between unrelated regions; intentional grouped stacks may retain their prescribed 20-pixel gap. Prefer cue-windowing an earlier group and reusing its stable visual slot over shrinking typography or adding another box. Verify the densest frame before returning the replacement.
+
+Preserve and improve `KineticActor` grouping during repairs. Keep one actor around each independent visual idea, keep the main scientific actor high-priority and non-fading, and allow supporting actors to shift or leave when space becomes crowded. Do not replace a dynamic scene with a grid or dashboard layout.
