@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 
 def test_studio_extension_creates_additive_reel_pack(tmp_path, monkeypatch):
     import studio.server as server
     import studio.reel_pack_extension as extension
+    import template_lab.reel_pack.common as reel_common
 
     runs_root = tmp_path / "template_lab" / "runs"
     topics_root = tmp_path / "video_engine" / "topics"
@@ -29,6 +29,7 @@ def test_studio_extension_creates_additive_reel_pack(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "RUNS_ROOT", runs_root)
     monkeypatch.setattr(server, "TOPICS_ROOT", topics_root)
     monkeypatch.setattr(server, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(reel_common, "RUNS_ROOT", runs_root)
     monkeypatch.setattr(
         server,
         "topic_detail",
