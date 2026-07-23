@@ -21,6 +21,9 @@ from direct_html.pipeline import (
     validate_and_inspect as validate_and_inspect_direct_html,
 )
 from motion_canvas.pipeline import generate as generate_motion_canvas
+from mav_env import load_repo_env
+
+load_repo_env()
 from motion_canvas.pipeline import prepare as prepare_motion_canvas
 from motion_canvas.pipeline import prepare_runtime_preview as prepare_motion_canvas_runtime_preview
 from motion_canvas.pipeline import validate_and_assemble as validate_and_assemble_motion_canvas
@@ -339,23 +342,26 @@ def generate_preview(args: argparse.Namespace) -> dict[str, Any]:
             units = manifest.get("reels") if manifest.get("timeline_mode") == "immutable_reels" else manifest.get("shots") or manifest.get("chapters") or []
             unit_directory = "reels" if manifest.get("timeline_mode") == "immutable_reels" else "shots" if manifest.get("timeline_mode") == "immutable_shots" else "chapters"
             return _step_summary(input_payload, path, 5, ["motion_canvas/manifest.json", "motion_canvas/generation-report.json", f"motion_canvas/{unit_directory}"], mode=MOTION_CANVAS_MODE, chapters=len(units), timeline_mode=manifest.get("timeline_mode"))
-        try:
-            _log(
-                "step 6: compiling and validating browser frames"
-                + (" with bounded Codex chapter repair enabled" if use_model else "")
-            )
-            validation = validate_and_assemble_motion_canvas(
-                path,
-                manifest,
-                allow_model_repair=use_model,
-                max_model_repairs=2,
-            )
-        except Exception:
-            if chapter_path is not None and chapter_backup is not None:
-                chapter_path.write_text(chapter_backup, encoding="utf-8")
-                prepare_motion_canvas_runtime_preview(path)
-                _log(f"validation failed; restored the previous accepted source for {args.motion_chapter_id}")
-            raise
+        if from_step <= 6:
+            try:
+                _log(
+                    "step 6: compiling and validating browser frames"
+                    + (" with bounded Codex chapter repair enabled" if use_model else "")
+                )
+                validation = validate_and_assemble_motion_canvas(
+                    path,
+                    manifest,
+                    allow_model_repair=use_model,
+                    max_model_repairs=2,
+                )
+            except Exception:
+                if chapter_path is not None and chapter_backup is not None:
+                    chapter_path.write_text(chapter_backup, encoding="utf-8")
+                    prepare_motion_canvas_runtime_preview(path)
+                    _log(f"validation failed; restored the previous accepted source for {args.motion_chapter_id}")
+                raise
+        else:
+            validation = _read_cached_json(path / "motion_canvas" / "robot-report.json", "Motion Canvas validation report")
         if stop_after_step == 6:
             units = manifest.get("reels") if manifest.get("timeline_mode") == "immutable_reels" else manifest.get("shots") or manifest.get("chapters") or []
             return _step_summary(input_payload, path, 6, ["motion_canvas/robot-report.json", "motion_canvas/validation.json", "motion_canvas/preview/contact-sheet.png", "motion_canvas/scenes.ts"], mode=MOTION_CANVAS_MODE, chapters=len(units), validation=validation["status"], timeline_mode=manifest.get("timeline_mode"))

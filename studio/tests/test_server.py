@@ -9,10 +9,28 @@ from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, topic_detail, update_run_models
+from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, approve_motion_lesson_review, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, start_motion_lesson_review, topic_detail, update_run_models
 
 
 class StudioPayloadTest(unittest.TestCase):
+    def test_corrected_lesson_review_can_be_manually_approved(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
+            run_path = Path(directory) / "approval-test"
+            corrected = run_path / "motion_canvas" / "lesson-review" / "corrected-evidence" / "contact-sheet-01.png"
+            corrected.parent.mkdir(parents=True)
+            corrected.write_bytes(b"png")
+            report_path = run_path / "motion_canvas" / "lesson-review.json"
+            report_path.write_text(json.dumps({
+                "status": "repaired_pending_review",
+                "corrected_contact_sheets": ["motion_canvas/lesson-review/corrected-evidence/contact-sheet-01.png"],
+            }))
+            (run_path / "motion_canvas" / "robot-report.json").write_text('{"status":"passed"}')
+            (run_path / "studio.log").write_text("")
+            report = approve_motion_lesson_review("approval-test")
+            self.assertEqual(report["status"], "approved")
+            robot = json.loads((run_path / "motion_canvas" / "robot-report.json").read_text())
+            self.assertEqual(robot["lesson_review_status"], "approved")
+
     def test_multiple_ready_runs_are_added_to_render_queue_in_order(self) -> None:
         with tempfile.TemporaryDirectory() as directory, patch(
             "studio.server.RENDER_QUEUE_PATH", Path(directory) / "render_queue.json"
@@ -92,7 +110,34 @@ class StudioPayloadTest(unittest.TestCase):
 
     def test_model_map_covers_all_paid_pipeline_tasks(self) -> None:
         tasks = {item["task"] for item in model_map_payload()["tasks"]}
-        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"})
+        self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen"})
+
+    def test_kimi_visual_review_uses_latest_multimodal_model(self) -> None:
+        task = next(item for item in model_map_payload()["tasks"] if item["task"] == "motion_canvas_lesson_screen")
+        self.assertEqual(task["provider_models"]["moonshot"], "kimi-k3")
+        self.assertEqual(task["provider_model_options"]["moonshot"], ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"])
+
+    def test_compile_qa_disables_optional_multimodal_review(self) -> None:
+        meta = {"id": "physics-1-1-command-test", "facts_path": "video_engine/topics/1.1/facts.json", "settings": {"duration": 480, "model_provider": "gemini", "audio_provider": "gemini"}}
+        _command, env = build_generation_command(meta, {"from_step": 1, "stop_after_step": 1, "confirm_paid_api": True})
+        self.assertEqual(env["MAV_MOTION_CANVAS_LESSON_REVIEW"], "0")
+
+    def test_optional_visual_review_uses_selected_screening_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("studio.server.RUNS_ROOT", Path(directory)):
+            run_path = Path(directory) / "review-run"
+            (run_path / "motion_canvas").mkdir(parents=True)
+            (run_path / "motion_canvas" / "robot-report.json").write_text('{"status":"passed"}')
+            (run_path / "studio_run.json").write_text(json.dumps({"id": "review-run", "current_step": 6, "settings": {}}))
+            (run_path / "studio.log").write_text("")
+            with patch("studio.server._start_process", return_value={"status": "running"}) as start:
+                start_motion_lesson_review("review-run", {
+                    "confirm_paid_api": True,
+                    "auto_repair": False,
+                    "task_models": {"motion_canvas_lesson_screen": {"provider": "gemini", "model": "gemini-2.5-pro"}},
+                })
+            command, env = start.call_args.args[1:3]
+            self.assertIn("--screen-only", command)
+            self.assertEqual(env["MAV_MOTION_CANVAS_LESSON_SCREEN_MODEL"], "gemini-2.5-pro")
 
     def test_codex_cli_model_can_be_selected_for_motion_canvas_only(self) -> None:
         meta = {"id": "physics-1-1-command-test", "facts_path": "video_engine/topics/1.1/facts.json", "settings": {"duration": 480, "model_provider": "gemini", "audio_provider": "gemini", "scene_concurrency": 4, "task_models": {"motion_canvas_batch": {"provider": "codex", "model": "gpt-5.6-sol", "reasoning_effort": "high"}}}}
@@ -324,7 +369,7 @@ class StudioHttpTest(unittest.TestCase):
     def test_model_map_api(self) -> None:
         with urllib.request.urlopen(f"{self.base}/api/model-map", timeout=5) as response:
             payload = json.load(response)
-        self.assertEqual(len(payload["tasks"]), 5)
+        self.assertEqual(len(payload["tasks"]), 6)
 
     def test_static_application(self) -> None:
         with urllib.request.urlopen(f"{self.base}/", timeout=5) as response:

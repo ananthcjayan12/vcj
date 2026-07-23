@@ -22,6 +22,9 @@ from urllib.parse import quote, unquote, urlparse
 from urllib.request import urlopen
 
 from video_engine.cli import TOPIC_ORDER, VALID_STATES
+from template_lab.mav_env import load_repo_env
+
+load_repo_env()
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +74,25 @@ _render_queue_thread: threading.Thread | None = None
 _render_queue_monitors: set[int] = set()
 
 
+def _invalidate_motion_preview(run_id: str) -> None:
+    """Stop a live preview whose loaded module graph is about to become stale."""
+    global _preview_process, _preview_run_id, _preview_url
+    with _process_lock:
+        if _preview_run_id != run_id:
+            return
+        process = _preview_process
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        _preview_process = None
+        _preview_run_id = None
+        _preview_url = None
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -107,9 +129,9 @@ def _run_dir(run_id: str) -> Path:
 def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
     tasks = []
-    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair"}
-    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair"}
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5, "motion_canvas_lesson_screen": 7}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair", "motion_canvas_lesson_screen": "Optional AI visual reviewer"}
+    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen"}
     for task, config in payload.get("tasks", {}).items():
         if task not in retained_tasks:
             continue
@@ -499,6 +521,7 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "motion_canvas/render-checkpoint.json",
         "motion_canvas/scenes.ts", "motion_canvas/validation.json",
         "motion_canvas/robot-report.json", "motion_canvas/preview/contact-sheet.png",
+        "motion_canvas/lesson-review.json",
         "motion_canvas/final.mp4",
     ):
         if (run_path / relative).exists():
@@ -668,6 +691,9 @@ def build_generation_command(meta: dict[str, Any], request: dict[str, Any]) -> t
     # Moonshot currently permits three organization-wide concurrent requests.
     # Keep one slot free for targeted repairs and unrelated activity.
     env["MAV_MOTION_CANVAS_WORKERS"] = str(max(1, min(concurrency, 2)))
+    # Compile & QA remains deterministic and technical-only. Multimodal
+    # screening is launched explicitly through the optional review endpoint.
+    env["MAV_MOTION_CANVAS_LESSON_REVIEW"] = "0"
     return command, env
 
 
@@ -676,6 +702,8 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
         existing = _processes.get(run_id)
         if existing and existing.poll() is None:
             raise RuntimeError("This run already has an active process")
+    if target_step >= 5:
+        _invalidate_motion_preview(run_id)
     meta = _load_meta(run_id)
     meta.update({"status": "rendering" if mode == "render" else "running", "error": None})
     _save_meta(meta)
@@ -1108,6 +1136,80 @@ def start_motion_preview(run_id: str) -> dict[str, Any]:
     raise RuntimeError(f"Motion Canvas preview did not become ready. See {log_path}")
 
 
+def start_motion_lesson_review(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Launch the optional multimodal review as an independent paid job."""
+    if not payload.get("confirm_paid_api"):
+        raise PermissionError("Optional AI visual review requires explicit paid-API confirmation")
+    meta = _load_meta(run_id)
+    run_path = _run_dir(run_id)
+    technical = _read_json(run_path / "motion_canvas" / "robot-report.json", {}) or {}
+    if technical.get("status") != "passed":
+        raise RuntimeError("Complete Compile & QA successfully before running optional AI visual review")
+    task_models = _validate_task_models(payload.get("task_models", (meta.get("settings") or {}).get("task_models", {})))
+    screen = task_models.get("motion_canvas_lesson_screen")
+    if not screen:
+        catalog = {item["task"]: item for item in model_map_payload()["tasks"]}
+        configured = catalog["motion_canvas_lesson_screen"]
+        screen = {"provider": configured["provider"], "model": configured["model"]}
+        task_models["motion_canvas_lesson_screen"] = screen
+    meta.setdefault("settings", {})["task_models"] = task_models
+    _save_meta(meta)
+
+    command = [PYTHON_EXECUTABLE, str(TEMPLATE_LAB_ROOT / "scripts" / "mav_lesson_review.py"), "--run-id", run_id]
+    auto_repair = bool(payload.get("auto_repair", True))
+    if not auto_repair:
+        command.append("--screen-only")
+    env = os.environ.copy()
+    for task in ("motion_canvas_lesson_screen", "motion_canvas_batch", "motion_canvas_repair"):
+        selection = task_models.get(task)
+        if not selection:
+            continue
+        prefix = f"MAV_{task.upper()}"
+        env[f"{prefix}_PROVIDER"] = selection["provider"]
+        env[f"{prefix}_MODEL"] = selection["model"]
+        if selection["provider"] in {"codex", "grok"}:
+            env[f"{prefix}_REASONING_EFFORT"] = selection.get("reasoning_effort", "low")
+    _append_log(run_id, f"Optional AI visual review requested: reviewer={screen['provider']}:{screen['model']} auto_repair={auto_repair}")
+    repair = task_models.get("motion_canvas_batch", {})
+    if auto_repair and repair:
+        _append_log(run_id, f"Flagged-reel regeneration model: {repair.get('provider')}:{repair.get('model')} reasoning={repair.get('reasoning_effort', 'default')}")
+    return _start_process(
+        run_id,
+        command,
+        env,
+        mode="optional AI visual review",
+        target_step=max(6, int(meta.get("current_step", 6))),
+    )
+
+
+def approve_motion_lesson_review(run_id: str) -> dict[str, Any]:
+    run_path = _run_dir(run_id)
+    report_path = run_path / "motion_canvas" / "lesson-review.json"
+    report = _read_json(report_path, {}) or {}
+    status = str(report.get("status") or "")
+    if status == "approved":
+        return report
+    if status != "repaired_pending_review":
+        raise ValueError("Only a repaired_pending_review report can be manually approved")
+    corrected = list(report.get("corrected_contact_sheets") or [])
+    if not corrected or any(not (run_path / relative).exists() for relative in corrected):
+        raise ValueError("Corrected review evidence is missing; rerun the optional AI visual review")
+    report.update({
+        "status": "approved",
+        "approved_at": _now(),
+        "approved_from_status": status,
+        "approval": "manual_corrected_evidence_review",
+    })
+    _write_json(report_path, report)
+    robot_path = run_path / "motion_canvas" / "robot-report.json"
+    robot = _read_json(robot_path, {}) or {}
+    robot["lesson_review"] = report
+    robot["lesson_review_status"] = "approved"
+    _write_json(robot_path, robot)
+    _append_log(run_id, "Corrected Gemini lesson-review evidence manually approved")
+    return report
+
+
 def repair_chapter_run(run_id: str, chapter_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     meta = _load_meta(run_id)
     if not CHAPTER_ID_RE.fullmatch(chapter_id):
@@ -1421,6 +1523,12 @@ class StudioHandler(BaseHTTPRequestHandler):
             if match:
                 result = start_motion_preview(match.group(1))
                 return self._json({"preview": result, "run": run_detail(match.group(1))}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/lesson-review/run", path)
+            if match:
+                return self._json({"run": start_motion_lesson_review(match.group(1), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/lesson-review/approve", path)
+            if match:
+                return self._json({"report": approve_motion_lesson_review(match.group(1))})
             match = re.fullmatch(r"/api/runs/([^/]+)/stop", path)
             if match:
                 return self._json({"run": stop_run(match.group(1))})

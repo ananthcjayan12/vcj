@@ -22,7 +22,7 @@ const formatUsd = value => { const number = Number(value || 0); return number >=
 const activeStatuses = new Set(["running", "rendering"]);
 const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Visual reels", "Compile & QA", "Review", "Approval"];
 const stepsForRun = () => motionCanvasSteps;
-const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair"]);
+const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen"]);
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -173,7 +173,8 @@ function modelMapMarkup(run, working) {
     const modelOptions = task.provider_model_options?.[current.provider] || [task.provider_models[current.provider]];
     const reasoning = current.reasoning_effort || "low";
     const reasoningOptions = current.provider === "grok" ? ["low", "medium", "high"] : (task.reasoning_efforts || ["low"]);
-    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}"><span class="model-step">STEP ${task.step}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(provider === "codex" ? "Codex CLI (ChatGPT)" : provider === "grok" ? "Grok CLI (SuperGrok)" : provider)}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select><select class="task-reasoning" ${working || !["codex", "grok"].includes(current.provider) ? "disabled" : ""}>${reasoningOptions.map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select></article>`;
+    const providerLabel = provider => ({anthropic: "Claude", codex: "Codex CLI (ChatGPT)", gemini: "Gemini", grok: "Grok CLI (SuperGrok)", moonshot: "Kimi (K3 / multimodal)"}[provider] || provider);
+    return `<article class="model-map-row" data-model-task="${escapeHtml(task.task)}" data-provider-models="${escapeHtml(JSON.stringify(task.provider_models || {}))}" data-provider-model-options="${escapeHtml(JSON.stringify(task.provider_model_options || {}))}"><span class="model-step">${task.task === "motion_canvas_lesson_screen" ? "OPTIONAL" : `STEP ${task.step}`}</span><div class="model-task-copy"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(prompts)}</small></div><select class="task-provider" ${working ? "disabled" : ""}>${providers.map(provider => `<option value="${escapeHtml(provider)}" ${provider === current.provider ? "selected" : ""}>${escapeHtml(providerLabel(provider))}</option>`).join("")}</select><select class="task-model" ${working ? "disabled" : ""}>${modelOptions.map(model => `<option value="${escapeHtml(model)}" ${model === current.model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}</select><select class="task-reasoning" ${working || !["codex", "grok"].includes(current.provider) ? "disabled" : ""}>${reasoningOptions.map(effort => `<option value="${effort}" ${effort === reasoning ? "selected" : ""}>${effort} reasoning</option>`).join("")}</select></article>`;
   }).join("")}</div><p class="model-map-note">Changes are saved to this run and applied on its next execution. Past usage records keep the model that actually produced them.</p></section>`;
 }
 
@@ -347,6 +348,7 @@ function renderPipeline() {
       <div class="preview-shell"><div class="preview-toolbar"><span>LIVE MOTION CANVAS · PRE-RENDER VIDEO + SYNCHRONIZED VOICEOVER</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank" rel="noreferrer">OPEN EDITOR ↗</a>` : "LOCAL EDITOR PREVIEW"}</div>${artifacts.preview_url ? `<iframe class="preview-frame editor-preview" src="${escapeHtml(artifacts.preview_url)}" title="Motion Canvas lesson preview" allow="autoplay"></iframe>` : `<div class="preview-placeholder preview-launch"><span>Start the live Motion Canvas player to review animation and voiceover immediately. Rendering is not required.</span><button class="primary-button start-preview" ${working || completed < 6 ? "disabled" : ""}>Start live preview</button></div>`}</div>
       <div class="run-side">
         <div class="run-control-card"><h3>Run or regenerate a stage</h3><div class="step-control"><select id="step-select">${steps.map((name,index) => `<option value="${index+1}">${index+1}. ${name}</option>`).join("")}</select><button class="secondary-button" id="run-step" ${working ? "disabled" : ""}>Run selected step</button><button class="danger-button" id="regenerate-step" ${working ? "disabled" : ""}>Regenerate from step</button></div><label class="paid-check" style="margin-top:9px"><input type="checkbox" id="run-paid-confirm" checked disabled> Paid model and voice APIs authorized</label><p class="control-help">Regenerate removes the selected stage and every downstream artifact before starting that stage again.</p></div>
+        <div class="run-control-card"><h3>Optional AI visual review</h3><p class="control-help">Runs separately after technical Compile & QA. It captures fresh evidence, screens it with the selected reviewer model, and can regenerate only flagged reels.</p><label class="paid-check" style="margin:9px 0"><input type="checkbox" id="lesson-review-auto-repair" checked> Automatically regenerate flagged reels</label><button class="primary-button" id="run-lesson-review" ${working || completed < 6 ? "disabled" : ""}>Run optional AI visual review</button></div>
         <div class="run-control-card"><h3>Generated artifacts</h3>${artifacts.validation_preview_url ? `<a class="validation-evidence-link" href="${escapeHtml(artifacts.validation_preview_url)}" target="_blank" rel="noreferrer">Open deterministic contact sheet ↗</a>` : ""}<div class="artifact-list">${artifacts.files?.length ? artifacts.files.map(path => `<a href="${artifactUrl(run.id, path)}" target="_blank" title="${escapeHtml(path)}"><span>${escapeHtml(artifactLabel(path))}</span><small>${escapeHtml(path)}</small><b>OPEN ↗</b></a>`).join("") : `<p class="artifact-empty">Artifacts appear after each completed stage.</p>`}</div></div>
         <pre class="log-box" id="run-log">Loading logs…</pre>
         ${artifacts.mp4_url ? `<a class="primary-button" href="${escapeHtml(artifacts.mp4_url)}" target="_blank">Open rendered MP4 ↗</a>` : ""}
@@ -636,6 +638,25 @@ document.addEventListener("click", async event => {
       state.activeRun = reset.run; renderPipeline();
       return executeActive({ from_step: selected, stop_after_step: selected, task_models: taskModels }, `Step ${selected} regeneration started.`);
     } catch (error) { showError(error); }
+    return;
+  }
+  if (event.target.closest("#run-lesson-review")) {
+    const button = event.target.closest("button");
+    setBusy(button, true, "Starting AI review…");
+    try {
+      const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/lesson-review/run`, {
+        method: "POST",
+        body: JSON.stringify({
+          confirm_paid_api: true,
+          auto_repair: $("#lesson-review-auto-repair")?.checked ?? true,
+          task_models: collectTaskModels(),
+        }),
+      });
+      state.activeRun = response.run;
+      renderPipeline();
+      await refreshRuns();
+      toast("Optional AI visual review started. Follow each phase in the run log.");
+    } catch (error) { showError(error); setBusy(button, false); }
     return;
   }
   if (event.target.closest("#render-button")) {

@@ -1,0 +1,42 @@
+name: Motion Canvas lesson visual review
+
+on:
+  pull_request:
+    paths:
+      - 'template_lab/motion_canvas/**'
+      - 'template_lab/scripts/mav_lesson_review.py'
+      - 'template_lab/tests/test_motion_canvas_lesson_review.py'
+      - 'motion_canvas_runtime/scripts/lesson-evidence.mjs'
+      - 'motion_canvas_runtime/package.json'
+      - 'studio/static/lesson-review-ui.js'
+      - 'studio/static/index.html'
+      - '.github/workflows/motion-canvas-lesson-review.yml'
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Compile Python modules
+        run: |
+          python -m py_compile \
+            template_lab/motion_canvas/generation_contract.py \
+            template_lab/motion_canvas/lesson_review.py \
+            template_lab/motion_canvas/lesson_review_integration.py \
+            template_lab/scripts/mav_lesson_review.py
+      - name: Run lesson review contract tests
+        env:
+          PYTHONPATH: template_lab
+        run: pytest -q template_lab/tests/test_motion_canvas_lesson_review.py
+      - name: Check JavaScript syntax
+        run: |
+          node --check motion_canvas_runtime/scripts/lesson-evidence.mjs
+          node --check studio/static/lesson-review-ui.js
