@@ -9,6 +9,33 @@ This feature is additive. The existing long-form Motion Canvas lesson pipeline r
 
 The two products may use the same grounded topic facts and model configuration, but they have independent scripts, audio, timing, visual sources, review states, caches, and MP4 files.
 
+## Studio UI
+
+Start Studio with the existing command:
+
+```bash
+python3 -m studio.server
+```
+
+The topic production form now includes a **Content product** selector:
+
+- **Full lesson video** keeps the existing long-form workspace and remains the default.
+- **12 standalone Reels** creates a Reel-pack run with its own portrait dashboard.
+
+The Reel-pack workspace provides:
+
+- the same eight numbered production stages;
+- a configurable three-Reel smoke test, six-Reel pack, or full twelve-Reel pack;
+- independent child status, audio, contact sheet and MP4 links;
+- model routing for planning, script writing, TTS, visual generation, repair and pack screening;
+- one-click run-next and run-to-screening controls;
+- one-call pack screening with zero to five findings;
+- child-only visual regeneration;
+- manual approval of clean or repaired evidence;
+- individual Reel rendering or bulk rendering of all approved children.
+
+Opening a long-form run continues to display the original continuous lesson workspace. Opening a `topic-reel-pack` run switches only that run to the portrait pack dashboard.
+
 ## Generate a pack
 
 ```bash
