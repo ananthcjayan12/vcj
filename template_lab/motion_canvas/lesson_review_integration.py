@@ -7,9 +7,13 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from mav_env import load_repo_env
+
+load_repo_env()
+
 
 def _enabled(allow_model_repair: bool) -> tuple[bool, str]:
-    raw = os.getenv("MAV_MOTION_CANVAS_LESSON_REVIEW", "1").strip().lower()
+    raw = os.getenv("MAV_MOTION_CANVAS_LESSON_REVIEW", "0").strip().lower()
     if raw in {"0", "false", "no", "off"}:
         return False, "lesson_review_disabled"
     if not allow_model_repair:
@@ -38,6 +42,15 @@ def _write_report(run_path: Path, report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _existing_screening_report(run_path: Path) -> dict[str, Any] | None:
+    path = run_path / "motion_canvas" / "lesson-review.json"
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+    return report if isinstance(report, dict) and report.get("status") not in {None, "skipped"} else None
+
+
 def install(pipeline: ModuleType) -> None:
     if getattr(pipeline, "_lesson_review_installed", False):
         return
@@ -60,8 +73,12 @@ def install(pipeline: ModuleType) -> None:
         )
         enabled, reason = _enabled(allow_model_repair)
         if not enabled:
-            report = {"version": "2.0", "status": "skipped", "reason": reason, "screening_calls": 0}
-            _write_report(run_path, report)
+            if reason == "lesson_review_disabled":
+                return technical
+            report = _existing_screening_report(run_path)
+            if report is None:
+                report = {"version": "2.0", "status": "skipped", "reason": reason, "screening_calls": 0}
+                _write_report(run_path, report)
             technical["lesson_review"] = report
             technical["lesson_review_status"] = report["status"]
             robot = run_path / "motion_canvas" / "robot-report.json"

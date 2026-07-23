@@ -29,6 +29,9 @@ function panelMarkup(runId, report) {
     </article>`;
   }).join('');
   const links = contactSheets.map((relative, index) => `<a href="${artifactUrl(runId, relative)}" target="_blank" rel="noreferrer">${index < (report.contact_sheets || []).length ? 'Screening' : 'Corrected'} sheet ${index + 1} ↗</a>`).join('');
+  const approval = status === 'repaired_pending_review'
+    ? `<div class="lesson-review-approval"><p>Inspect the corrected sheet above. Approve only if the repaired reels now look correct.</p><button type="button" class="primary-button approve-lesson-review" data-run-id="${escapeHtml(runId)}">Approve corrected review</button></div>`
+    : status === 'approved' ? `<div class="lesson-review-approved">Approved ${escapeHtml(report.approved_at || '')}</div>` : '';
   return `<section class="lesson-review-panel" id="${PANEL_ID}">
     <header><div><p class="eyebrow">One-call rendered screening</p><h3>Lesson Visual Review</h3></div><span class="lesson-review-status status-${escapeHtml(status)}">${escapeHtml(status.replaceAll('_', ' '))}</span></header>
     <div class="lesson-review-summary">
@@ -38,6 +41,7 @@ function panelMarkup(runId, report) {
       ${report.elapsed_seconds != null ? `<span><b>${escapeHtml(report.elapsed_seconds)}s</b> elapsed</span>` : ''}
     </div>
     ${links ? `<div class="lesson-review-links">${links}</div>` : ''}
+    ${approval}
     ${rows ? `<div class="lesson-review-findings">${rows}</div>` : `<p class="lesson-review-empty">${status === 'passed' ? 'No serious visible defect was found.' : 'The review runs during Compile & QA after the complete lesson renders.'}</p>`}
     ${report.error ? `<div class="alert">${escapeHtml(report.error)}</div>` : ''}
   </section>`;
@@ -50,9 +54,10 @@ function ensureStyles() {
   style.textContent = `
     .lesson-review-panel{margin:18px 0;border:1px solid rgba(70,217,255,.2);border-radius:18px;padding:18px;background:linear-gradient(145deg,rgba(14,29,49,.97),rgba(7,17,31,.97))}
     .lesson-review-panel>header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:13px}.lesson-review-panel h3{margin:2px 0 0}.lesson-review-status{padding:7px 11px;border-radius:999px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;background:rgba(145,168,197,.12)}
-    .status-passed{color:#6ee7b7;background:rgba(52,211,153,.12)}.status-issues_found,.status-needs_review{color:#ff8f8f;background:rgba(255,107,107,.12)}.status-repaired_pending_review{color:#ffc857;background:rgba(255,200,87,.12)}
+    .status-passed,.status-approved{color:#6ee7b7;background:rgba(52,211,153,.12)}.status-issues_found,.status-needs_review{color:#ff8f8f;background:rgba(255,107,107,.12)}.status-repaired_pending_review{color:#ffc857;background:rgba(255,200,87,.12)}
     .lesson-review-summary,.lesson-review-links{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:12px}.lesson-review-summary span{padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.045);color:#91a8c5;font-size:12px}.lesson-review-summary b{color:#eaf3ff;font-size:15px;margin-right:3px}.lesson-review-links a{font-size:13px}
     .lesson-review-findings{display:grid;gap:8px}.lesson-review-row{display:grid;grid-template-columns:minmax(145px,.55fr) minmax(300px,2fr) 80px;gap:14px;align-items:center;padding:12px;border-radius:13px;background:rgba(255,255,255,.035)}.lesson-review-row small{display:block;color:#91a8c5;margin-top:3px}.lesson-review-row p{margin:4px 0;color:#eaf3ff}.lesson-review-confidence{text-align:right;color:#46d9ff;font-weight:800}.lesson-review-confidence small{font-weight:500}.lesson-review-empty{color:#91a8c5}
+    .lesson-review-approval{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:12px 0;padding:12px;border:1px solid rgba(255,200,87,.25);border-radius:12px;background:rgba(255,200,87,.06)}.lesson-review-approval p{margin:0;color:#eaf3ff}.lesson-review-approved{margin:12px 0;color:#6ee7b7;font-weight:700}
     @media(max-width:900px){.lesson-review-row{grid-template-columns:1fr}.lesson-review-confidence{text-align:left}}
   `;
   document.head.append(style);
@@ -84,5 +89,27 @@ async function refreshLessonReview() {
 }
 
 window.addEventListener('hashchange', () => { lastSignature = ''; refreshLessonReview(); });
+document.addEventListener('click', async event => {
+  const button = event.target.closest('.approve-lesson-review');
+  if (!button) return;
+  if (!window.confirm('Approve the corrected Gemini evidence for this lesson?')) return;
+  button.disabled = true;
+  button.textContent = 'Approving…';
+  try {
+    const response = await fetch(`/api/runs/${encodeURIComponent(button.dataset.runId)}/lesson-review/approve`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}',
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || `Approval failed (${response.status})`);
+    }
+    lastSignature = '';
+    await refreshLessonReview();
+  } catch (error) {
+    window.alert(error.message || String(error));
+    button.disabled = false;
+    button.textContent = 'Approve corrected review';
+  }
+});
 setInterval(refreshLessonReview, 3000);
 refreshLessonReview();

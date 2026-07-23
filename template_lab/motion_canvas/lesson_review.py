@@ -6,8 +6,10 @@ import json
 import mimetypes
 import os
 import re
+import base64
 import subprocess
 import time
+import urllib.request
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -18,6 +20,10 @@ TASK = "motion_canvas_lesson_screen"
 VERSION = "2.0"
 DEFAULT_MAX_FINDINGS = 5
 DEFAULT_MIN_CONFIDENCE = 0.85
+
+
+def _log(message: str) -> None:
+    print(f"[lesson-review] {message}", flush=True)
 
 
 def _load(path: Path, default: Any) -> Any:
@@ -204,7 +210,7 @@ def _resolved_model() -> Any:
     from mav_models import load_env, model_config_for_task
 
     load_env()
-    return model_config_for_task("direct_html_review", requested_max_tokens=4_000)
+    return model_config_for_task(TASK, requested_max_tokens=8_000)
 
 
 def _gemini_screen(*, system: str, user: str, images: list[Path]) -> str:
@@ -220,14 +226,13 @@ def _gemini_screen(*, system: str, user: str, images: list[Path]) -> str:
     )
 
     resolved = _resolved_model()
-    if resolved.provider != "gemini":
-        raise RuntimeError(f"{TASK} requires Gemini multimodal input; configured provider is {resolved.provider!r}")
     parts = [types.Part.from_text(text=user)]
     for image in images:
         mime_type = mimetypes.guess_type(image.name)[0] or "image/png"
         parts.append(types.Part.from_bytes(data=image.read_bytes(), mime_type=mime_type))
     http_options = types.HttpOptions(timeout=model_timeout_seconds(resolved) * 1000)
     client = genai.Client(api_key=_api_key_for_provider("gemini"), http_options=http_options)
+    _log(f"screen request: provider={resolved.provider} model={resolved.model} images={len(images)} max_tokens={resolved.max_tokens}")
     response = client.models.generate_content(
         model=resolved.model,
         contents=[types.Content(role="user", parts=parts)],
@@ -251,7 +256,137 @@ def _gemini_screen(*, system: str, user: str, images: list[Path]) -> str:
     text = _gemini_response_text(response)
     if not text:
         raise RuntimeError("Lesson screening model returned no text")
+    _log(f"screen response received: model={resolved.model} characters={len(text)}")
     return text
+
+
+def _anthropic_screen(*, system: str, user: str, images: list[Path], resolved: Any) -> str:
+    from mav_costs import record_model_usage
+    from mav_models import _anthropic_request_json, _api_key_for_provider, model_timeout_seconds
+
+    content: list[dict[str, Any]] = [{"type": "text", "text": user}]
+    for image in images:
+        media_type = mimetypes.guess_type(image.name)[0] or "image/png"
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": base64.b64encode(image.read_bytes()).decode("ascii")},
+        })
+    payload = {"model": resolved.model, "max_tokens": resolved.max_tokens, "system": system, "messages": [{"role": "user", "content": content}]}
+    request = urllib.request.Request(
+        os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/") + "/v1/messages",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"content-type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": _api_key_for_provider("anthropic") or ""},
+        method="POST",
+    )
+    _log(f"screen request: provider=anthropic model={resolved.model} images={len(images)} max_tokens={resolved.max_tokens}")
+    data = _anthropic_request_json(request, resolved, model_timeout_seconds(resolved))
+    if data.get("stop_reason") in {"max_tokens", "refusal"}:
+        raise RuntimeError(f"Anthropic {TASK} stopped with {data.get('stop_reason')}")
+    record_model_usage(task=TASK, provider="anthropic", model=resolved.model, usage=data.get("usage") or {}, response_id=data.get("id"))
+    text = "\n".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text")
+    if not text:
+        raise RuntimeError("Anthropic lesson screening returned no text")
+    _log(f"screen response received: model={resolved.model} characters={len(text)}")
+    return text
+
+
+def _moonshot_screen(*, system: str, user: str, images: list[Path], resolved: Any) -> str:
+    from mav_costs import record_model_usage
+    from mav_models import MOONSHOT_CHAT_COMPLETIONS_URL, _api_key_for_provider, model_timeout_seconds
+
+    content: list[dict[str, Any]] = [{"type": "text", "text": user}]
+    for image in images:
+        media_type = mimetypes.guess_type(image.name)[0] or "image/png"
+        data = base64.b64encode(image.read_bytes()).decode("ascii")
+        content.append({"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{data}"}})
+    payload = {
+        "model": resolved.model,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}],
+        "response_format": {"type": "json_object"},
+    }
+    if resolved.model == "kimi-k3":
+        # K3 uses the newer completion-token field and always reasons. Keep its
+        # reasoning budget bounded so the reviewer still returns final JSON.
+        payload["max_completion_tokens"] = resolved.max_tokens
+        payload["reasoning_effort"] = os.getenv("MAV_MOTION_CANVAS_LESSON_SCREEN_REASONING_EFFORT", "low")
+    else:
+        payload["max_completion_tokens"] = resolved.max_tokens
+    request = urllib.request.Request(
+        MOONSHOT_CHAT_COMPLETIONS_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {_api_key_for_provider('moonshot') or ''}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    _log(f"screen request: provider=moonshot model={resolved.model} images={len(images)} max_completion_tokens={resolved.max_tokens}")
+    with urllib.request.urlopen(request, timeout=model_timeout_seconds(resolved)) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    record_model_usage(task=TASK, provider="moonshot", model=resolved.model, usage=data.get("usage") or {}, response_id=data.get("id"))
+    choices = data.get("choices") or []
+    message = choices[0].get("message", {}) if choices and isinstance(choices[0], dict) else {}
+    finish_reason = choices[0].get("finish_reason") if choices and isinstance(choices[0], dict) else None
+    _log(
+        "moonshot response metadata: "
+        f"keys={sorted(data.keys())} choices={len(choices)} "
+        f"message_keys={sorted(message.keys()) if isinstance(message, dict) else []} "
+        f"finish_reason={finish_reason!r} usage_keys={sorted((data.get('usage') or {}).keys())}"
+    )
+    text = message.get("content", "") if isinstance(message, dict) else ""
+    if isinstance(text, list):
+        parts = []
+        for item in text:
+            piece = item.get("text", item.get("content", "")) if isinstance(item, dict) else item
+            if piece:
+                parts.append(str(piece))
+        text = "\n".join(parts)
+    if not text:
+        error = data.get("error")
+        detail = f" error={error!r}" if error else ""
+        raise RuntimeError(
+            "Kimi lesson screening returned no text "
+            f"(model={resolved.model!r}, choices={len(choices)}, finish_reason={finish_reason!r}, "
+            f"response_keys={sorted(data.keys())}, message_keys={sorted(message.keys()) if isinstance(message, dict) else []}).{detail}"
+        )
+    _log(f"screen response received: model={resolved.model} characters={len(text)}")
+    return str(text)
+
+
+def _codex_screen(*, system: str, user: str, images: list[Path], resolved: Any) -> str:
+    from mav_codex import _binary, _login_status, _tokens
+    from mav_costs import record_model_usage
+    import tempfile
+
+    codex = _binary()
+    _login_status(codex)
+    reasoning = os.getenv("MAV_MOTION_CANVAS_LESSON_SCREEN_REASONING_EFFORT", "low").strip().lower()
+    prompt = f"Return JSON only.\n\nSYSTEM INSTRUCTIONS\n{system}\n\nUSER REQUEST\n{user}"
+    with tempfile.TemporaryDirectory(prefix="mav-codex-screen-") as directory:
+        output = Path(directory) / "response.txt"
+        command = [codex, "exec", "-", "--ephemeral", "--sandbox", "read-only", "--color", "never", "--output-last-message", str(output), "--cd", str(Path(__file__).resolve().parents[2]), "--model", resolved.model]
+        for image in images:
+            command.extend(["--image", str(image)])
+        command.extend(["--config", f'model_reasoning_effort="{reasoning}"'])
+        _log(f"screen request: provider=codex model={resolved.model} images={len(images)} max_tokens={resolved.max_tokens}")
+        result = subprocess.run(command, input=prompt, capture_output=True, text=True, timeout=int(os.getenv("MAV_CODEX_TIMEOUT_SECONDS", "2400")))
+        if result.returncode != 0:
+            raise RuntimeError(f"Codex lesson screening exited with code {result.returncode}: {(result.stderr or result.stdout)[-3000:]}")
+        if not output.exists():
+            raise RuntimeError("Codex lesson screening produced no response")
+        text = output.read_text(encoding="utf-8")
+    record_model_usage(task=TASK, provider="codex", model=resolved.model, usage={"total_tokens": _tokens(result.stderr)})
+    _log(f"screen response received: model={resolved.model} characters={len(text)}")
+    return text
+
+
+def _screen_with_model(*, system: str, user: str, images: list[Path], resolved: Any) -> str:
+    if resolved.provider == "gemini":
+        return _gemini_screen(system=system, user=user, images=images)
+    if resolved.provider == "anthropic":
+        return _anthropic_screen(system=system, user=user, images=images, resolved=resolved)
+    if resolved.provider == "moonshot":
+        return _moonshot_screen(system=system, user=user, images=images, resolved=resolved)
+    if resolved.provider == "codex":
+        return _codex_screen(system=system, user=user, images=images, resolved=resolved)
+    raise RuntimeError(f"Unsupported multimodal lesson-screen provider: {resolved.provider}")
 
 
 def _run_evidence(
@@ -317,7 +452,9 @@ def screen_and_repair(
     report_path = run_path / "motion_canvas" / "lesson-review.json"
     prompt_path = Path(__file__).with_name("prompts") / "lesson_screen.system.txt"
     system = prompt_path.read_text(encoding="utf-8")
-    cache_key = _screen_cache_key(run_path, manifest, system)
+    resolved = _resolved_model() if model_call is None else None
+    model_signature = f"{resolved.provider}:{resolved.model}" if resolved is not None else "injected-model-call"
+    cache_key = _screen_cache_key(run_path, manifest, system + "\nMODEL=" + model_signature)
     previous = _load(report_path, {}) or {}
     if previous.get("status") == "passed" and previous.get("cache_key") == cache_key:
         return {**previous, "cached": True}
@@ -329,11 +466,14 @@ def screen_and_repair(
         "started_at": time.time(),
         "screening_calls": 0,
         "cache_key": cache_key,
+        "screening_model": model_signature,
         "findings": [],
         "repairs": [],
     }
     _write_json(report_path, report)
 
+    _log(f"starting optional visual review: run={run_path.name} model={model_signature} auto_repair={allow_repairs}")
+    _log("capturing lesson evidence from the accepted Motion Canvas sources")
     evidence = _run_evidence(run_path, pipeline, output=root / "evidence")
     context = build_screening_context(run_path, manifest, evidence)
     _write_json(root / "screening-context.json", context)
@@ -342,11 +482,16 @@ def screen_and_repair(
     images = [image for image in images if image.exists()]
     if not images:
         raise RuntimeError("Lesson screening produced no contact sheets")
+    frame_count = sum(len(reel.get("frames", [])) for reel in evidence.get("reels", []))
+    _log(f"evidence ready: reels={len(evidence.get('reels', []))} frames={frame_count} contact_sheets={len(images)}")
 
     report.update({"phase": "screening", "contact_sheets": [str(path.relative_to(run_path)) for path in images]})
     _write_json(report_path, report)
-    call = model_call or _gemini_screen
-    response = call(system=system, user=user, images=images)
+    response = (
+        model_call(system=system, user=user, images=images)
+        if model_call is not None
+        else _screen_with_model(system=system, user=user, images=images, resolved=resolved)
+    )
     (root / "screening-response.txt").write_text(response.rstrip() + "\n", encoding="utf-8")
     max_findings = int(os.getenv("MAV_MOTION_CANVAS_SCREEN_MAX_FINDINGS", str(DEFAULT_MAX_FINDINGS)))
     min_confidence = float(os.getenv("MAV_MOTION_CANVAS_SCREEN_MIN_CONFIDENCE", str(DEFAULT_MIN_CONFIDENCE)))
@@ -357,6 +502,7 @@ def screen_and_repair(
         min_confidence=min_confidence,
     )
     report.update({"screening_calls": 1, "screening": decision, "findings": decision["findings"]})
+    _log(f"screen decision: status={decision['status']} accepted_findings={len(decision['findings'])}")
     _write_json(report_path, report)
 
     if not decision["findings"]:
@@ -386,6 +532,7 @@ def screen_and_repair(
         original = source_path.read_text(encoding="utf-8")
         contract, _ = extract_visual_contract(original, reel_id)
         try:
+            _log(f"repairing {reel_id}: findings={len(reel_findings)} using configured motion_canvas_batch model")
             generation = pipeline.generate(
                 run_path,
                 manifest,
@@ -398,15 +545,18 @@ def screen_and_repair(
             if generation.get("status") != "generated":
                 raise RuntimeError(f"targeted regeneration returned {generation.get('status')}")
             repaired_ids.append(reel_id)
+            _log(f"repair completed: reel={reel_id}")
             report["repairs"].append({"reel_id": reel_id, "status": "regenerated", "finding_count": len(reel_findings)})
         except Exception as exc:
             source_path.write_text(original.rstrip() + "\n", encoding="utf-8")
             pipeline.assemble(run_path, manifest)
             pipeline._sync_runtime(run_path)
             report["repairs"].append({"reel_id": reel_id, "status": "failed_restored", "error": str(exc)})
+            _log(f"repair failed and original restored: reel={reel_id} error={exc}")
         _write_json(report_path, report)
 
     if repaired_ids:
+        _log(f"capturing corrected evidence for {len(repaired_ids)} repaired reel(s)")
         corrected = _run_evidence(
             run_path,
             pipeline,
@@ -428,5 +578,6 @@ def screen_and_repair(
             "elapsed_seconds": round(time.monotonic() - started, 2),
         }
     )
+    _log(f"optional visual review complete: status={report['status']} repaired={len(repaired_ids)} unresolved={len(failed)}")
     _write_json(report_path, report)
     return report

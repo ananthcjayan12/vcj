@@ -14,11 +14,11 @@ Report only a clearly visible defect that is serious enough to damage scientific
 - an equation, value, unit, graph, label, or scientific conclusion visibly contradicts the facts or narration;
 - severe overlap, clipping, off-screen content, unreadable font size, or poor contrast obscures important teaching content;
 - a labelled checkpoint visibly fails the cue-to-visual event described by its contract.
+- anything against logic and redability
 
 Do not report:
 - minor alignment or spacing preferences;
 - subjective style improvements;
-- harmless decorative overlap;
 - a concern that cannot be seen in the supplied frames;
 - more than one finding for the same underlying defect;
 - low-confidence speculation.
