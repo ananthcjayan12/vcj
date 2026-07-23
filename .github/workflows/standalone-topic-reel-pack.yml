@@ -9,6 +9,11 @@ on:
       - 'motion_canvas_runtime/src/render-host.ts'
       - 'motion_canvas_runtime/scripts/reel-pack-*.mjs'
       - 'motion_canvas_runtime/package.json'
+      - 'studio/__init__.py'
+      - 'studio/reel_pack_extension.py'
+      - 'studio/static/reel-pack-ui.js'
+      - 'studio/static/lesson-review-ui.js'
+      - 'studio/tests/test_reel_pack_extension.py'
       - 'docs/standalone-topic-reel-pack.md'
       - '.github/workflows/standalone-topic-reel-pack.yml'
 
@@ -34,12 +39,18 @@ jobs:
             template_lab/reel_pack/visuals.py \
             template_lab/reel_pack/review.py \
             template_lab/reel_pack/pipeline.py \
-            template_lab/scripts/mav_generate_reel_pack.py
+            template_lab/scripts/mav_generate_reel_pack.py \
+            studio/__init__.py \
+            studio/reel_pack_extension.py
       - name: Run Reel-pack contract tests
         env:
-          PYTHONPATH: template_lab:template_lab/scripts
-        run: pytest -q template_lab/tests/test_reel_pack.py
-      - name: Check runtime JavaScript syntax
+          PYTHONPATH: .:template_lab:template_lab/scripts
+        run: |
+          pytest -q template_lab/tests/test_reel_pack.py
+          pytest -q studio/tests/test_reel_pack_extension.py
+      - name: Check runtime and Studio JavaScript syntax
         run: |
           node --check motion_canvas_runtime/scripts/reel-pack-render.mjs
           node --check motion_canvas_runtime/scripts/reel-pack-evidence.mjs
+          node --check studio/static/reel-pack-ui.js
+          node --check studio/static/lesson-review-ui.js
