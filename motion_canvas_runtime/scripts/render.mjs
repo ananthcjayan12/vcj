@@ -297,29 +297,29 @@ try {
       fs.rmSync(FRAME_ROOT, {recursive: true, force: true});
       fs.mkdirSync(FRAME_ROOT, {recursive: true});
     }
-    const startFrame = reusable ? contiguousFrameCount(frameCount) : 0;
+    const resumeFrame = reusable ? contiguousFrameCount(frameCount) : 0;
     for (const name of fs.readdirSync(FRAME_ROOT)) {
       const match = /^(\d{6})\.png$/.exec(name);
-      if (match && Number(match[1]) >= startFrame) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
+      if (match && Number(match[1]) >= resumeFrame) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
       if (name.includes('.tmp-')) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
     }
     writeCheckpoint({
       version: 1,
-      status: startFrame >= totalFrames ? 'frames_complete' : 'rendering_frames',
+      status: resumeFrame >= totalFrames ? 'frames_complete' : 'rendering_frames',
       fingerprint,
       fps,
       duration,
       frameCount,
       totalFrames,
-      completedFrames: startFrame,
+      completedFrames: resumeFrame,
       updatedAt: new Date().toISOString(),
     });
     const progressInterval = Math.max(1, Math.min(Math.ceil(totalFrames / 100), fps * 5));
     const renderStarted = Date.now();
-    if (startFrame > 0) {
+    if (resumeFrame > 0) {
       renderLog(
-        `Resuming frame rendering at ${startFrame.toLocaleString()}/${totalFrames.toLocaleString()} ` +
-        `(${(startFrame / totalFrames * 100).toFixed(1)}% already complete)`,
+        `Resuming frame rendering at ${resumeFrame.toLocaleString()}/${totalFrames.toLocaleString()} ` +
+        `(${(resumeFrame / totalFrames * 100).toFixed(1)}% already complete)`,
       );
     } else {
       renderLog(
@@ -328,7 +328,7 @@ try {
       );
     }
 
-    for (let frame = startFrame; frame <= frameCount; frame++) {
+    for (let frame = resumeFrame; frame <= frameCount; frame++) {
       const target = framePath(frame);
       const temporary = path.join(FRAME_ROOT, `.${String(frame).padStart(6, '0')}.tmp-${process.pid}.png`);
       await capture(frame / fps, temporary);
@@ -336,7 +336,7 @@ try {
       const completed = frame + 1;
       if (completed === 1 || completed === totalFrames || completed % progressInterval === 0) {
         const elapsedSeconds = (Date.now() - renderStarted) / 1000;
-        const newlyRendered = completed - startFrame;
+        const newlyRendered = completed - resumeFrame;
         const rate = newlyRendered / Math.max(elapsedSeconds, .001);
         const remainingSeconds = (totalFrames - completed) / Math.max(rate, .001);
         const percentage = completed / totalFrames * 100;
