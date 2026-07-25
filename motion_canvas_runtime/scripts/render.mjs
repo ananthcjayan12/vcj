@@ -16,6 +16,12 @@ const videoMode = process.argv.includes('--video');
 const previewMode = process.argv.includes('--preview') || !videoMode;
 const manifestPath = path.join(RUN_ROOT, 'manifest.json');
 const runManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
+const selectedUnitId = process.env.MAV_RENDER_UNIT_ID || '';
+const selectedUnit = selectedUnitId
+  ? (runManifest.reels || runManifest.shots || runManifest.chapters || []).find(item => String(item.scene_id) === selectedUnitId)
+  : null;
+const canvasWidth = Number(process.env.VITE_MAV_CANVAS_WIDTH || 1920);
+const canvasHeight = Number(process.env.VITE_MAV_CANVAS_HEIGHT || 1080);
 
 function visualSourceFiles() {
   const files = [
@@ -35,9 +41,9 @@ function visualSourceFiles() {
   return files.filter(file => fs.existsSync(file));
 }
 
-function renderFingerprint({fps, duration, frameCount}) {
+function renderFingerprint({fps, duration, frameCount, startFrame = 0, endFrame = frameCount}) {
   const hash = crypto.createHash('sha256');
-  hash.update(JSON.stringify({version: 1, fps, duration, frameCount}));
+  hash.update(JSON.stringify({version: 2, fps, duration, frameCount, startFrame, endFrame, selectedUnitId}));
   for (const file of visualSourceFiles()) {
     hash.update(path.relative(ROOT, file));
     hash.update(fs.readFileSync(file));
@@ -148,14 +154,14 @@ try {
   const url = `http://127.0.0.1:${port}/render.html`;
   renderLog('Starting local render host');
   await waitForServer(url);
-  renderLog('Launching headless browser at 1920×1080');
+  renderLog(`Launching headless browser at ${canvasWidth}×${canvasHeight}`);
   browser = await puppeteer.launch({
     executablePath: findChrome(),
     headless: true,
     args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
   });
   const page = await browser.newPage();
-  await page.setViewport({width: 1920, height: 1080, deviceScaleFactor: 1});
+  await page.setViewport({width: canvasWidth, height: canvasHeight, deviceScaleFactor: 1});
   page.on('console', message => {
     if (message.type() !== 'error') return;
     consoleTasks.push(
@@ -186,13 +192,20 @@ try {
     );
   }
 
-  const duration = await page.evaluate(() => window.MotionCanvasRobot.duration());
-  if (!Number.isFinite(duration) || duration <= 0) {
-    throw new Error(`Invalid animation duration: ${duration}`);
+  const masterDuration = await page.evaluate(() => window.MotionCanvasRobot.duration());
+  if (!Number.isFinite(masterDuration) || masterDuration <= 0) {
+    throw new Error(`Invalid animation duration: ${masterDuration}`);
   }
-  renderLog(`Scene initialized; duration=${formatDuration(duration)}`);
-  const expectedDuration = Number(runManifest.render_duration || 0);
   const fps = await page.evaluate(() => window.MotionCanvasRobot.fps);
+  const startFrame = selectedUnit ? Number(selectedUnit.render_start_frame || 0) : 0;
+  const endFrame = selectedUnit ? Number(selectedUnit.render_end_frame || 0) : Math.ceil(masterDuration * fps);
+  const duration = selectedUnit ? (endFrame - startFrame) / fps : masterDuration;
+  const startTime = startFrame / fps;
+  if (!Number.isFinite(duration) || duration <= 0 || endFrame <= startFrame) {
+    throw new Error(`Invalid selected render range: ${startFrame}-${endFrame}`);
+  }
+  renderLog(`Scene initialized; duration=${formatDuration(duration)}${selectedUnit ? `; unit=${selectedUnitId}` : ''}`);
+  const expectedDuration = selectedUnit ? Number(selectedUnit.render_duration || duration) : Number(runManifest.render_duration || 0);
   const timelineDelta = expectedDuration > 0 ? duration - expectedDuration : 0;
   const timelineStable = expectedDuration <= 0 || Math.abs(timelineDelta) <= 1.1 / fps;
   if (!timelineStable) {
@@ -205,7 +218,7 @@ try {
   const canvas = await page.$('#robot-canvas');
   if (!canvas) throw new Error('Motion Canvas render surface was not found.');
   const capture = async (time, target) => {
-    await page.evaluate(at => window.MotionCanvasRobot.seek(at), time);
+    await page.evaluate(at => window.MotionCanvasRobot.seek(at), selectedUnit ? startTime + time : time);
     await canvas.screenshot({path: target, type: 'png'});
   };
 
@@ -266,7 +279,7 @@ try {
     fs.mkdirSync(FRAME_ROOT, {recursive: true});
     const frameCount = Math.ceil(duration * fps);
     const totalFrames = frameCount + 1;
-    const fingerprint = renderFingerprint({fps, duration, frameCount});
+    const fingerprint = renderFingerprint({fps, duration, frameCount, startFrame, endFrame});
     const checkpoint = fs.existsSync(CHECKPOINT_PATH)
       ? JSON.parse(fs.readFileSync(CHECKPOINT_PATH, 'utf8'))
       : null;
@@ -284,29 +297,29 @@ try {
       fs.rmSync(FRAME_ROOT, {recursive: true, force: true});
       fs.mkdirSync(FRAME_ROOT, {recursive: true});
     }
-    const startFrame = reusable ? contiguousFrameCount(frameCount) : 0;
+    const resumeFrame = reusable ? contiguousFrameCount(frameCount) : 0;
     for (const name of fs.readdirSync(FRAME_ROOT)) {
       const match = /^(\d{6})\.png$/.exec(name);
-      if (match && Number(match[1]) >= startFrame) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
+      if (match && Number(match[1]) >= resumeFrame) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
       if (name.includes('.tmp-')) fs.rmSync(path.join(FRAME_ROOT, name), {force: true});
     }
     writeCheckpoint({
       version: 1,
-      status: startFrame >= totalFrames ? 'frames_complete' : 'rendering_frames',
+      status: resumeFrame >= totalFrames ? 'frames_complete' : 'rendering_frames',
       fingerprint,
       fps,
       duration,
       frameCount,
       totalFrames,
-      completedFrames: startFrame,
+      completedFrames: resumeFrame,
       updatedAt: new Date().toISOString(),
     });
     const progressInterval = Math.max(1, Math.min(Math.ceil(totalFrames / 100), fps * 5));
     const renderStarted = Date.now();
-    if (startFrame > 0) {
+    if (resumeFrame > 0) {
       renderLog(
-        `Resuming frame rendering at ${startFrame.toLocaleString()}/${totalFrames.toLocaleString()} ` +
-        `(${(startFrame / totalFrames * 100).toFixed(1)}% already complete)`,
+        `Resuming frame rendering at ${resumeFrame.toLocaleString()}/${totalFrames.toLocaleString()} ` +
+        `(${(resumeFrame / totalFrames * 100).toFixed(1)}% already complete)`,
       );
     } else {
       renderLog(
@@ -315,7 +328,7 @@ try {
       );
     }
 
-    for (let frame = startFrame; frame <= frameCount; frame++) {
+    for (let frame = resumeFrame; frame <= frameCount; frame++) {
       const target = framePath(frame);
       const temporary = path.join(FRAME_ROOT, `.${String(frame).padStart(6, '0')}.tmp-${process.pid}.png`);
       await capture(frame / fps, temporary);
@@ -323,7 +336,7 @@ try {
       const completed = frame + 1;
       if (completed === 1 || completed === totalFrames || completed % progressInterval === 0) {
         const elapsedSeconds = (Date.now() - renderStarted) / 1000;
-        const newlyRendered = completed - startFrame;
+        const newlyRendered = completed - resumeFrame;
         const rate = newlyRendered / Math.max(elapsedSeconds, .001);
         const remainingSeconds = (totalFrames - completed) / Math.max(rate, .001);
         const percentage = completed / totalFrames * 100;
@@ -347,7 +360,7 @@ try {
     }
 
     const frameElapsed = (Date.now() - renderStarted) / 1000;
-    const output = path.join(RUN_ROOT, 'final.mp4');
+    const output = process.env.MAV_RENDER_OUTPUT || path.join(RUN_ROOT, selectedUnit ? `${selectedUnitId}.mp4` : 'final.mp4');
     const audioOutput = path.join(RUN_ROOT, 'final.with-audio.mp4');
     fs.rmSync(audioOutput, {force: true});
     renderLog(`All frames captured in ${formatDuration(frameElapsed)}; starting H.264 video encoding`);
@@ -381,6 +394,7 @@ try {
         [
           '-y',
           '-i', output,
+          ...(selectedUnit ? ['-ss', String(Number(selectedUnit.audio_start_sample || 0) / Number(runManifest.sample_rate || 24000)), '-t', String(duration)] : []),
           '-i', audio,
           '-map', '0:v:0',
           '-map', '1:a:0',

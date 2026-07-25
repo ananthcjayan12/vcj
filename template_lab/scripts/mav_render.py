@@ -397,6 +397,50 @@ def render_mp4(
     return output_path
 
 
+def render_reel_mp4(
+    run_id: str,
+    reel_id: str,
+    *,
+    output: Path | None = None,
+    fps: int = 30,
+) -> Path:
+    """Render one immutable Motion Canvas Reel range from a shared run."""
+    run_path = run_dir(run_id)
+    manifest_path = run_path / "motion_canvas" / "manifest.json"
+    manifest = read_json(manifest_path)
+    unit = next((item for item in (manifest.get("reels") or []) if str(item.get("scene_id")) == reel_id), None)
+    if unit is None:
+        raise RuntimeError(f"Unknown Motion Canvas Reel: {reel_id}")
+    output_path = (output or (run_path / "motion_canvas" / "renders" / f"{reel_id}.mp4")).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    env = _hyperframes_env()
+    canvas = manifest.get("canvas") or {}
+    env["MAV_MOTION_RUN_ROOT"] = str((run_path / "motion_canvas").resolve())
+    env["MAV_RENDER_UNIT_ID"] = reel_id
+    env["MAV_RENDER_OUTPUT"] = str(output_path)
+    env["VITE_MAV_CANVAS_WIDTH"] = str(int(canvas.get("width") or 1920))
+    env["VITE_MAV_CANVAS_HEIGHT"] = str(int(canvas.get("height") or 1080))
+    result = subprocess.run(
+        ["npm", "run", "render-video"],
+        cwd=LAB_ROOT / "motion_canvas_runtime",
+        env=env,
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0 or not output_path.exists():
+        raise RuntimeError(f"Independent Reel render failed for {reel_id}")
+    write_json(run_path / "motion_canvas" / "renders" / f"{reel_id}.report.json", {
+        "run_id": run_id,
+        "reel_id": reel_id,
+        "output": str(output_path),
+        "render_start_frame": unit.get("render_start_frame"),
+        "render_end_frame": unit.get("render_end_frame"),
+        "duration": unit.get("render_duration"),
+        "fps": fps,
+    })
+    return output_path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render a Template Lab MAV preview to an MP4 with voiceover audio.")
     parser.add_argument("--run-id", required=True)
@@ -406,13 +450,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--keep-visual", action="store_true", help="Keep the intermediate video-only MP4.")
     parser.add_argument("--animation-mode", choices=(DIRECT_HTML_MODE, MOTION_CANVAS_MODE, LEGACY_MODE), help="Override the run's stored animation mode.")
+    parser.add_argument("--motion-reel-id", help="Render one immutable Motion Canvas Reel range independently.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
-        output = render_mp4(
+        output = render_reel_mp4(args.run_id, args.motion_reel_id, output=args.output, fps=args.fps) if args.motion_reel_id else render_mp4(
             args.run_id,
             output=args.output,
             fps=args.fps,

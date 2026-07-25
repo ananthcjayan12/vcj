@@ -113,3 +113,11 @@ document.addEventListener('click', async event => {
 });
 setInterval(refreshLessonReview, 3000);
 refreshLessonReview();
+
+if (!document.querySelector('script[data-reel-pack-ui]')) {
+  const script = document.createElement('script');
+  script.src = '/reel-pack-ui.js';
+  script.defer = true;
+  script.dataset.reelPackUi = 'true';
+  document.head.append(script);
+}

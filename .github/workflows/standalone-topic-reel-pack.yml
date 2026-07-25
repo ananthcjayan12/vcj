@@ -1,0 +1,56 @@
+name: Standalone topic Reel pack
+
+on:
+  pull_request:
+    paths:
+      - 'template_lab/reel_pack/**'
+      - 'template_lab/scripts/mav_generate_reel_pack.py'
+      - 'template_lab/tests/test_reel_pack.py'
+      - 'motion_canvas_runtime/src/render-host.ts'
+      - 'motion_canvas_runtime/scripts/reel-pack-*.mjs'
+      - 'motion_canvas_runtime/package.json'
+      - 'studio/__init__.py'
+      - 'studio/reel_pack_extension.py'
+      - 'studio/static/reel-pack-ui.js'
+      - 'studio/static/lesson-review-ui.js'
+      - 'studio/tests/test_reel_pack_extension.py'
+      - 'docs/standalone-topic-reel-pack.md'
+      - '.github/workflows/standalone-topic-reel-pack.yml'
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Compile Python modules
+        run: |
+          python -m py_compile \
+            template_lab/reel_pack/schema.py \
+            template_lab/reel_pack/common.py \
+            template_lab/reel_pack/planning.py \
+            template_lab/reel_pack/visuals.py \
+            template_lab/reel_pack/review.py \
+            template_lab/reel_pack/pipeline.py \
+            template_lab/scripts/mav_generate_reel_pack.py \
+            studio/__init__.py \
+            studio/reel_pack_extension.py
+      - name: Run Reel-pack contract tests
+        env:
+          PYTHONPATH: .:template_lab:template_lab/scripts
+        run: |
+          pytest -q template_lab/tests/test_reel_pack.py
+          pytest -q studio/tests/test_reel_pack_extension.py
+      - name: Check runtime and Studio JavaScript syntax
+        run: |
+          node --check motion_canvas_runtime/scripts/reel-pack-render.mjs
+          node --check motion_canvas_runtime/scripts/reel-pack-evidence.mjs
+          node --check studio/static/reel-pack-ui.js
+          node --check studio/static/lesson-review-ui.js

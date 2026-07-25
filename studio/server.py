@@ -383,6 +383,7 @@ def _normalized_meta(run_path: Path, meta: dict[str, Any]) -> dict[str, Any]:
         normalized["topic_ref"] = topic_ref
     normalized.setdefault("topic", input_payload.get("topic") or summary.get("topic") or run_path.name)
     normalized.setdefault("objective_ids", input_payload.get("objective_ids", []))
+    normalized.setdefault("content_product", "full-lesson")
     if not normalized.get("facts_path") and TOPIC_REF_RE.fullmatch(topic_ref):
         facts_path = TOPICS_ROOT / topic_ref / "facts.json"
         if facts_path.exists():
@@ -390,6 +391,7 @@ def _normalized_meta(run_path: Path, meta: dict[str, Any]) -> dict[str, Any]:
 
     existing_settings = normalized.get("settings") if isinstance(normalized.get("settings"), dict) else {}
     settings = dict(existing_settings)
+    settings.setdefault("content_product", normalized["content_product"])
     settings.setdefault("duration", float(input_payload.get("target_duration_seconds") or 480))
     settings.setdefault("model_provider", "gemini")
     settings.setdefault("audio_provider", "gemini")
@@ -705,7 +707,20 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
     if target_step >= 5:
         _invalidate_motion_preview(run_id)
     meta = _load_meta(run_id)
-    meta.update({"status": "rendering" if mode == "render" else "running", "error": None})
+    active_step = None
+    if "--from-step" in command:
+        try:
+            active_step = int(command[command.index("--from-step") + 1])
+        except (ValueError, IndexError):
+            active_step = None
+    meta.update({
+        "status": "rendering" if mode == "render" else "running",
+        "error": None,
+        "process_started_at": _now(),
+        "process_mode": mode,
+        "process_target_step": target_step,
+        "process_active_step": active_step,
+    })
     _save_meta(meta)
     _append_log(run_id, f"Starting {mode}: {' '.join(command[:3])} …")
     if mode == "generation" and target_step >= 5 and env.get("MAV_MOTION_CANVAS_BATCH_PROVIDER"):
@@ -748,15 +763,27 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
                     latest["status"] = "rendered" if mode == "render" else "completed"
                     latest["current_step"] = max(int(latest.get("current_step", 0)), target_step)
                     latest["error"] = None
+                    latest.pop("process_started_at", None)
+                    latest.pop("process_mode", None)
+                    latest.pop("process_target_step", None)
+                    latest.pop("process_active_step", None)
                     _append_log(run_id, f"{mode.title()} completed")
             else:
                 latest["status"] = "failed"
                 latest["error"] = f"{mode.title()} exited with code {return_code}"
+                latest.pop("process_started_at", None)
+                latest.pop("process_mode", None)
+                latest.pop("process_target_step", None)
+                latest.pop("process_active_step", None)
                 _append_log(run_id, latest["error"])
             _save_meta(latest)
         except Exception as exc:  # noqa: BLE001
             latest = _load_meta(run_id)
             latest.update({"status": "failed", "error": str(exc)})
+            latest.pop("process_started_at", None)
+            latest.pop("process_mode", None)
+            latest.pop("process_target_step", None)
+            latest.pop("process_active_step", None)
             _save_meta(latest)
             _append_log(run_id, f"Failed: {exc}")
         finally:
@@ -769,6 +796,9 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
 
 
 def create_run(payload: dict[str, Any]) -> dict[str, Any]:
+    content_product = str(payload.get("content_product") or "full-lesson")
+    if content_product != "full-lesson":
+        raise ValueError(f"Unsupported content product for the full-lesson pipeline: {content_product}")
     topic_ref = _require_topic_ref(str(payload.get("topic_ref", "")))
     detail = topic_detail(topic_ref)
     facts_path = TOPICS_ROOT / topic_ref / "facts.json"
@@ -782,6 +812,7 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
         raise FileExistsError(f"Run already exists: {run_id}")
     animation_mode = MOTION_CANVAS_MODE
     settings = {
+        "content_product": content_product,
         "duration": max(30, min(float(payload.get("duration", 480)), 1800)),
         "model_provider": payload.get("model_provider", "gemini"),
         "audio_provider": payload.get("audio_provider", "gemini"),
@@ -792,6 +823,7 @@ def create_run(payload: dict[str, Any]) -> dict[str, Any]:
     }
     meta = {
         "id": run_id,
+        "content_product": content_product,
         "topic_ref": topic_ref,
         "topic": f"{topic_ref} {detail['topic']['title']}",
         "objective_ids": [objective["objective_id"] for objective in detail["objectives"] if objective["status"] != "covered"],
@@ -1093,6 +1125,11 @@ def start_motion_preview(run_id: str) -> dict[str, Any]:
         sys.path.insert(0, str(TEMPLATE_LAB_ROOT))
     from motion_canvas.pipeline import RUNTIME_ROOT, _modern_node_bin, prepare_runtime_preview
 
+    manifest = _read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
+    canvas = manifest.get("canvas") or {}
+    width = int(canvas.get("width") or 1920)
+    height = int(canvas.get("height") or 1080)
+
     with _process_lock:
         if _preview_process and _preview_process.poll() is None:
             if _preview_run_id == run_id and _preview_url:
@@ -1110,6 +1147,8 @@ def start_motion_preview(run_id: str) -> dict[str, Any]:
         node_bin = _modern_node_bin()
         if node_bin:
             env["PATH"] = str(node_bin) + os.pathsep + env.get("PATH", "")
+        env["VITE_MAV_CANVAS_WIDTH"] = str(width)
+        env["VITE_MAV_CANVAS_HEIGHT"] = str(height)
         log_path = run_path / "motion_canvas" / "preview-server.log"
         with log_path.open("a", encoding="utf-8") as log_handle:
             _preview_process = subprocess.Popen(

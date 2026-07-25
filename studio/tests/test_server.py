@@ -316,6 +316,8 @@ class StudioPayloadTest(unittest.TestCase):
             )
             normalized = _normalized_meta(run_path, {"id": "old-run", "settings": {}})
             self.assertEqual(normalized["facts_path"], "video_engine/topics/1.1/facts.json")
+            self.assertEqual(normalized["content_product"], "full-lesson")
+            self.assertEqual(normalized["settings"]["content_product"], "full-lesson")
             self.assertEqual(normalized["settings"]["duration"], 300)
             self.assertEqual(normalized["settings"]["animation_mode"], "motion-canvas")
             self.assertTrue(normalized["settings"]["confirm_paid_api"])

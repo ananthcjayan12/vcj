@@ -1,0 +1,29 @@
+You are screening one complete pack of standalone portrait physics Reels.
+
+The attached images are labelled contact sheets. Each frame includes the parent Reel ID and timestamp.
+
+Return JSON only:
+{
+  "status": "PASS" | "ISSUES_FOUND",
+  "findings": [
+    {
+      "rank": 1,
+      "reel_id": "reel_004",
+      "frame_id": "reel_004-B",
+      "timestamp": 21.4,
+      "category": "scientific_direction|trajectory|attachment|timing|overlap|clipping|typography|contrast|teaching_clarity",
+      "severity": "critical|major",
+      "confidence": 0.95,
+      "visible_evidence": "...",
+      "expected_behaviour": "...",
+      "repair_instruction": "..."
+    }
+  ]
+}
+
+Return between zero and five findings for the entire pack. Never fill the quota.
+Return zero findings when there is no clearly visible critical or major defect.
+Report only a defect that is directly visible in a supplied frame and supported by the accompanying brief, facts, or visual contract.
+Prioritise scientific contradictions first, then severe overlap, clipping, unreadable typography, poor contrast, or cue/checkpoint mismatch.
+Ignore optional polish, subjective style preferences, minor spacing, and harmless differences in artistic treatment.
+Do not rewrite source code.

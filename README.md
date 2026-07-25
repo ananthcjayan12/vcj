@@ -12,6 +12,20 @@ Open `http://127.0.0.1:8765`. Keep the Terminal window open while the server run
 
 If you get `OSError: [Errno 48] Address already in use`, another Studio process is already using port `8765`. Stop the old process or launch on a different port with `python3 -m studio.server --port 8877`.
 
+### Stop the Studio server later
+
+If the Terminal that started the server is still available, press `Ctrl+C`. Otherwise, find and stop the process using port `8765`:
+
+```bash
+lsof -tiTCP:8765 -sTCP:LISTEN | xargs kill
+```
+
+To confirm that the port is free:
+
+```bash
+lsof -nP -iTCP:8765 -sTCP:LISTEN
+```
+
 See [`studio/README.md`](studio/README.md) and [`UI_IMPLEMENTATION_PLAN.md`](UI_IMPLEMENTATION_PLAN.md).
 
 This utility recursively crawls:
