@@ -10,12 +10,37 @@ from reel_pack.common import active_narration
 from reel_pack.schema import validate_plan, validate_script
 
 
+def _beats() -> list[dict]:
+    return [
+        {
+            "id": beat_id,
+            "time_budget": duration,
+            "narrative_job": f"Narrative job for {beat_id}",
+            "visual_job": f"Visual job for {beat_id}",
+            "energy": energy,
+            "transition_intent": "continuous transformation",
+        }
+        for beat_id, duration, energy in (
+            ("hook", 4, 5),
+            ("prediction", 5, 4),
+            ("reversal", 7, 5),
+            ("proof", 11, 4),
+            ("payoff", 8, 5),
+        )
+    ]
+
+
 def _brief(index: int) -> dict:
     return {
         "reel_id": f"reel_{index:03d}",
         "working_title": f"Reel {index}",
         "hook": f"Distinct hook {index}",
         "learning_payoff": f"Distinct payoff {index}",
+        "central_question": f"Central question {index}?",
+        "misconception": f"Misconception {index}",
+        "answer": f"Answer {index}",
+        "continuity_entity": f"Continuity entity {index}",
+        "visual_thesis": f"One evolving portrait mechanism {index}",
         "objective_ids": [f"objective_{index}"],
         "fact_ids": [f"fact_{index}"],
         "angle": "curiosity",
@@ -23,7 +48,27 @@ def _brief(index: int) -> dict:
         "required_scientific_relationships": [
             "The displayed vector and object response must remain directionally consistent."
         ],
-        "target_duration_seconds": 45,
+        "target_duration_seconds": 35,
+        "beats": _beats(),
+    }
+
+
+def _script(brief: dict, words_per_beat: int = 16) -> dict:
+    beats = [
+        {
+            "id": beat["id"],
+            "spoken_text": " ".join([beat["id"]] * words_per_beat),
+            "delivery": "fast-curious" if beat["id"] == "hook" else "confident",
+        }
+        for beat in brief["beats"]
+    ]
+    return {
+        "reel_id": brief["reel_id"],
+        "title": "A standalone Reel",
+        "narration": " ".join(item["spoken_text"] for item in beats),
+        "beats": beats,
+        "visual_direction": "One evolving portrait mechanism",
+        "target_duration_seconds": 35,
     }
 
 
@@ -42,22 +87,37 @@ def test_plan_rejects_duplicate_hook_and_payoff():
         validate_plan({"reels": records}, reel_count=12)
 
 
-def test_script_must_be_standalone():
+def test_plan_requires_five_to_seven_story_beats():
     brief = _brief(1)
-    valid = {
-        "reel_id": "reel_001",
-        "title": "A standalone Reel",
-        "narration": " ".join(["physics"] * 70),
-        "visual_direction": "One portrait mechanism",
-        "target_duration_seconds": 45,
-    }
-    assert validate_script(valid, brief=brief)["status"] == "scripted"
-    long_narration = dict(valid)
-    long_narration["narration"] = " ".join(["physics"] * 216)
-    assert validate_script(long_narration, brief=brief)["narration_word_count"] == 216
-    invalid = dict(valid)
-    invalid["narration"] = "In the previous Reel " + " ".join(["physics"] * 70)
+    brief["beats"] = brief["beats"][:4]
+    with pytest.raises(ValueError, match="5-7 beats"):
+        validate_plan({"reels": [brief]}, reel_count=1)
+
+
+def test_script_must_be_standalone_and_reel_length():
+    brief = validate_plan({"reels": [_brief(1)]}, reel_count=1)[0]
+    valid = _script(brief)
+    result = validate_script(valid, brief=brief)
+    assert result["status"] == "scripted"
+    assert result["narration_word_count"] == 80
+
+    long_narration = _script(brief, words_per_beat=22)
+    with pytest.raises(ValueError, match="expected 70-94"):
+        validate_script(long_narration, brief=brief)
+
+    invalid = _script(brief)
+    invalid["beats"][0]["spoken_text"] = "In the previous Reel " + invalid["beats"][0]["spoken_text"]
+    invalid["narration"] = " ".join(item["spoken_text"] for item in invalid["beats"])
     with pytest.raises(ValueError, match="not standalone"):
+        validate_script(invalid, brief=brief)
+
+
+def test_script_beats_must_match_blueprint_order():
+    brief = validate_plan({"reels": [_brief(1)]}, reel_count=1)[0]
+    invalid = _script(brief)
+    invalid["beats"][0], invalid["beats"][1] = invalid["beats"][1], invalid["beats"][0]
+    invalid["narration"] = " ".join(item["spoken_text"] for item in invalid["beats"])
+    with pytest.raises(ValueError, match="exactly match"):
         validate_script(invalid, brief=brief)
 
 
