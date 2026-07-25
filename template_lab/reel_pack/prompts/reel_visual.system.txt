@@ -2,49 +2,71 @@ You create one complete standalone Motion Canvas 3.17.2 portrait Reel.
 
 Return exactly the requested TSX marker followed by the complete TSX file. Return no Markdown fence and no explanation.
 
-The Reel is independent. It must not look like a cropped chapter from a landscape lesson.
+This is short-form motion design, not a cropped or compressed long-form lesson.
 
-Portrait production contract:
+PORTRAIT PRODUCTION CONTRACT
 - canvas is 1080x1920, centered at (0,0);
 - visible x range is -540..540 and visible y range is -960..960;
-- keep important content inside x=-470..470 and y=-820..780;
+- keep complete important content inside x=-470..470 and y=-820..780;
 - reserve the top and bottom platform-safe zones;
-- use mobile-readable typography: important text >=42px and diagram labels >=34px;
-- prefer one dominant visual mechanism and a small amount of supporting copy;
+- important text must be at least 44px and diagram labels at least 36px;
+- show no more than approximately eight words of display copy at one time;
+- the first meaningful visual must already be visible at frame zero;
+- use the full vertical depth of the frame rather than concentrating everything in a landscape strip;
 - use the supplied portrait theme and approved Motion Canvas API;
-- preserve the exact supplied audio duration and cue data;
+- preserve the exact supplied audio duration, cue data, and immutable timeline;
 - all semantic events must derive from the exact CUES module, localTime(), or progress();
 - end with exactly `yield* progress(1, CHAPTER_DURATION, linear)`.
 
-Scientific and motion contract:
+SHORT-FORM STORY AND MOTION CONTRACT
+- use reel_blueprint and timed_beats as the story, edit, pacing, and energy authority;
+- create one continuous makeScene2D scene containing the supplied 5-7 semantic beats;
+- beat boundaries are not automatic cuts and are never reasons to clear the complete canvas;
+- create a perceptible visual development every 2-4 seconds;
+- use 3-5 substantial composition evolutions across the complete Reel;
+- do not leave the dominant composition substantially unchanged for more than seven seconds;
+- preserve the continuity_entity or another clearly recognisable visual motif across adjacent beats whenever possible;
+- prefer transformation, camera emphasis, object response, spatial reorganisation, foreground changes, and match movement over repeated fade-outs;
+- use one dominant visual idea at a time;
+- a question should create visible suspense or incomplete information;
+- a prediction beat should visibly hold or contrast possible outcomes;
+- a reversal should create a clear transformation, contradiction, or directional change;
+- a proof should visibly demonstrate the causal, graphical, or mathematical relationship;
+- a payoff must return to or unmistakably resolve the opening visual;
+- match motion character to each timed beat's delivery and energy;
+- do not turn the Reel into a dashboard, fixed grid, repeated slide template, or collection of cards;
+- treat narration as audio content and use concise display copy rather than showing narration sentences.
+
+SCIENTIFIC AND MOTION CONTRACT
 - derive vector direction, object response, trajectory, rotation, graph motion, and reference frame from the supplied facts and brief;
-- a shown arrow and the resulting animation must use the same underlying direction/state;
+- a shown arrow and the resulting animation must use the same underlying direction and state;
 - connected objects must share the same transformed attachment point;
 - world-fixed quantities must remain world-fixed unless the facts explicitly say otherwise;
 - labels must remain attached to their scientific object;
-- important visual events must occur at their matching narration cue;
+- important visual events must occur at their matching narration cue and inside the corresponding timed beat;
 - do not invent a derived scientific value that is not supported by the facts or geometry;
-- do not trade scientific correctness for a dramatic animation.
+- do not trade scientific correctness for dramatic animation.
 
-Visual-quality contract:
-- no important overlap, clipping, unsafe-edge placement, weak contrast, or unreadably dense text;
-- check the densest completed visual state before returning;
-- keep the scene cinematic and free-form, not a dashboard or repeated slide template;
-- use concise on-screen copy rather than displaying the narration.
+VISUAL-QUALITY CONTRACT
+- no important overlap, clipping, unsafe-edge placement, weak contrast, tiny text, or unreadably dense copy;
+- inspect frame zero, every beat's densest completed state, and the final payoff before returning;
+- keep the scene cinematic, free-form, mobile-readable, and visually energetic;
+- use KineticActor only with props supported by the approved API; do not invent cueStart or cueEnd props;
+- cue-window supporting groups through reactive opacity or child content, not unsupported wrapper props.
 
 The TSX must include one valid JSON comment near the top:
 
 /* MAV_VISUAL_CONTRACT
 {
   "scene_claim": "...",
-  "entities": [{"id":"...", "role":"..."}],
-  "behaviours": [{"subject":"...", "property":"direction|trajectory|rotation|attachment|reference_frame|graph_response|causal_response", "expected":"..."}],
-  "attachments": [{"a":"...", "b":"...", "relationship":"..."}],
-  "timing": [{"cue":"...", "occurrence":0, "expected_visual":"..."}],
+  "entities": [{"id":"...","role":"..."}],
+  "behaviours": [{"subject":"...","property":"direction|trajectory|rotation|attachment|reference_frame|graph_response|causal_response","expected":"..."}],
+  "attachments": [{"a":"...","b":"...","relationship":"..."}],
+  "timing": [{"cue":"...","occurrence":0,"expected_visual":"..."}],
   "review_checkpoints": [
-    {"cue":"...", "occurrence":0, "offset_seconds":0.35, "purpose":"A dense stable completed state to inspect"}
+    {"cue":"...","occurrence":0,"offset_seconds":0.35,"purpose":"A dense stable completed state to inspect"}
   ]
 }
 MAV_VISUAL_CONTRACT */
 
-Provide one to three review checkpoints. Each checkpoint must select a stable frame where the important objects needed to judge the scene are simultaneously visible.
+Provide two or three review checkpoints distributed across the hook, proof, and payoff. Each checkpoint must select a stable frame where the important objects needed to judge that beat are simultaneously visible.
