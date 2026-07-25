@@ -1,4 +1,3 @@
-"""Validation helpers for independent standalone topic Reel packs."""
 from __future__ import annotations
 
 import re
@@ -12,6 +11,8 @@ MAX_REEL_COUNT = 24
 MIN_DURATION_SECONDS = 20.0
 DEFAULT_DURATION_SECONDS = 35.0
 MAX_DURATION_SECONDS = 75.0
+MIN_BLUEPRINT_BEATS = 5
+MAX_BLUEPRINT_BEATS = 7
 REEL_ID_RE = re.compile(r"^reel_(\d{3})$")
 
 PACK_STATES = {
@@ -80,6 +81,44 @@ def bounded_duration(value: Any) -> float:
     return round(duration, 3)
 
 
+def _required_text(raw: dict[str, Any], key: str, *, fallback: str = "") -> str:
+    value = str(raw.get(key) or fallback).strip()
+    if not value:
+        raise ValueError(f"Reel blueprint must include {key}")
+    return value
+
+
+def _normalize_beat(raw: dict[str, Any], *, index: int) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError(f"Blueprint beat {index} must be an object")
+    beat_id = str(raw.get("id") or "").strip()
+    narrative_job = str(raw.get("narrative_job") or "").strip()
+    visual_job = str(raw.get("visual_job") or "").strip()
+    transition = str(raw.get("transition_intent") or "continuous transformation").strip()
+    if not beat_id or not narrative_job or not visual_job:
+        raise ValueError(f"Blueprint beat {index} must include id, narrative_job, and visual_job")
+    try:
+        time_budget = float(raw.get("time_budget"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Blueprint beat {beat_id} must include a numeric time_budget") from exc
+    try:
+        energy = int(raw.get("energy"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Blueprint beat {beat_id} must include an integer energy") from exc
+    if time_budget <= 0:
+        raise ValueError(f"Blueprint beat {beat_id} time_budget must be positive")
+    if not 1 <= energy <= 5:
+        raise ValueError(f"Blueprint beat {beat_id} energy must be between 1 and 5")
+    return {
+        "id": beat_id,
+        "time_budget": round(time_budget, 3),
+        "narrative_job": narrative_job,
+        "visual_job": visual_job,
+        "energy": energy,
+        "transition_intent": transition,
+    }
+
+
 def normalize_brief(raw: dict[str, Any], *, expected_id: str) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError(f"{expected_id} brief must be an object")
@@ -99,6 +138,23 @@ def normalize_brief(raw: dict[str, Any], *, expected_id: str) -> dict[str, Any]:
         for item in raw.get("required_scientific_relationships", [])
         if str(item).strip()
     ]
+    target_duration = bounded_duration(raw.get("target_duration_seconds", DEFAULT_DURATION_SECONDS))
+    beats = [
+        _normalize_beat(item, index=index)
+        for index, item in enumerate(raw.get("beats") or [], start=1)
+    ]
+    if not MIN_BLUEPRINT_BEATS <= len(beats) <= MAX_BLUEPRINT_BEATS:
+        raise ValueError(
+            f"{expected_id} blueprint must contain {MIN_BLUEPRINT_BEATS}-{MAX_BLUEPRINT_BEATS} beats"
+        )
+    beat_ids = [item["id"] for item in beats]
+    if len(set(beat_ids)) != len(beat_ids):
+        raise ValueError(f"{expected_id} blueprint contains duplicate beat IDs")
+    budget_total = sum(item["time_budget"] for item in beats)
+    if budget_total > target_duration * 1.2:
+        raise ValueError(
+            f"{expected_id} beat budgets total {budget_total:g}s, above the allowed target range"
+        )
     return {
         "reel_id": expected_id,
         "working_title": title,
@@ -109,9 +165,13 @@ def normalize_brief(raw: dict[str, Any], *, expected_id: str) -> dict[str, Any]:
         "angle": str(raw.get("angle") or "standalone-concept").strip(),
         "visual_concept": visual,
         "required_scientific_relationships": relationships,
-        "target_duration_seconds": bounded_duration(
-            raw.get("target_duration_seconds", DEFAULT_DURATION_SECONDS)
-        ),
+        "target_duration_seconds": target_duration,
+        "central_question": _required_text(raw, "central_question", fallback=hook),
+        "misconception": _required_text(raw, "misconception"),
+        "answer": _required_text(raw, "answer", fallback=payoff),
+        "continuity_entity": _required_text(raw, "continuity_entity"),
+        "visual_thesis": _required_text(raw, "visual_thesis", fallback=visual),
+        "beats": beats,
         "independent": True,
         "status": "planned",
     }
@@ -159,10 +219,33 @@ def validate_script(raw: dict[str, Any], *, brief: dict[str, Any]) -> dict[str, 
     lowered = narration.lower()
     if any(phrase in lowered for phrase in forbidden):
         raise ValueError(f"{reel} depends on another Reel and is not standalone")
-    # Narration length is a soft production target, not a schema gate. Natural
-    # wording can run longer or shorter than the target; generated audio and
-    # derived timing are the source of truth for the final Reel duration.
+    target_duration = bounded_duration(raw.get("target_duration_seconds", brief["target_duration_seconds"]))
     word_count = len(narration.split())
+    minimum_words = round(target_duration * 2.0)
+    maximum_words = round(target_duration * 2.7)
+    if not minimum_words <= word_count <= maximum_words:
+        raise ValueError(
+            f"{reel} has {word_count} words; expected {minimum_words}-{maximum_words} "
+            f"for a {target_duration:g}-second Reel"
+        )
+    raw_beats = raw.get("beats")
+    if not isinstance(raw_beats, list):
+        raise ValueError(f"{reel} script must contain a beats array")
+    expected_beats = list(brief.get("beats") or [])
+    expected_ids = [str(item["id"]) for item in expected_beats]
+    received_ids = [str(item.get("id") or "") for item in raw_beats if isinstance(item, dict)]
+    if received_ids != expected_ids:
+        raise ValueError(f"{reel} script beat IDs must exactly match the approved blueprint")
+    merged_beats = []
+    for blueprint, scripted in zip(expected_beats, raw_beats):
+        spoken_text = str(scripted.get("spoken_text") or "").strip()
+        delivery = str(scripted.get("delivery") or "curious").strip()
+        if not spoken_text:
+            raise ValueError(f"{reel} beat {blueprint['id']} has no spoken_text")
+        merged_beats.append({**blueprint, "spoken_text": spoken_text, "delivery": delivery})
+    beat_narration = " ".join(item["spoken_text"] for item in merged_beats).strip()
+    if " ".join(beat_narration.split()) != " ".join(narration.split()):
+        raise ValueError(f"{reel} narration must be the exact concatenation of beat spoken_text values")
     return {
         "reel_id": reel,
         "title": str(raw.get("title") or brief["working_title"]).strip(),
@@ -171,11 +254,10 @@ def validate_script(raw: dict[str, Any], *, brief: dict[str, Any]) -> dict[str, 
         "narration_word_count": word_count,
         "closing_line": str(raw.get("closing_line") or "").strip(),
         "visual_direction": str(raw.get("visual_direction") or brief["visual_concept"]).strip(),
+        "beats": merged_beats,
         "fact_ids": brief["fact_ids"],
         "objective_ids": brief["objective_ids"],
-        "target_duration_seconds": bounded_duration(
-            raw.get("target_duration_seconds", brief["target_duration_seconds"])
-        ),
+        "target_duration_seconds": target_duration,
         "status": "scripted",
     }
 
