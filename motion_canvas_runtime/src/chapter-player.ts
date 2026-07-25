@@ -17,6 +17,7 @@ audio.preload = 'auto';
 const ready = async () => {
   while (!window.__motionCanvasRobotReady) await new Promise(resolve => setTimeout(resolve, 25));
   const canvas = document.querySelector('canvas');
+  stage.classList.toggle('is-portrait', window.MotionCanvasRobot.height > window.MotionCanvasRobot.width);
   if (canvas) stage.append(canvas);
   await window.MotionCanvasRobot.seek(visualStart);
 };

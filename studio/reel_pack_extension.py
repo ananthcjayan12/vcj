@@ -80,6 +80,13 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
     narration = read_json(run_path / "narration.json", {}) or {}
     paragraphs = {str(item.get("id")): item for item in narration.get("paragraphs", [])}
     motion_manifest = read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
+    preview_url = (
+        server._preview_url
+        if server._preview_run_id == run_id
+        and server._preview_process
+        and server._preview_process.poll() is None
+        else None
+    )
     for record in pack.get("reels", []):
         parent_id = str(record.get("reel_id") or "")
         if not parent_id:
@@ -104,6 +111,12 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
                 "learning_payoff": brief.get("learning_payoff") or "",
                 "narration": script.get("narration") or script.get("text") or "",
                 "duration": timeline_unit.get("duration") or record.get("target_duration_seconds"),
+                "absolute_start": timeline_unit.get("absolute_start"),
+                "absolute_end": timeline_unit.get("absolute_end"),
+                "render_absolute_start": timeline_unit.get("render_absolute_start"),
+                "render_absolute_end": timeline_unit.get("render_absolute_end"),
+                "render_start_frame": timeline_unit.get("render_start_frame"),
+                "render_end_frame": timeline_unit.get("render_end_frame"),
                 "source_ready": (run_path / source_relative).exists(),
                 "source": source_relative if (run_path / source_relative).exists() else None,
                 "audio": audio_relative if (run_path / audio_relative).exists() else None,
@@ -141,8 +154,12 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
         "pack_review": review,
         "review_contact_sheets": list(evidence.get("contact_sheets") or []),
         "publishing_manifest": publishing,
-        "preview_url": None,
-        "validation_preview_url": None,
+        "preview_url": preview_url,
+        "validation_preview_url": (
+            f"/artifacts/runs/{run_id}/motion_canvas/preview/contact-sheet.png"
+            if (run_path / "motion_canvas" / "preview" / "contact-sheet.png").exists()
+            else None
+        ),
         "mp4_url": None,
         "cost_summary": server._read_json(run_path / "costs" / "summary.json", {}) or {},
         "usage_records": (server._read_json(run_path / "costs" / "model_usage.json", {}) or {}).get("records", []),

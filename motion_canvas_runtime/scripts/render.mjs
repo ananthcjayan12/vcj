@@ -20,6 +20,8 @@ const selectedUnitId = process.env.MAV_RENDER_UNIT_ID || '';
 const selectedUnit = selectedUnitId
   ? (runManifest.reels || runManifest.shots || runManifest.chapters || []).find(item => String(item.scene_id) === selectedUnitId)
   : null;
+const canvasWidth = Number(process.env.VITE_MAV_CANVAS_WIDTH || 1920);
+const canvasHeight = Number(process.env.VITE_MAV_CANVAS_HEIGHT || 1080);
 
 function visualSourceFiles() {
   const files = [
@@ -152,14 +154,14 @@ try {
   const url = `http://127.0.0.1:${port}/render.html`;
   renderLog('Starting local render host');
   await waitForServer(url);
-  renderLog('Launching headless browser at 1920×1080');
+  renderLog(`Launching headless browser at ${canvasWidth}×${canvasHeight}`);
   browser = await puppeteer.launch({
     executablePath: findChrome(),
     headless: true,
     args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
   });
   const page = await browser.newPage();
-  await page.setViewport({width: 1920, height: 1080, deviceScaleFactor: 1});
+  await page.setViewport({width: canvasWidth, height: canvasHeight, deviceScaleFactor: 1});
   page.on('console', message => {
     if (message.type() !== 'error') return;
     consoleTasks.push(

@@ -23,6 +23,12 @@ const activeStatuses = new Set(["running", "rendering"]);
 const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Visual reels", "Compile & QA", "Review", "Approval"];
 const stepsForRun = () => motionCanvasSteps;
 const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen"]);
+const FULL_LESSON_PRODUCT = "full-lesson";
+const REEL_PACK_PRODUCT = "topic-reel-pack";
+
+function contentProductForRun(run) {
+  return run?.content_product || run?.settings?.content_product || run?.artifacts?.content_product || FULL_LESSON_PRODUCT;
+}
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -251,8 +257,10 @@ async function selectTopic(topicRef, rerenderList = true, syncActiveRun = true) 
     renderTopicDetail();
     const topicRuns = state.topicDetail.runs || [];
     if (syncActiveRun && state.activeRun?.topic_ref !== topicRef) {
-      if (topicRuns[0]) {
-        await selectRun(topicRuns[0].id, false);
+      const selectedProduct = $("#content-product-select")?.value || FULL_LESSON_PRODUCT;
+      const matchingRun = topicRuns.find(run => contentProductForRun(run) === selectedProduct);
+      if (matchingRun) {
+        await selectRun(matchingRun.id, false);
       } else {
         state.activeRunId = null;
         state.activeRun = null;
@@ -271,6 +279,7 @@ function evidenceChips(items, fallback = "No classified pattern") {
 function renderTopicDetail() {
   const { topic, objectives, assessment, facts } = state.topicDetail;
   const runDefault = `physics-${topic.ref.replaceAll(".", "-")}-v01`;
+  const selectedProduct = state.activeRun?.topic_ref === topic.ref ? contentProductForRun(state.activeRun) : FULL_LESSON_PRODUCT;
   $("#topic-detail").innerHTML = `
     <div class="topic-hero">
       <div><span class="topic-kicker">TOPIC ${escapeHtml(topic.ref)} · ${escapeHtml(topic.domain_title)}</span><h2>${escapeHtml(topic.title)}</h2><p>${topic.core} Core and ${topic.supplement} Supplement objectives. The lesson packet uses syllabus statements plus private aggregate assessment patterns, while all examples and diagrams remain original.</p></div>
@@ -296,7 +305,7 @@ function renderTopicDetail() {
     <div class="production-form">
       <p class="model-map-note">These settings apply to the next new run. To change an existing run, use its active-run controls and model map below.</p>
       <div class="form-grid">
-        <label class="field pack-product-field"><span>Content product</span><select id="content-product-select"><option value="full-lesson">Full lesson video</option><option value="topic-reel-pack">Independent Reels</option></select></label>
+        <label class="field pack-product-field"><span>Content product</span><select id="content-product-select"><option value="full-lesson" ${selectedProduct === FULL_LESSON_PRODUCT ? "selected" : ""}>Full lesson video</option><option value="topic-reel-pack" ${selectedProduct === REEL_PACK_PRODUCT ? "selected" : ""}>Independent Reels</option></select></label>
         <label class="field pack-only-field is-hidden"><span>Independent Reels</span><select id="reel-count-input"><option value="4">4 Reels</option><option value="5" selected>5 Reels</option></select></label>
         <label class="field pack-only-field is-hidden"><span>Target duration per Reel</span><select id="reel-duration-input"><option value="30">30 seconds</option><option value="35" selected>35 seconds</option><option value="40">40 seconds</option></select></label>
         <label class="field"><span>Run ID</span><input id="run-id-input" value="${escapeHtml(runDefault)}"></label>
@@ -318,6 +327,24 @@ function renderTopicDetail() {
         </div>
       </div>
     </div>`;
+}
+
+async function selectProductWorkspace(product) {
+  const topicRef = state.selectedTopicRef;
+  const topicRuns = state.topicDetail?.runs || state.runs.filter(run => run.topic_ref === topicRef);
+  const matchingRun = topicRuns.find(run => contentProductForRun(run) === product);
+  if (matchingRun) {
+    await selectRun(matchingRun.id, false);
+    return;
+  }
+  if (state.activeRun && contentProductForRun(state.activeRun) !== product) {
+    state.activeRunId = null;
+    state.activeRun = null;
+    state.selectedChapterId = null;
+    state.selectedBeatId = null;
+    managePolling();
+    renderPipeline();
+  }
 }
 
 function renderPipeline() {
@@ -508,6 +535,7 @@ function switchViewTo(view) {
 }
 
 function productionPayload(execute) {
+  const contentProduct = $("#content-product-select")?.value || "full-lesson";
   const chapterProvider = $("#chapter-provider").value;
   const scriptSelection = $("#model-provider").value;
   const scriptProvider = scriptSelection.startsWith("codex:") ? "codex" : scriptSelection;
@@ -524,6 +552,7 @@ function productionPayload(execute) {
     for (const task of ["script_structure", "script_writing"]) taskModels[task] = {provider: "codex", model: scriptModel, reasoning_effort: $("#script-reasoning").value};
   }
   return {
+    content_product: contentProduct,
     topic_ref: state.selectedTopicRef,
     run_id: $("#run-id-input").value.trim(),
     duration: Number($("#duration-input").value),
@@ -552,7 +581,9 @@ async function createProductionRun(button, execute) {
   try {
     const response = await request("/api/runs", { method: "POST", body: JSON.stringify(payload) });
     state.activeRun = response.run; state.activeRunId = response.run.id;
-    await refreshRuns(); renderPipeline(); toast(execute ? "Full lesson generation started." : "Production run created.");
+    await refreshRuns(); renderPipeline();
+    const productLabel = payload.content_product === "topic-reel-pack" ? "Independent Reel pack" : "Full lesson";
+    toast(execute ? `${productLabel} generation started.` : `${productLabel} run created.`);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   } catch (error) { showError(error); } finally { setBusy(button, false); }
 }
@@ -723,6 +754,9 @@ document.addEventListener("input", event => {
   if (event.target.id === "topic-search") renderTopicList();
 });
 document.addEventListener("change", event => {
+  if (event.target.id === "content-product-select") {
+    selectProductWorkspace(event.target.value).catch(showError);
+  }
   if (event.target.classList.contains("topic-status-select")) updateCoverage(event.target);
   if (event.target.id === "chapter-provider") {
     $("#codex-model").disabled = event.target.value !== "codex";

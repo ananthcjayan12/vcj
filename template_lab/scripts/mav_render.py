@@ -414,9 +414,12 @@ def render_reel_mp4(
     output_path = (output or (run_path / "motion_canvas" / "renders" / f"{reel_id}.mp4")).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     env = _hyperframes_env()
+    canvas = manifest.get("canvas") or {}
     env["MAV_MOTION_RUN_ROOT"] = str((run_path / "motion_canvas").resolve())
     env["MAV_RENDER_UNIT_ID"] = reel_id
     env["MAV_RENDER_OUTPUT"] = str(output_path)
+    env["VITE_MAV_CANVAS_WIDTH"] = str(int(canvas.get("width") or 1920))
+    env["VITE_MAV_CANVAS_HEIGHT"] = str(int(canvas.get("height") or 1080))
     result = subprocess.run(
         ["npm", "run", "render-video"],
         cwd=LAB_ROOT / "motion_canvas_runtime",

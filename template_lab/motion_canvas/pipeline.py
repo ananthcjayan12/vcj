@@ -935,7 +935,12 @@ def _modern_node_bin() -> Path | None:
 
 
 def _npm(script: str, run_path: Path, timeout: int) -> dict[str, Any]:
-    env = os.environ.copy(); env["MAV_MOTION_RUN_ROOT"] = str((run_path / "motion_canvas").resolve())
+    manifest = _load(run_path / "motion_canvas" / "manifest.json")
+    canvas = manifest.get("canvas") or {}
+    env = os.environ.copy()
+    env["MAV_MOTION_RUN_ROOT"] = str((run_path / "motion_canvas").resolve())
+    env["VITE_MAV_CANVAS_WIDTH"] = str(int(canvas.get("width") or 1920))
+    env["VITE_MAV_CANVAS_HEIGHT"] = str(int(canvas.get("height") or 1080))
     node_bin = _modern_node_bin()
     if node_bin: env["PATH"] = str(node_bin) + os.pathsep + env.get("PATH", "")
     result = subprocess.run(["npm", "run", script], cwd=RUNTIME_ROOT, env=env, capture_output=True, text=True, timeout=timeout)
@@ -944,8 +949,12 @@ def _npm(script: str, run_path: Path, timeout: int) -> dict[str, Any]:
 
 def _npm_live(script: str, run_path: Path, timeout: int) -> dict[str, Any]:
     """Run a long renderer with output inherited by Studio's live log pipe."""
+    manifest = _load(run_path / "motion_canvas" / "manifest.json")
+    canvas = manifest.get("canvas") or {}
     env = os.environ.copy()
     env["MAV_MOTION_RUN_ROOT"] = str((run_path / "motion_canvas").resolve())
+    env["VITE_MAV_CANVAS_WIDTH"] = str(int(canvas.get("width") or 1920))
+    env["VITE_MAV_CANVAS_HEIGHT"] = str(int(canvas.get("height") or 1080))
     node_bin = _modern_node_bin()
     if node_bin:
         env["PATH"] = str(node_bin) + os.pathsep + env.get("PATH", "")
