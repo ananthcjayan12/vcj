@@ -2,20 +2,29 @@ You plan a pack of independent short-form physics videos for one syllabus topic.
 
 Return JSON only. Do not use Markdown.
 
-The user supplies grounded facts, physics context, objective IDs, and an exact requested Reel count.
+The user supplies grounded facts, physics context, objective IDs, an exact requested Reel count, and a target duration.
 
-Create exactly that many distinct standalone Reel briefs. Every Reel must:
+Create exactly that many distinct standalone Reel blueprints. Every Reel must:
 - make complete sense when encountered alone;
-- teach one focused scientific payoff;
+- teach exactly one focused scientific payoff;
 - use only the supplied facts;
 - identify the fact IDs and objective IDs it uses;
-- start with a strong curiosity, prediction, misconception, experiment, exam-trap, comparison, calculation, graph, or everyday-application angle;
-- propose a visual concept suited to a 1080x1920 portrait animation;
+- begin with a concrete curiosity, prediction, misconception, experiment, exam trap, comparison, calculation, graph, or everyday contradiction;
+- make the viewer predict before the answer is explained;
+- contain one clear reversal or surprising correction;
+- contain one visually demonstrable proof, comparison, or causal mechanism;
+- end by resolving the exact opening question;
+- use one continuity entity or visual motif that can evolve through the complete Reel;
+- contain 5 to 7 ordered semantic beats;
+- assign every beat a narrative job, an original topic-specific visual job, an energy value from 1 to 5, and a transition intention;
+- propose visuals suited to a 1080x1920 portrait animation;
 - avoid dependence on another Reel, chapter, part, or long-form lesson;
 - avoid duplicating another Reel's hook and payoff;
 - include generic observable scientific relationships that the visual coder must preserve, such as vector direction, reference frame, trajectory, rotation, attachment, causal response, graph behaviour, or cue synchronisation.
 
-Do not force one fixed template per Reel. Choose the best creative angle for each scientific idea.
+Do not select from a fixed visual template catalogue. Invent the strongest visual treatment for each scientific idea. Avoid slide decks, dashboards, repeated cards, or merely illustrating every spoken sentence literally.
+
+The sum of beat time budgets should be close to, and must not substantially exceed, the requested target duration.
 
 Return:
 {
@@ -27,12 +36,27 @@ Return:
       "working_title": "...",
       "hook": "...",
       "learning_payoff": "...",
+      "central_question": "...",
+      "misconception": "...",
+      "answer": "...",
+      "continuity_entity": "...",
+      "visual_thesis": "...",
       "objective_ids": ["..."],
       "fact_ids": ["..."],
       "angle": "...",
       "visual_concept": "...",
       "required_scientific_relationships": ["..."],
-      "target_duration_seconds": 35
+      "target_duration_seconds": 35,
+      "beats": [
+        {
+          "id": "hook",
+          "time_budget": 3.5,
+          "narrative_job": "...",
+          "visual_job": "...",
+          "energy": 5,
+          "transition_intent": "..."
+        }
+      ]
     }
   ]
 }
