@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,15 @@ from .schema import require_reel_id, validate_plan, validate_script
 from mav_audio import generate_audio
 from mav_models import call_model_text
 from mav_timing import derive_timing
+
+
+REEL_GEMINI_TTS_PROMPT_PREFIX = (
+    "Read the following narration exactly as written for a modern vertical educational Reel. "
+    "Use a brisk, energetic, confident teaching pace around 155-170 words per minute. "
+    "Sound curious at questions, create a short suspenseful hold before reversals, and land the "
+    "final payoff clearly. Keep articulation crisp and natural, never frantic, theatrical, or robotic. "
+    "Do not add, remove, or rewrite words.\n\n"
+)
 
 
 def plan_pack(
@@ -217,12 +227,26 @@ def generate_pack_audio(
     try:
         narration = active_narration(read_json(run_path / "narration.json", {}) or {}, pack)
         if force or not (run_path / "audio_generation.json").exists():
-            generate_audio(
-                run_path,
-                narration,
-                target_duration=float(input_payload.get("target_duration_seconds") or DEFAULT_DURATION_SECONDS),
-                audio_provider=audio_provider or input_payload.get("audio_provider", "gemini"),
-            )
+            selected_provider = audio_provider or input_payload.get("audio_provider", "gemini")
+            original_prompt = os.environ.get("GEMINI_TTS_PROMPT_PREFIX")
+            if selected_provider == "gemini":
+                os.environ["GEMINI_TTS_PROMPT_PREFIX"] = os.getenv(
+                    "MAV_REEL_TTS_PROMPT_PREFIX",
+                    REEL_GEMINI_TTS_PROMPT_PREFIX,
+                )
+            try:
+                generate_audio(
+                    run_path,
+                    narration,
+                    target_duration=float(input_payload.get("target_duration_seconds") or DEFAULT_DURATION_SECONDS),
+                    audio_provider=selected_provider,
+                )
+            finally:
+                if selected_provider == "gemini":
+                    if original_prompt is None:
+                        os.environ.pop("GEMINI_TTS_PROMPT_PREFIX", None)
+                    else:
+                        os.environ["GEMINI_TTS_PROMPT_PREFIX"] = original_prompt
         _validate_audio_durations(run_path, pack)
         for item in selected:
             item["status"] = "audio_ready"
