@@ -133,6 +133,29 @@ def facts_for_brief(input_payload: dict[str, Any], brief: dict[str, Any]) -> lis
     return selected or facts
 
 
+def active_reels(pack: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return Reels that have not been explicitly rejected by the user."""
+    return [record for record in pack.get("reels", []) if record.get("status") != "rejected"]
+
+
+def active_narration(narration: dict[str, Any], pack: dict[str, Any]) -> dict[str, Any]:
+    """Keep script review data complete while excluding rejected Reels downstream."""
+    active_ids = {str(record.get("reel_id")) for record in active_reels(pack)}
+    filtered = {
+        key: value for key, value in narration.items() if key != "paragraphs"
+    }
+    filtered["paragraphs"] = [
+        paragraph for paragraph in narration.get("paragraphs", [])
+        if str(paragraph.get("id") or paragraph.get("reel_id")) in active_ids
+    ]
+    filtered["elevenlabs_narration"] = " ".join(
+        str(paragraph.get("text") or paragraph.get("narration") or "").strip()
+        for paragraph in filtered["paragraphs"]
+        if str(paragraph.get("text") or paragraph.get("narration") or "").strip()
+    )
+    return filtered
+
+
 def create_pack(
     *,
     run_id: str,
@@ -167,6 +190,7 @@ def create_pack(
         "tone": str(tone).strip(),
         "reel_count": count,
         "target_duration_seconds": duration,
+        "visual_batch_size": 2,
         "audio_provider": audio_provider,
     }
     write_json_file(run_path / "input.json", input_payload)
@@ -182,11 +206,12 @@ def create_pack(
         "topic": input_payload["topic"],
         "topic_ref": input_payload["topic_ref"],
         "target_reel_count": count,
+        "visual_batch_size": 2,
         "reels": [{
             "reel_id": reel_id(index),
             "status": "planned",
             "target_duration_seconds": duration,
-            "path": f"reels/{reel_id(index)}",
+            "path": ".",
         } for index in range(1, count + 1)],
     }
     return save_pack(run_path, pack)

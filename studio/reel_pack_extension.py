@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from template_lab.reel_pack.common import create_pack, load_pack, read_json, reel_path
-from template_lab.reel_pack.pipeline import approve_reel
+from template_lab.reel_pack.pipeline import approve_reel, reject_reel, restore_reel
 from template_lab.reel_pack.schema import CONTENT_PRODUCT, require_reel_id
 
 FULL_LESSON_PRODUCT = "full-lesson"
@@ -77,20 +77,24 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
         if (run_path / relative).exists():
             files.append(relative)
 
+    narration = read_json(run_path / "narration.json", {}) or {}
+    paragraphs = {str(item.get("id")): item for item in narration.get("paragraphs", [])}
+    motion_manifest = read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
     for record in pack.get("reels", []):
         parent_id = str(record.get("reel_id") or "")
         if not parent_id:
             continue
-        child = reel_path(run_path, parent_id)
-        brief = read_json(child / "brief.json", {}) or record
-        script = read_json(child / "script.json", {}) or {}
-        audio = read_json(child / "audio_generation.json", {}) or {}
-        validation = read_json(child / "validation-report.json", {}) or {}
-        source_relative = _child_source_relative(child)
-        preview_relative = f"reels/{parent_id}/motion_canvas/preview/contact-sheet.png"
-        audio_relative = f"reels/{parent_id}/voiceover.mp3"
-        video_relative = f"reels/{parent_id}/motion_canvas/final.mp4"
+        paragraph = paragraphs.get(parent_id, {})
+        brief = record
+        script = paragraph
+        audio = read_json(run_path / "audio_generation.json", {}) or {}
+        validation = read_json(run_path / "validation-report.json", {}) or {}
+        source_relative = f"motion_canvas/reels/{parent_id}.tsx"
+        preview_relative = "motion_canvas/preview/contact-sheet.png"
+        audio_relative = f"audio_chunks/{parent_id}/audio.wav"
+        video_relative = f"motion_canvas/renders/{parent_id}.mp4"
         evidence_payload = read_json(run_path / "review" / "evidence" / parent_id / "evidence.json", {}) or {}
+        timeline_unit = next((item for item in motion_manifest.get("reels", []) if item.get("scene_id") == parent_id), {})
         reels.append(
             {
                 **record,
@@ -98,10 +102,10 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
                 "title": script.get("title") or brief.get("working_title") or parent_id,
                 "hook": brief.get("hook") or script.get("hook") or "",
                 "learning_payoff": brief.get("learning_payoff") or "",
-                "narration": script.get("narration") or "",
-                "duration": audio.get("audio_duration_seconds") or record.get("target_duration_seconds"),
-                "source_ready": bool(source_relative),
-                "source": f"reels/{parent_id}/{source_relative}" if source_relative else None,
+                "narration": script.get("narration") or script.get("text") or "",
+                "duration": timeline_unit.get("duration") or record.get("target_duration_seconds"),
+                "source_ready": (run_path / source_relative).exists(),
+                "source": source_relative if (run_path / source_relative).exists() else None,
                 "audio": audio_relative if (run_path / audio_relative).exists() else None,
                 "preview": preview_relative if (run_path / preview_relative).exists() else None,
                 "video": video_relative if (run_path / video_relative).exists() else None,
@@ -113,12 +117,11 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
             }
         )
         for relative in (
-            f"reels/{parent_id}/brief.json",
-            f"reels/{parent_id}/script.json",
-            f"reels/{parent_id}/narration.json",
-            f"reels/{parent_id}/voiceover.mp3",
-            f"reels/{parent_id}/audio_timing.json",
-            f"reels/{parent_id}/audio_word_timestamps.json",
+            "narration.json",
+            "voiceover.mp3",
+            "audio_timing.json",
+            "audio_word_timestamps.json",
+            source_relative,
             preview_relative,
             video_relative,
         ):
@@ -145,7 +148,7 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
         "usage_records": (server._read_json(run_path / "costs" / "model_usage.json", {}) or {}).get("records", []),
         "direct_html_cost_summary": {},
         "routing_summary": {},
-        "asset_shortlist": {},
+                "asset_shortlist": {},
     }
 
 
@@ -216,8 +219,8 @@ def install(server: Any) -> None:
             "settings": {
                 "content_product": CONTENT_PRODUCT,
                 "animation_mode": server.MOTION_CANVAS_MODE,
-                "duration": input_payload.get("target_duration_seconds", 45),
-                "reel_count": input_payload.get("reel_count", 12),
+                "duration": input_payload.get("target_duration_seconds", 35),
+                "reel_count": input_payload.get("reel_count", 5),
                 "model_provider": "gemini",
                 "audio_provider": input_payload.get("audio_provider", "gemini"),
                 "scene_concurrency": 2,
@@ -265,8 +268,8 @@ def install(server: Any) -> None:
             for objective in detail["objectives"]
             if objective.get("status") != "covered"
         ]
-        count = max(1, min(int(payload.get("reel_count", 12)), 24))
-        duration = max(20.0, min(float(payload.get("duration", 45)), 75.0))
+        count = max(1, min(int(payload.get("reel_count", 5)), 24))
+        duration = max(20.0, min(float(payload.get("duration", 35)), 75.0))
         audio_provider = str(payload.get("audio_provider", "gemini"))
         create_pack(
             run_id=run_id,
@@ -295,7 +298,7 @@ def install(server: Any) -> None:
             "id": run_id,
             "content_product": CONTENT_PRODUCT,
             "topic_ref": topic_ref,
-            "topic": f"{topic_ref} {detail['topic']['title']} · 12-Reel pack",
+            "topic": f"{topic_ref} {detail['topic']['title']} · Independent Reel pack",
             "objective_ids": objectives,
             "facts_path": str(facts_path.relative_to(server.REPO_ROOT)),
             "status": "created",
@@ -379,6 +382,21 @@ def install(server: Any) -> None:
                 reel_id = require_reel_id(match.group(2))
                 approve_reel(server._run_dir(run_id), reel_id)
                 server._append_log(run_id, f"Approved standalone {reel_id}")
+                return self._json({"run": server.run_detail(run_id)})
+            match = re.fullmatch(r"/api/runs/([^/]+)/reel-pack/reels/([^/]+)/reject", path)
+            if match:
+                run_id = server._require_run_id(match.group(1))
+                reel_id = require_reel_id(match.group(2))
+                body = self._body()
+                reject_reel(server._run_dir(run_id), reel_id, str(body.get("reason") or ""))
+                server._append_log(run_id, f"Rejected standalone {reel_id} during script review")
+                return self._json({"run": server.run_detail(run_id)})
+            match = re.fullmatch(r"/api/runs/([^/]+)/reel-pack/reels/([^/]+)/restore", path)
+            if match:
+                run_id = server._require_run_id(match.group(1))
+                reel_id = require_reel_id(match.group(2))
+                restore_reel(server._run_dir(run_id), reel_id)
+                server._append_log(run_id, f"Restored standalone {reel_id} for downstream stages")
                 return self._json({"run": server.run_detail(run_id)})
             match = re.fullmatch(r"/api/runs/([^/]+)/reel-pack/reels/([^/]+)/regenerate", path)
             if match:

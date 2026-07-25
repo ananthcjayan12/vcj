@@ -296,8 +296,11 @@ function renderTopicDetail() {
     <div class="production-form">
       <p class="model-map-note">These settings apply to the next new run. To change an existing run, use its active-run controls and model map below.</p>
       <div class="form-grid">
+        <label class="field pack-product-field"><span>Content product</span><select id="content-product-select"><option value="full-lesson">Full lesson video</option><option value="topic-reel-pack">Independent Reels</option></select></label>
+        <label class="field pack-only-field is-hidden"><span>Independent Reels</span><select id="reel-count-input"><option value="4">4 Reels</option><option value="5" selected>5 Reels</option></select></label>
+        <label class="field pack-only-field is-hidden"><span>Target duration per Reel</span><select id="reel-duration-input"><option value="30">30 seconds</option><option value="35" selected>35 seconds</option><option value="40">40 seconds</option></select></label>
         <label class="field"><span>Run ID</span><input id="run-id-input" value="${escapeHtml(runDefault)}"></label>
-        <label class="field"><span>Duration</span><select id="duration-input"><option value="300">5 minutes</option><option value="480" selected>8 minutes</option><option value="600">10 minutes</option><option value="720">12 minutes</option></select></label>
+        <label class="field lesson-only-field"><span>Duration</span><select id="duration-input"><option value="300">5 minutes</option><option value="480" selected>8 minutes</option><option value="600">10 minutes</option><option value="720">12 minutes</option></select></label>
         <label class="field"><span>Script generator / model</span><select id="model-provider"><option value="gemini">Gemini</option><option value="anthropic">Claude</option><optgroup label="Codex CLI (ChatGPT)"><option value="codex:gpt-5.6-sol">GPT-5.6-Sol</option><option value="codex:gpt-5.6-terra">GPT-5.6-Terra</option><option value="codex:gpt-5.6-luna">GPT-5.6-Luna</option><option value="codex:gpt-5.5">GPT-5.5</option><option value="codex:gpt-5.4">GPT-5.4</option><option value="codex:gpt-5.4-mini">GPT-5.4-Mini</option></optgroup><option value="configured">Configured</option></select></label>
         <label class="field"><span>Script reasoning</span><select id="script-reasoning" disabled><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option><option>ultra</option></select></label>
         <label class="field"><span>Voice</span><select id="audio-provider"><option value="gemini">Gemini TTS</option><option value="elevenlabs">ElevenLabs</option></select></label>
@@ -321,9 +324,18 @@ function renderPipeline() {
   const run = state.activeRun;
   const root = $("#pipeline-panel");
   if (!run) {
+    root.removeAttribute("data-reel-pack-id");
     root.innerHTML = `<div class="empty-pipeline"><span class="empty-orbit">◎</span><h3>No active production run</h3><p>Create a run for the selected syllabus topic.</p></div>`;
     return;
   }
+  const isReelPack = run.content_product === "topic-reel-pack" || run.artifacts?.content_product === "topic-reel-pack";
+  if (isReelPack) {
+    root.dataset.reelPackId = run.id;
+    root.innerHTML = `<div class="loading-card"><span class="run-id">${escapeHtml(run.id)} · TOPIC REEL PACK</span><p>Loading independent Reel workspace…</p></div>`;
+    document.dispatchEvent(new CustomEvent("mav:render-reel-pack", { detail: { run } }));
+    return;
+  }
+  root.removeAttribute("data-reel-pack-id");
   const working = activeStatuses.has(run.status) || run.process_active;
   const artifacts = run.artifacts || {};
   const completed = Number(run.current_step || 0);

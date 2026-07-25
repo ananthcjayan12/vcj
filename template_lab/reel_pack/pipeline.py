@@ -20,7 +20,7 @@ from .common import (
     write_json_file,
 )
 from .planning import derive_pack_timing, generate_pack_audio, plan_pack, write_scripts
-from .review import approve_reel, screen_pack
+from .review import approve_reel, reject_reel, restore_reel, screen_pack
 from .schema import require_reel_id
 from .visuals import generate_visual_sources, render_pack, validate_visuals
 
@@ -35,10 +35,12 @@ def publishing_manifest(run_path: Path) -> dict[str, Any]:
         "render_profile": RENDER_PROFILE,
         "reels": [],
     }
+    narration = read_json(run_path / "narration.json", {}) or {}
+    scripts = {str(item.get("id")): item for item in narration.get("paragraphs", [])}
+    manifest = read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
     for record in pack["reels"]:
-        child = reel_path(run_path, record["reel_id"])
-        script = read_json(child / "script.json", {}) or {}
-        output = child / "motion_canvas" / "final.mp4"
+        script = scripts.get(record["reel_id"], {})
+        output = run_path / "motion_canvas" / "renders" / f"{record['reel_id']}.mp4"
         payload["reels"].append({
             "reel_id": record["reel_id"],
             "title": script.get("title") or record.get("working_title"),
@@ -46,6 +48,7 @@ def publishing_manifest(run_path: Path) -> dict[str, Any]:
             "status": record.get("status"),
             "fact_ids": record.get("fact_ids", []),
             "objective_ids": record.get("objective_ids", []),
+            "timeline": next((item for item in manifest.get("reels", []) if item.get("scene_id") == record["reel_id"]), None),
         })
     write_json_file(run_path / "publishing_manifest.json", payload)
     return payload
@@ -106,6 +109,8 @@ __all__ = [
     "CONTENT_PRODUCT",
     "DEFAULT_REEL_COUNT",
     "approve_reel",
+    "reject_reel",
+    "restore_reel",
     "create_pack",
     "load_pack",
     "pack_path",

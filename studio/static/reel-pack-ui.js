@@ -27,10 +27,10 @@
     style.textContent = `
       .pack-product-field select{font-weight:750}.pack-only-field.is-hidden,.lesson-only-field.is-hidden{display:none!important}
       .reel-pack-workspace{display:grid;gap:18px}.reel-pack-header{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;padding:22px;border:1px solid rgba(70,217,255,.22);border-radius:20px;background:linear-gradient(145deg,rgba(14,29,49,.98),rgba(7,17,31,.98))}.reel-pack-header h2{margin:4px 0 5px}.reel-pack-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.reel-pack-subtitle{color:#91a8c5}.pack-stepper{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:7px}.pack-step{border:1px solid rgba(145,168,197,.16);background:rgba(14,29,49,.8);color:#91a8c5;border-radius:12px;padding:10px 7px;text-align:left;cursor:pointer}.pack-step span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.06);font-weight:800;margin-bottom:6px}.pack-step b{font-size:11px}.pack-step.is-done{color:#eaf3ff;border-color:rgba(70,217,255,.3)}.pack-step.is-done span{background:rgba(70,217,255,.16);color:#46d9ff}.pack-step:disabled{cursor:not-allowed;opacity:.65}
-      .pack-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.pack-summary article{padding:14px;border-radius:15px;background:rgba(14,29,49,.86);border:1px solid rgba(145,168,197,.12)}.pack-summary span{display:block;color:#91a8c5;font-size:12px}.pack-summary strong{display:block;font-size:25px;color:#eaf3ff;margin-top:5px}
+      .pack-summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.pack-summary article{padding:14px;border-radius:15px;background:rgba(14,29,49,.86);border:1px solid rgba(145,168,197,.12)}.pack-summary span{display:block;color:#91a8c5;font-size:12px}.pack-summary strong{display:block;font-size:25px;color:#eaf3ff;margin-top:5px}
       .pack-review{padding:17px;border-radius:17px;background:rgba(14,29,49,.86);border:1px solid rgba(255,200,87,.18)}.pack-section-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.pack-section-head h3{margin:2px 0}.pack-review-links{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.pack-review-links a{padding:7px 10px;border-radius:9px;background:rgba(70,217,255,.08)}.pack-findings{display:grid;gap:8px}.pack-finding{display:grid;grid-template-columns:130px 1fr 70px;gap:12px;padding:11px;border-radius:12px;background:rgba(255,255,255,.035)}.pack-finding p{margin:3px 0}.pack-finding small{color:#91a8c5}.pack-finding>strong:last-child{text-align:right;color:#46d9ff}
       .pack-model-panel{padding:17px;border-radius:17px;background:rgba(14,29,49,.86);border:1px solid rgba(145,168,197,.12)}.pack-model-list{display:grid;gap:8px}.pack-model-row{display:grid;grid-template-columns:115px minmax(180px,1fr) 160px 210px 135px;gap:9px;align-items:center;padding:10px;border-radius:12px;background:rgba(255,255,255,.03)}.pack-model-row small{display:block;color:#91a8c5}.pack-model-row select{min-width:0}
-      .pack-reels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.pack-reel-card{display:flex;flex-direction:column;min-width:0;border:1px solid rgba(145,168,197,.14);border-radius:17px;background:rgba(14,29,49,.88);overflow:hidden}.pack-reel-preview{aspect-ratio:9/16;background:#07111f;display:grid;place-items:center;overflow:hidden}.pack-reel-preview img{width:100%;height:100%;object-fit:cover}.pack-reel-preview span{padding:20px;text-align:center;color:#91a8c5}.pack-reel-body{display:grid;gap:9px;padding:14px;flex:1}.pack-reel-head{display:flex;justify-content:space-between;gap:9px;align-items:flex-start}.pack-reel-head h4{margin:2px 0;font-size:16px}.pack-reel-meta{display:flex;gap:8px;flex-wrap:wrap;color:#91a8c5;font-size:12px}.pack-reel-copy{margin:0;color:#cbd9ea;font-size:13px;line-height:1.45}.pack-reel-findings{padding:9px;border-radius:10px;background:rgba(255,107,107,.07);color:#ffadad;font-size:12px}.pack-reel-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto}.pack-reel-actions button,.pack-reel-actions a{font-size:11px;padding:7px 9px}.pack-log{max-height:210px;overflow:auto;padding:13px;border-radius:13px;background:#050c16;color:#91a8c5;font-size:11px;white-space:pre-wrap}.pack-status{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.05em;background:rgba(145,168,197,.11);color:#b9c8d9}.pack-status-approved,.pack-status-rendered,.pack-status-complete,.pack-status-passed{background:rgba(52,211,153,.12);color:#6ee7b7}.pack-status-flagged,.pack-status-failed,.pack-status-needs-review{background:rgba(255,107,107,.12);color:#ff9a9a}.pack-status-repaired-pending-review{background:rgba(255,200,87,.12);color:#ffc857}.pack-status-visual-ready,.pack-status-timed,.pack-status-audio-ready,.pack-status-scripted{background:rgba(70,217,255,.1);color:#46d9ff}
+      .pack-reels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.pack-reel-card{display:flex;flex-direction:column;min-width:0;border:1px solid rgba(145,168,197,.14);border-radius:17px;background:rgba(14,29,49,.88);overflow:hidden}.pack-reel-preview{position:relative;aspect-ratio:9/16;background:#07111f;display:grid;place-items:center;overflow:hidden}.pack-reel-preview img{width:100%;height:100%;object-fit:cover}.pack-reel-preview span{padding:20px;text-align:center;color:#91a8c5}.pack-script-review{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(5,12,22,.9);backdrop-filter:blur(8px)}.pack-reel-body{display:grid;gap:9px;padding:14px;flex:1}.pack-reel-head{display:flex;justify-content:space-between;gap:9px;align-items:flex-start}.pack-reel-head h4{margin:2px 0;font-size:16px}.pack-reel-meta{display:flex;gap:8px;flex-wrap:wrap;color:#91a8c5;font-size:12px}.pack-reel-copy{margin:0;color:#cbd9ea;font-size:13px;line-height:1.45}.pack-reel-findings{padding:9px;border-radius:10px;background:rgba(255,107,107,.07);color:#ffadad;font-size:12px}.pack-reel-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto}.pack-reel-actions button,.pack-reel-actions a{font-size:11px;padding:7px 9px}.pack-log{max-height:210px;overflow:auto;padding:13px;border-radius:13px;background:#050c16;color:#91a8c5;font-size:11px;white-space:pre-wrap}.pack-script-dialog{width:min(760px,calc(100vw - 30px));max-height:85vh;padding:0;border:1px solid rgba(70,217,255,.35);border-radius:18px;background:#0b192a;color:#eaf3ff;box-shadow:0 30px 100px rgba(0,0,0,.55)}.pack-script-dialog::backdrop{background:rgba(0,0,0,.72)}.pack-script-dialog-content{padding:22px;overflow:auto;max-height:72vh}.pack-script-dialog h3{margin:3px 0 5px}.pack-script-dialog p{line-height:1.55;color:#cbd9ea}.pack-script-dialog .pack-script-label{color:#46d9ff;text-transform:uppercase;font-size:10px;letter-spacing:.08em;font-weight:800;margin:14px 0 3px}.pack-script-dialog-actions{display:flex;justify-content:flex-end;padding:12px 22px;border-top:1px solid rgba(145,168,197,.14)}.pack-status{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.05em;background:rgba(145,168,197,.11);color:#b9c8d9}.pack-status-approved,.pack-status-rendered,.pack-status-complete,.pack-status-passed{background:rgba(52,211,153,.12);color:#6ee7b7}.pack-status-rejected{background:rgba(255,107,107,.12);color:#ff9a9a}.pack-status-flagged,.pack-status-failed,.pack-status-needs-review{background:rgba(255,107,107,.12);color:#ff9a9a}.pack-status-repaired-pending-review{background:rgba(255,200,87,.12);color:#ffc857}.pack-status-visual-ready,.pack-status-timed,.pack-status-audio-ready,.pack-status-scripted{background:rgba(70,217,255,.1);color:#46d9ff}
       @media(max-width:1200px){.pack-reels{grid-template-columns:repeat(2,minmax(0,1fr))}.pack-model-row{grid-template-columns:100px 1fr 140px 180px}.pack-model-row .pack-reasoning{grid-column:4}.pack-summary{grid-template-columns:repeat(3,1fr)}}@media(max-width:800px){.reel-pack-header{display:grid}.reel-pack-header-actions{justify-content:flex-start}.pack-stepper{grid-template-columns:repeat(4,1fr)}.pack-reels{grid-template-columns:1fr}.pack-summary{grid-template-columns:repeat(2,1fr)}.pack-model-row,.pack-finding{grid-template-columns:1fr}.pack-finding>strong:last-child{text-align:left}}
     `;
     document.head.append(style);
@@ -39,23 +39,19 @@
   function addProductControls() {
     const formGrid = document.querySelector('#topic-detail .production-form .form-grid');
     const runInput = document.getElementById('run-id-input');
-    if (!formGrid || !runInput || document.getElementById('content-product-select')) return;
-    runInput.dataset.lessonDefault = runInput.value;
-    const product = document.createElement('label');
-    product.className = 'field pack-product-field';
-    product.innerHTML = `<span>Content product</span><select id="content-product-select"><option value="full-lesson">Full lesson video</option><option value="${PRODUCT}">12 standalone Reels</option></select>`;
-    formGrid.prepend(product);
-    const durationField = document.getElementById('duration-input')?.closest('.field');
-    durationField?.classList.add('lesson-only-field');
-    const count = document.createElement('label');
-    count.className = 'field pack-only-field is-hidden';
-    count.innerHTML = '<span>Standalone Reels</span><select id="reel-count-input"><option value="3">3-Reel smoke test</option><option value="6">6 Reels</option><option value="12" selected>12 Reels</option></select>';
-    const duration = document.createElement('label');
-    duration.className = 'field pack-only-field is-hidden';
-    duration.innerHTML = '<span>Target duration per Reel</span><select id="reel-duration-input"><option value="30">30 seconds</option><option value="45" selected>45 seconds</option><option value="60">60 seconds</option></select>';
-    product.insertAdjacentElement('afterend', count);
-    count.insertAdjacentElement('afterend', duration);
-    document.getElementById('content-product-select').addEventListener('change', applyProductFormState);
+    if (!formGrid || !runInput) return;
+    let productSelect = document.getElementById('content-product-select');
+    if (productSelect?.dataset.reelPackBound === 'true') return;
+    runInput.dataset.lessonDefault ||= runInput.value;
+    if (!productSelect) {
+      const product = document.createElement('label');
+      product.className = 'field pack-product-field';
+      product.innerHTML = `<span>Content product</span><select id="content-product-select"><option value="full-lesson">Full lesson video</option><option value="${PRODUCT}">Independent Reels</option></select>`;
+      formGrid.prepend(product);
+      productSelect = product.querySelector('select');
+    }
+    productSelect.addEventListener('change', applyProductFormState);
+    productSelect.dataset.reelPackBound = 'true';
     applyProductFormState();
   }
 
@@ -100,8 +96,8 @@
       content_product: PRODUCT,
       topic_ref: document.querySelector('.topic-item.is-selected')?.dataset.topic || '',
       run_id: document.getElementById('run-id-input')?.value.trim() || '',
-      reel_count: Number(document.getElementById('reel-count-input')?.value || 12),
-      duration: Number(document.getElementById('reel-duration-input')?.value || 45),
+      reel_count: Number(document.getElementById('reel-count-input')?.value || 5),
+      duration: Number(document.getElementById('reel-duration-input')?.value || 35),
       model_provider: scriptSelection.startsWith('codex:') ? 'configured' : scriptSelection,
       audio_provider: document.getElementById('audio-provider')?.value || 'gemini',
       scene_concurrency: Number(document.getElementById('scene-concurrency')?.value || 2),
@@ -153,6 +149,7 @@
   }
 
   function nextStepForReel(reel) {
+    if (reel.status === 'rejected') return 0;
     if (!reel.audio) return 3;
     if (!reel.source_ready) return 5;
     if (!reel.preview) return 6;
@@ -175,7 +172,17 @@
   function reelCard(run, reel, working) {
     const next = nextStepForReel(reel);
     const findings = reel.findings || [];
-    return `<article class="pack-reel-card"><div class="pack-reel-preview">${reel.preview ? `<a href="${artifactUrl(run.id, reel.preview)}" target="_blank" rel="noreferrer"><img src="${artifactUrl(run.id, reel.preview)}" alt="${escapeHtml(reel.reel_id)} preview"></a>` : `<span>${reel.source_ready ? 'Compile & preview this Reel to create evidence.' : 'Portrait visual source not generated yet.'}</span>`}</div><div class="pack-reel-body"><div class="pack-reel-head"><div><p class="eyebrow">${escapeHtml(reel.reel_id)}</p><h4>${escapeHtml(reel.title)}</h4></div>${statusPill(reel.status)}</div><div class="pack-reel-meta"><span>${Number(reel.duration || 0).toFixed(1)}s</span><span>${(reel.fact_ids || []).length} facts</span><span>${(reel.objective_ids || []).length} objectives</span></div><p class="pack-reel-copy"><strong>Hook:</strong> ${escapeHtml(reel.hook || '—')}</p><p class="pack-reel-copy"><strong>Payoff:</strong> ${escapeHtml(reel.learning_payoff || '—')}</p>${findings.length ? `<div class="pack-reel-findings">${findings.map(item => escapeHtml(item.visible_evidence)).join('<br>')}</div>` : ''}${reel.error ? `<div class="alert">${escapeHtml(reel.error)}</div>` : ''}<div class="pack-reel-actions">${reel.audio ? `<a class="secondary-button" href="${artifactUrl(run.id, reel.audio)}" target="_blank">Audio ↗</a>` : ''}${reel.video ? `<a class="primary-button" href="${artifactUrl(run.id, reel.video)}" target="_blank">MP4 ↗</a>` : ''}<button class="secondary-button pack-reel-next" data-reel-id="${escapeHtml(reel.reel_id)}" data-step="${next}" ${working || reel.status === 'rendered' ? 'disabled' : ''}>Run stage ${next}</button><button class="danger-button pack-reel-regenerate" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.source_ready ? 'disabled' : ''}>Regenerate visual</button><button class="secondary-button pack-reel-approve" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.preview || !['visual_ready', 'flagged', 'repaired_pending_review'].includes(reel.status) ? 'disabled' : ''}>Approve</button><button class="primary-button pack-reel-render" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || reel.status !== 'approved' ? 'disabled' : ''}>Render</button></div></div></article>`;
+    const scriptPayload = JSON.stringify({title: reel.title || reel.reel_id, hook: reel.hook || '', narration: reel.narration || '', visual_direction: reel.visual_direction || reel.visual_concept || '', learning_payoff: reel.learning_payoff || ''});
+    const rejectable = ['planned', 'scripted'].includes(reel.status);
+    const reviewButton = reel.narration ? `<button class="secondary-button pack-script-review" data-reel-id="${escapeHtml(reel.reel_id)}" data-script="${escapeHtml(scriptPayload)}">Review script ↗</button>` : '';
+    const nextButton = next ? `<button class="secondary-button pack-reel-next" data-reel-id="${escapeHtml(reel.reel_id)}" data-step="${next}" ${working || reel.status === 'rendered' ? 'disabled' : ''}>Run stage ${next}</button>` : '';
+    const canRestore = reel.status === 'rejected' && Number(run.current_step || 1) <= 2;
+    const rejectButton = rejectable ? `<button class="danger-button pack-reel-reject" data-reel-id="${escapeHtml(reel.reel_id)}" ${working ? 'disabled' : ''}>Reject Reel</button>` : reel.status === 'rejected' ? `<button class="secondary-button pack-reel-restore" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !canRestore ? 'disabled' : ''}>Restore Reel</button>` : '';
+    return `<article class="pack-reel-card"><div class="pack-reel-preview">${reel.preview ? `<a href="${artifactUrl(run.id, reel.preview)}" target="_blank" rel="noreferrer"><img src="${artifactUrl(run.id, reel.preview)}" alt="${escapeHtml(reel.reel_id)} preview"></a>` : `<span>${reel.source_ready ? 'Compile & preview this Reel to create evidence.' : 'Portrait visual source not generated yet.'}</span>`}${reviewButton}</div><div class="pack-reel-body"><div class="pack-reel-head"><div><p class="eyebrow">${escapeHtml(reel.reel_id)}</p><h4>${escapeHtml(reel.title)}</h4></div>${statusPill(reel.status)}</div><div class="pack-reel-meta"><span>${Number(reel.duration || 0).toFixed(1)}s</span><span>${(reel.fact_ids || []).length} facts</span><span>${(reel.objective_ids || []).length} objectives</span></div><p class="pack-reel-copy"><strong>Hook:</strong> ${escapeHtml(reel.hook || '—')}</p><p class="pack-reel-copy"><strong>Payoff:</strong> ${escapeHtml(reel.learning_payoff || '—')}</p>${reel.status === 'rejected' && reel.rejection_reason ? `<div class="pack-reel-findings">Rejected: ${escapeHtml(reel.rejection_reason)}</div>` : ''}${findings.length ? `<div class="pack-reel-findings">${findings.map(item => escapeHtml(item.visible_evidence)).join('<br>')}</div>` : ''}${reel.error ? `<div class="alert">${escapeHtml(reel.error)}</div>` : ''}<div class="pack-reel-actions">${reel.audio ? `<a class="secondary-button" href="${artifactUrl(run.id, reel.audio)}" target="_blank">Audio ↗</a>` : ''}${reel.video ? `<a class="primary-button" href="${artifactUrl(run.id, reel.video)}" target="_blank">MP4 ↗</a>` : ''}${nextButton}${rejectButton}<button class="danger-button pack-reel-regenerate" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.source_ready ? 'disabled' : ''}>Regenerate visual</button><button class="secondary-button pack-reel-approve" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.preview || !['visual_ready', 'flagged', 'repaired_pending_review'].includes(reel.status) ? 'disabled' : ''}>Approve</button><button class="primary-button pack-reel-render" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || reel.status !== 'approved' ? 'disabled' : ''}>Render</button></div></div></article>`;
+  }
+
+  function scriptDialogMarkup() {
+    return `<dialog class="pack-script-dialog" id="pack-script-dialog"><div class="pack-script-dialog-content" id="pack-script-dialog-content"></div><div class="pack-script-dialog-actions"><button class="secondary-button" id="pack-script-dialog-close">Close</button></div></dialog>`;
   }
 
   async function loadLog(runId) {
@@ -186,6 +193,14 @@
       box.textContent = payload.log || 'No process output yet.';
       box.scrollTop = box.scrollHeight;
     } catch { /* normal run refresh surfaces errors */ }
+  }
+
+  function liveProcessLabel(run) {
+    if (!run.process_active && run.status !== 'running' && run.status !== 'rendering') return '';
+    const step = run.process_active_step ? `step ${run.process_active_step}` : 'current stage';
+    const started = run.process_started_at ? new Date(run.process_started_at).getTime() : 0;
+    const elapsed = started ? Math.max(0, Math.round((Date.now() - started) / 1000)) : 0;
+    return `LIVE · ${step} · elapsed ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
   }
 
   function renderPackWorkspace(run) {
@@ -201,7 +216,12 @@
     const approved = Number(counts.approved || 0) + Number(counts.rendered || 0);
     const ready = Number(counts.visual_ready || 0) + approved + Number(counts.flagged || 0) + Number(counts.repaired_pending_review || 0);
     root.dataset.reelPackId = run.id;
-    root.innerHTML = `<div class="reel-pack-workspace"><section class="reel-pack-header"><div><p class="eyebrow">Standalone portrait production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><p class="reel-pack-subtitle"><span class="run-id">${escapeHtml(run.id)} · TOPIC REEL PACK</span><br>${reels.length} independent 1080×1920 productions · ${Number(run.settings?.duration || 45)}s target each</p></div><div class="reel-pack-header-actions"><button class="secondary-button" id="pack-refresh">Refresh</button><button class="danger-button" id="pack-stop" ${working ? '' : 'disabled'}>Stop</button><button class="danger-button" id="pack-delete" ${working ? 'disabled' : ''}>Delete</button><button class="secondary-button" id="pack-run-next" ${working || completed >= 8 ? 'disabled' : ''}>Run next</button><button class="primary-button" id="pack-run-review" ${working || completed >= 7 ? 'disabled' : ''}>Run to screening</button><button class="secondary-button" id="pack-screen" ${working || completed < 6 ? 'disabled' : ''}>Screen pack</button><button class="primary-button" id="pack-render-approved" ${working || !approved ? 'disabled' : ''}>Render approved</button></div></section><div class="pack-stepper">${PACK_STEPS.map((name, index) => { const step = index + 1; return `<button class="pack-step${completed >= step ? ' is-done' : ''}" data-pack-step="${step}" ${working ? 'disabled' : ''}><span>${completed >= step ? '✓' : step}</span><b>${escapeHtml(name)}</b></button>`; }).join('')}</div><section class="pack-summary"><article><span>Total Reels</span><strong>${reels.length}</strong></article><article><span>Scripts ready</span><strong>${Number(counts.scripted || 0) + ready}</strong></article><article><span>Visual evidence</span><strong>${ready}</strong></article><article><span>Approved</span><strong>${approved}</strong></article><article><span>Rendered</span><strong>${Number(counts.rendered || 0)}</strong></article></section>${reviewMarkup(run)}${modelMapMarkup(run, working)}<section><div class="pack-section-head"><div><p class="eyebrow">Independent child productions</p><h3>${reels.length} standalone Reels</h3></div><span class="reel-pack-subtitle">Regenerating one child never rewrites another.</span></div><div class="pack-reels">${reels.map(reel => reelCard(run, reel, working)).join('')}</div></section><pre class="pack-log" id="pack-run-log">Loading logs…</pre>${run.error ? `<div class="alert">${escapeHtml(run.error)}</div>` : ''}</div>`;
+    root.innerHTML = `<div class="reel-pack-workspace"><section class="reel-pack-header"><div><p class="eyebrow">Standalone portrait production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><p class="reel-pack-subtitle"><span class="run-id">${escapeHtml(run.id)} · TOPIC REEL PACK</span><br>${reels.length} independent 1080×1920 productions · ${Number(run.settings?.duration || 45)}s target each</p></div><div class="reel-pack-header-actions"><button class="secondary-button" id="pack-refresh">Refresh</button><button class="danger-button" id="pack-stop" ${working ? '' : 'disabled'}>Stop</button><button class="danger-button" id="pack-delete" ${working ? 'disabled' : ''}>Delete</button><button class="secondary-button" id="pack-run-next" ${working || completed >= 8 ? 'disabled' : ''}>Run next</button><button class="primary-button" id="pack-run-review" ${working || completed >= 7 ? 'disabled' : ''}>Run to screening</button><button class="secondary-button" id="pack-screen" ${working || completed < 6 ? 'disabled' : ''}>Screen pack</button><button class="primary-button" id="pack-render-approved" ${working || !approved ? 'disabled' : ''}>Render approved</button></div></section><div class="pack-stepper">${PACK_STEPS.map((name, index) => { const step = index + 1; return `<button class="pack-step${completed >= step ? ' is-done' : ''}" data-pack-step="${step}" ${working ? 'disabled' : ''}><span>${completed >= step ? '✓' : step}</span><b>${escapeHtml(name)}</b></button>`; }).join('')}</div><section class="pack-summary"><article><span>Total Reels</span><strong>${reels.length}</strong></article><article><span>Scripts ready</span><strong>${Number(counts.scripted || 0) + ready}</strong></article><article><span>Rejected</span><strong>${Number(counts.rejected || 0)}</strong></article><article><span>Visual evidence</span><strong>${ready}</strong></article><article><span>Approved</span><strong>${approved}</strong></article><article><span>Rendered</span><strong>${Number(counts.rendered || 0)}</strong></article></section>${reviewMarkup(run)}${modelMapMarkup(run, working)}<section><div class="pack-section-head"><div><p class="eyebrow">Independent child productions</p><h3>${reels.length} standalone Reels</h3></div><span class="reel-pack-subtitle">Regenerating one child never rewrites another.</span></div><div class="pack-reels">${reels.map(reel => reelCard(run, reel, working)).join('')}</div></section>${scriptDialogMarkup()}<pre class="pack-log" id="pack-run-log">Loading logs…</pre>${run.error ? `<div class="alert">${escapeHtml(run.error)}</div>` : ''}</div>`;
+    const live = liveProcessLabel(run);
+    if (live) {
+      const eyebrow = root.querySelector('.reel-pack-header .eyebrow');
+      if (eyebrow) eyebrow.insertAdjacentHTML('beforeend', ` <span class="pack-live-status">${escapeHtml(live)}</span>`);
+    }
     loadLog(run.id);
     if (working) startPolling(run.id); else stopPolling();
   }
@@ -226,7 +246,10 @@
       }
       const signature = signatureFor(run);
       const root = document.getElementById('pipeline-panel');
-      if (!force && signature === lastSignature && root?.dataset.reelPackId === runId) return;
+      if (!force && signature === lastSignature && root?.dataset.reelPackId === runId) {
+        await loadLog(runId);
+        return;
+      }
       activePackId = runId;
       lastSignature = signature;
       renderPackWorkspace(run);
@@ -258,6 +281,26 @@
     const runId = root.dataset.reelPackId;
     const button = event.target.closest('button');
     if (!button) return false;
+    const isPackControl = button.matches([
+      '#pack-refresh',
+      '#pack-stop',
+      '#pack-delete',
+      '#pack-save-models',
+      '#pack-run-next',
+      '#pack-run-review',
+      '#pack-screen',
+      '#pack-render-approved',
+      '#pack-script-dialog-close',
+      '[data-pack-step]',
+      '.pack-script-review',
+      '.pack-reel-next',
+      '.pack-reel-regenerate',
+      '.pack-reel-reject',
+      '.pack-reel-restore',
+      '.pack-reel-approve',
+      '.pack-reel-render',
+    ].join(','));
+    if (!isPackControl) return false;
     event.preventDefault();
     event.stopImmediatePropagation();
     try {
@@ -289,6 +332,29 @@
       }
       if (button.id === 'pack-render-approved') {
         const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/render`, {method: 'POST', body: JSON.stringify({task_models: collectPackTaskModels()})});
+        renderPackWorkspace(response.run); return true;
+      }
+      if (button.id === 'pack-script-dialog-close') {
+        document.getElementById('pack-script-dialog')?.close(); return true;
+      }
+      if (button.classList.contains('pack-script-review')) {
+        const script = JSON.parse(button.dataset.script || '{}');
+        const dialog = document.getElementById('pack-script-dialog');
+        const content = document.getElementById('pack-script-dialog-content');
+        if (dialog && content) {
+          content.innerHTML = `<p class="pack-script-label">${escapeHtml(button.dataset.reelId || 'Reel')}</p><h3>${escapeHtml(script.title || '')}</h3><p class="pack-script-label">Hook</p><p>${escapeHtml(script.hook || '—')}</p><p class="pack-script-label">Narration</p><p>${escapeHtml(script.narration || '—')}</p><p class="pack-script-label">Learning payoff</p><p>${escapeHtml(script.learning_payoff || '—')}</p><p class="pack-script-label">Visual direction</p><p>${escapeHtml(script.visual_direction || '—')}</p>`;
+          if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+        }
+        return true;
+      }
+      if (button.classList.contains('pack-reel-reject')) {
+        const reason = window.prompt(`Why are you rejecting ${button.dataset.reelId}?`, 'Script needs revision');
+        if (reason === null) return true;
+        const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/reels/${encodeURIComponent(button.dataset.reelId)}/reject`, {method: 'POST', body: JSON.stringify({reason})});
+        renderPackWorkspace(response.run); return true;
+      }
+      if (button.classList.contains('pack-reel-restore')) {
+        const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/reels/${encodeURIComponent(button.dataset.reelId)}/restore`, {method: 'POST', body: '{}'});
         renderPackWorkspace(response.run); return true;
       }
       if (button.matches('[data-pack-step]')) {
@@ -364,6 +430,13 @@
   }
 
   ensureStyles();
+  document.addEventListener('mav:render-reel-pack', event => {
+    const run = event.detail?.run;
+    if (!run || (run.content_product !== PRODUCT && run.artifacts?.content_product !== PRODUCT)) return;
+    activePackId = run.id;
+    lastSignature = signatureFor(run);
+    renderPackWorkspace(run);
+  });
   const observer = new MutationObserver(() => {
     addProductControls();
     reopenCreatedPack();
@@ -371,5 +444,6 @@
   });
   observer.observe(document.documentElement, {subtree: true, childList: true});
   addProductControls();
+  syncActiveWorkspace(true);
   setInterval(() => { addProductControls(); reopenCreatedPack(); syncActiveWorkspace(); }, 2500);
 })();

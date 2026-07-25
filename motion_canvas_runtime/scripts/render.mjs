@@ -16,6 +16,10 @@ const videoMode = process.argv.includes('--video');
 const previewMode = process.argv.includes('--preview') || !videoMode;
 const manifestPath = path.join(RUN_ROOT, 'manifest.json');
 const runManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
+const selectedUnitId = process.env.MAV_RENDER_UNIT_ID || '';
+const selectedUnit = selectedUnitId
+  ? (runManifest.reels || runManifest.shots || runManifest.chapters || []).find(item => String(item.scene_id) === selectedUnitId)
+  : null;
 
 function visualSourceFiles() {
   const files = [
@@ -35,9 +39,9 @@ function visualSourceFiles() {
   return files.filter(file => fs.existsSync(file));
 }
 
-function renderFingerprint({fps, duration, frameCount}) {
+function renderFingerprint({fps, duration, frameCount, startFrame = 0, endFrame = frameCount}) {
   const hash = crypto.createHash('sha256');
-  hash.update(JSON.stringify({version: 1, fps, duration, frameCount}));
+  hash.update(JSON.stringify({version: 2, fps, duration, frameCount, startFrame, endFrame, selectedUnitId}));
   for (const file of visualSourceFiles()) {
     hash.update(path.relative(ROOT, file));
     hash.update(fs.readFileSync(file));
@@ -186,13 +190,20 @@ try {
     );
   }
 
-  const duration = await page.evaluate(() => window.MotionCanvasRobot.duration());
-  if (!Number.isFinite(duration) || duration <= 0) {
-    throw new Error(`Invalid animation duration: ${duration}`);
+  const masterDuration = await page.evaluate(() => window.MotionCanvasRobot.duration());
+  if (!Number.isFinite(masterDuration) || masterDuration <= 0) {
+    throw new Error(`Invalid animation duration: ${masterDuration}`);
   }
-  renderLog(`Scene initialized; duration=${formatDuration(duration)}`);
-  const expectedDuration = Number(runManifest.render_duration || 0);
   const fps = await page.evaluate(() => window.MotionCanvasRobot.fps);
+  const startFrame = selectedUnit ? Number(selectedUnit.render_start_frame || 0) : 0;
+  const endFrame = selectedUnit ? Number(selectedUnit.render_end_frame || 0) : Math.ceil(masterDuration * fps);
+  const duration = selectedUnit ? (endFrame - startFrame) / fps : masterDuration;
+  const startTime = startFrame / fps;
+  if (!Number.isFinite(duration) || duration <= 0 || endFrame <= startFrame) {
+    throw new Error(`Invalid selected render range: ${startFrame}-${endFrame}`);
+  }
+  renderLog(`Scene initialized; duration=${formatDuration(duration)}${selectedUnit ? `; unit=${selectedUnitId}` : ''}`);
+  const expectedDuration = selectedUnit ? Number(selectedUnit.render_duration || duration) : Number(runManifest.render_duration || 0);
   const timelineDelta = expectedDuration > 0 ? duration - expectedDuration : 0;
   const timelineStable = expectedDuration <= 0 || Math.abs(timelineDelta) <= 1.1 / fps;
   if (!timelineStable) {
@@ -205,7 +216,7 @@ try {
   const canvas = await page.$('#robot-canvas');
   if (!canvas) throw new Error('Motion Canvas render surface was not found.');
   const capture = async (time, target) => {
-    await page.evaluate(at => window.MotionCanvasRobot.seek(at), time);
+    await page.evaluate(at => window.MotionCanvasRobot.seek(at), selectedUnit ? startTime + time : time);
     await canvas.screenshot({path: target, type: 'png'});
   };
 
@@ -266,7 +277,7 @@ try {
     fs.mkdirSync(FRAME_ROOT, {recursive: true});
     const frameCount = Math.ceil(duration * fps);
     const totalFrames = frameCount + 1;
-    const fingerprint = renderFingerprint({fps, duration, frameCount});
+    const fingerprint = renderFingerprint({fps, duration, frameCount, startFrame, endFrame});
     const checkpoint = fs.existsSync(CHECKPOINT_PATH)
       ? JSON.parse(fs.readFileSync(CHECKPOINT_PATH, 'utf8'))
       : null;
@@ -347,7 +358,7 @@ try {
     }
 
     const frameElapsed = (Date.now() - renderStarted) / 1000;
-    const output = path.join(RUN_ROOT, 'final.mp4');
+    const output = process.env.MAV_RENDER_OUTPUT || path.join(RUN_ROOT, selectedUnit ? `${selectedUnitId}.mp4` : 'final.mp4');
     const audioOutput = path.join(RUN_ROOT, 'final.with-audio.mp4');
     fs.rmSync(audioOutput, {force: true});
     renderLog(`All frames captured in ${formatDuration(frameElapsed)}; starting H.264 video encoding`);
@@ -381,6 +392,7 @@ try {
         [
           '-y',
           '-i', output,
+          ...(selectedUnit ? ['-ss', String(Number(selectedUnit.audio_start_sample || 0) / Number(runManifest.sample_rate || 24000)), '-t', String(duration)] : []),
           '-i', audio,
           '-map', '0:v:0',
           '-map', '1:a:0',

@@ -468,11 +468,14 @@ def _batch_prompt(
     chapter_by_id = {chapter["scene_id"]: chapter for chapter in _timeline_units(manifest)}
     chapters = [chapter_by_id[chapter_id] for chapter_id in batch["chapter_ids"]]
     markers = "\n".join(f"=== {chapter['scene_id']}.tsx ===" for chapter in chapters)
+    canvas = manifest.get("canvas") or {"width": 1920, "height": 1080}
+    width, height = int(canvas.get("width", 1920)), int(canvas.get("height", 1080))
+    safe_x, safe_y = int(width * 0.45), int(height * 0.23)
     user = (
         "OUTPUT MARKERS\nReturn these markers in this exact order, each followed by its complete TSX file:\n"
-        f"{markers}\n\nFIXED VISUAL THEME\nCanvas 1920x1080; background #07111f; panel #0e1d31; text #eaf3ff; muted #91a8c5; "
+        f"{markers}\n\nFIXED VISUAL THEME\nCanvas {width}x{height}; background #07111f; panel #0e1d31; text #eaf3ff; muted #91a8c5; "
         "cyan #46d9ff; amber #ffc857; coral #ff6b6b; minimum important text 30px. Motion Canvas origin is the CENTER at (0,0), "
-        "visible x=-960..960 and y=-540..540; keep complete important content inside x=-860..860 and y=-440..440. Do not use browser/top-left coordinates.\n\n"
+        f"visible x={-width//2}..{width//2} and y={-height//2}..{height//2}; keep complete important content inside x={-safe_x}..{safe_x} and y={-safe_y}..{safe_y}. Do not use browser/top-left coordinates.\n\n"
         f"APPROVED API\n{approved}\n\nFIXED CONTINUOUS REEL DATA\n{json.dumps(chapters, ensure_ascii=False, separators=(',', ':'))}\n\n"
         "Each reel is one continuous visual scene on the master audio timeline. Its beats are edit markers, not scene boundaries. "
         "Use the supplied reel-local word times and evolve a persistent composition across beats. "

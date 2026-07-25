@@ -6,11 +6,11 @@ from typing import Any
 
 CONTENT_PRODUCT = "topic-reel-pack"
 RENDER_PROFILE = "portrait-short-v1"
-DEFAULT_REEL_COUNT = 12
+DEFAULT_REEL_COUNT = 5
 MIN_REEL_COUNT = 1
 MAX_REEL_COUNT = 24
 MIN_DURATION_SECONDS = 20.0
-DEFAULT_DURATION_SECONDS = 45.0
+DEFAULT_DURATION_SECONDS = 35.0
 MAX_DURATION_SECONDS = 75.0
 REEL_ID_RE = re.compile(r"^reel_(\d{3})$")
 
@@ -33,6 +33,7 @@ PACK_STATES = {
 REEL_STATES = {
     "planned",
     "scripted",
+    "rejected",
     "audio_ready",
     "timed",
     "visual_ready",
@@ -158,14 +159,16 @@ def validate_script(raw: dict[str, Any], *, brief: dict[str, Any]) -> dict[str, 
     lowered = narration.lower()
     if any(phrase in lowered for phrase in forbidden):
         raise ValueError(f"{reel} depends on another Reel and is not standalone")
+    # Narration length is a soft production target, not a schema gate. Natural
+    # wording can run longer or shorter than the target; generated audio and
+    # derived timing are the source of truth for the final Reel duration.
     word_count = len(narration.split())
-    if word_count < 45 or word_count > 185:
-        raise ValueError(f"{reel} narration must contain 45-185 words; received {word_count}")
     return {
         "reel_id": reel,
         "title": str(raw.get("title") or brief["working_title"]).strip(),
         "hook": str(raw.get("hook") or brief["hook"]).strip(),
         "narration": narration,
+        "narration_word_count": word_count,
         "closing_line": str(raw.get("closing_line") or "").strip(),
         "visual_direction": str(raw.get("visual_direction") or brief["visual_concept"]).strip(),
         "fact_ids": brief["fact_ids"],

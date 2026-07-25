@@ -705,7 +705,20 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
     if target_step >= 5:
         _invalidate_motion_preview(run_id)
     meta = _load_meta(run_id)
-    meta.update({"status": "rendering" if mode == "render" else "running", "error": None})
+    active_step = None
+    if "--from-step" in command:
+        try:
+            active_step = int(command[command.index("--from-step") + 1])
+        except (ValueError, IndexError):
+            active_step = None
+    meta.update({
+        "status": "rendering" if mode == "render" else "running",
+        "error": None,
+        "process_started_at": _now(),
+        "process_mode": mode,
+        "process_target_step": target_step,
+        "process_active_step": active_step,
+    })
     _save_meta(meta)
     _append_log(run_id, f"Starting {mode}: {' '.join(command[:3])} …")
     if mode == "generation" and target_step >= 5 and env.get("MAV_MOTION_CANVAS_BATCH_PROVIDER"):
@@ -748,15 +761,27 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
                     latest["status"] = "rendered" if mode == "render" else "completed"
                     latest["current_step"] = max(int(latest.get("current_step", 0)), target_step)
                     latest["error"] = None
+                    latest.pop("process_started_at", None)
+                    latest.pop("process_mode", None)
+                    latest.pop("process_target_step", None)
+                    latest.pop("process_active_step", None)
                     _append_log(run_id, f"{mode.title()} completed")
             else:
                 latest["status"] = "failed"
                 latest["error"] = f"{mode.title()} exited with code {return_code}"
+                latest.pop("process_started_at", None)
+                latest.pop("process_mode", None)
+                latest.pop("process_target_step", None)
+                latest.pop("process_active_step", None)
                 _append_log(run_id, latest["error"])
             _save_meta(latest)
         except Exception as exc:  # noqa: BLE001
             latest = _load_meta(run_id)
             latest.update({"status": "failed", "error": str(exc)})
+            latest.pop("process_started_at", None)
+            latest.pop("process_mode", None)
+            latest.pop("process_target_step", None)
+            latest.pop("process_active_step", None)
             _save_meta(latest)
             _append_log(run_id, f"Failed: {exc}")
         finally:

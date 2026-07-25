@@ -14,6 +14,8 @@ from .common import (
     PROMPT_ROOT,
     RENDER_PROFILE,
     RUNTIME_ROOT,
+    active_narration,
+    active_reels,
     extract_marked_source,
     load_pack,
     read_json,
@@ -106,51 +108,34 @@ def generate_visual_sources(
     model_call: Any = call_model_text,
 ) -> dict[str, Any]:
     pack = load_pack(run_path)
-    system = (PROMPT_ROOT / "reel_visual.system.txt").read_text(encoding="utf-8")
-    errors = []
-    for record in pack["reels"]:
-        parent_id = record["reel_id"]
-        if target_reel_id and parent_id != require_reel_id(target_reel_id):
-            continue
-        child, manifest = prepare_child(run_path, record, force=force)
-        unit = list(manifest.get("reels") or manifest.get("chapters") or [])[0]
-        source_path = motion_pipeline._unit_path(child / "motion_canvas", str(unit["scene_id"]), ".tsx", manifest)
-        if source_path.exists() and not force:
-            record["status"] = "visual_ready"
-            continue
-        if not allow_model_call:
-            errors.append(f"{parent_id}: visual source cache missing and model calls are not authorized")
-            continue
-        try:
-            response = model_call(
-                task="motion_canvas_batch",
-                system=system,
-                user=visual_user_prompt(run_path, child, record, manifest),
-                max_tokens=64_000,
-            )
-            if not response:
-                raise RuntimeError("Visual coder returned no response")
-            write_text(child / "motion_canvas" / "responses" / "standalone-reel.txt", response)
-            source = extract_marked_source(response, INTERNAL_SCENE_ID)
-            source = motion_pipeline._normalize_chapter_source(source)
-            source = motion_pipeline._enforce_manifest_duration(source, unit)
-            motion_pipeline._validate_chapter_source(source, str(unit["scene_id"]))
-            motion_pipeline._validate_cue_references(child / "motion_canvas", source, str(unit["scene_id"]))
-            contract, warnings = extract_visual_contract(source, record["reel_id"])
-            if warnings or not contract:
-                raise RuntimeError("; ".join(warnings) or "MAV_VISUAL_CONTRACT is missing")
-            write_text(source_path, source)
-            motion_pipeline.assemble(child, manifest)
-            record["status"] = "visual_ready"
-        except Exception as exc:
-            record["status"] = "failed"
-            record["error"] = str(exc)
-            errors.append(f"{parent_id}: {exc}")
-    pack["status"] = "partial" if errors else "visuals_ready"
+    narration = active_narration(read_json(run_path / "narration.json", {}) or {}, pack)
+    if not narration:
+        raise RuntimeError("Shared Reel-pack narration.json is missing")
+    manifest_path = run_path / "motion_canvas" / "manifest.json"
+    manifest = (
+        read_json(manifest_path, {}) or {}
+        if manifest_path.exists() and not force
+        else motion_pipeline.prepare(run_path, narration, batch_size=int(pack.get("visual_batch_size", 2)))
+    )
+    manifest.update({"content_product": CONTENT_PRODUCT, "standalone": True, "render_profile": RENDER_PROFILE, "canvas": CANVAS})
+    write_json_file(manifest_path, manifest)
+    report = motion_pipeline.generate(
+        run_path,
+        manifest,
+        allow_model_call=allow_model_call,
+        force=force,
+        workers=max(1, min(int(pack.get("workers", 2)), 3)),
+        model_call=model_call,
+        target_chapter_id=target_reel_id,
+    )
+    failed = {str(item.get("id")) for item in report.get("failures", [])}
+    for record in active_reels(pack):
+        record["status"] = "failed" if record["reel_id"] in failed else "visual_ready"
+    pack["status"] = "partial" if failed else "visuals_ready"
     pack["current_step"] = max(int(pack.get("current_step", 4)), 5)
     save_pack(run_path, pack)
-    if errors:
-        raise RuntimeError("; ".join(errors))
+    if failed:
+        raise RuntimeError("; ".join(str(item) for item in report.get("failures", [])))
     return pack
 
 
@@ -190,42 +175,28 @@ def npm(child: Path, manifest: dict[str, Any], script: str, timeout: int) -> dic
 
 def validate_visuals(run_path: Path, *, target_reel_id: str | None = None) -> dict[str, Any]:
     pack = load_pack(run_path)
-    errors = []
-    for record in pack["reels"]:
-        parent_id = record["reel_id"]
-        if target_reel_id and parent_id != require_reel_id(target_reel_id):
-            continue
-        child = reel_path(run_path, parent_id)
-        manifest = read_json(child / "motion_canvas" / "manifest.json", {}) or {}
-        try:
-            motion_pipeline.assemble(child, manifest)
-            motion_pipeline._sync_runtime(child)
-            checks = []
-            for script, timeout in (("typecheck", 240), ("build", 240), ("reel-pack-preview", 900)):
-                report = npm(child, manifest, script, timeout)
-                checks.append(report)
-                if report["returncode"] != 0:
-                    raise RuntimeError(f"npm run {script} failed:\n{report['stderr'] or report['stdout']}")
-            validation = read_json(child / "motion_canvas" / "validation.json", {}) or {}
-            if validation.get("status") != "passed":
-                raise RuntimeError(f"Portrait preview validation failed: {validation}")
-            write_json_file(child / "validation-report.json", {
-                "status": "passed",
-                "canvas": manifest.get("canvas"),
-                "checks": checks,
-                "preview": "motion_canvas/preview/contact-sheet.png",
-            })
+    manifest = read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
+    if not manifest:
+        raise RuntimeError("Shared Motion Canvas manifest is missing")
+    try:
+        validation = motion_pipeline.validate_and_assemble(run_path, manifest, allow_model_repair=False, max_model_repairs=0)
+    except Exception as exc:
+        if target_reel_id:
+            for record in pack["reels"]:
+                if record["reel_id"] == require_reel_id(target_reel_id):
+                    record["status"] = "failed"
+                    record["error"] = str(exc)
+        pack["status"] = "partial"
+        save_pack(run_path, pack)
+        raise
+    for record in active_reels(pack):
+        if not target_reel_id or record["reel_id"] == require_reel_id(target_reel_id):
             record["status"] = "visual_ready"
             record.pop("error", None)
-        except Exception as exc:
-            record["status"] = "failed"
-            record["error"] = str(exc)
-            errors.append(f"{parent_id}: {exc}")
-    pack["status"] = "partial" if errors else "visuals_ready"
+    pack["status"] = "visuals_ready"
     pack["current_step"] = max(int(pack.get("current_step", 5)), 6)
+    write_json_file(run_path / "validation-report.json", validation)
     save_pack(run_path, pack)
-    if errors:
-        raise RuntimeError("; ".join(errors))
     return pack
 
 
@@ -280,17 +251,11 @@ def render_pack(run_path: Path, *, target_reel_id: str | None = None, render_all
             continue
         if not render_all and record.get("status") not in {"approved", "rendered"}:
             continue
-        child = reel_path(run_path, parent_id)
-        manifest = read_json(child / "motion_canvas" / "manifest.json", {}) or {}
         try:
-            motion_pipeline.assemble(child, manifest)
-            motion_pipeline._sync_runtime(child)
-            report = npm(child, manifest, "reel-pack-render", 3_600)
-            if report["returncode"] != 0:
-                raise RuntimeError(report["stderr"] or report["stdout"])
-            final = child / "motion_canvas" / "final.mp4"
+            from mav_render import render_reel_mp4
+            final = render_reel_mp4(run_path.name, parent_id)
             if not final.exists():
-                raise RuntimeError("Portrait renderer did not produce final.mp4")
+                raise RuntimeError(f"Portrait renderer did not produce {parent_id}.mp4")
             record["status"] = "rendered"
             record["output"] = str(final.relative_to(run_path))
         except Exception as exc:
@@ -298,7 +263,8 @@ def render_pack(run_path: Path, *, target_reel_id: str | None = None, render_all
             record["error"] = str(exc)
             errors.append(f"{parent_id}: {exc}")
     rendered = sum(item.get("status") == "rendered" for item in pack["reels"])
-    pack["status"] = "complete" if rendered == len(pack["reels"]) else "partial" if errors else "approved"
+    active_count = sum(item.get("status") != "rejected" for item in pack["reels"])
+    pack["status"] = "complete" if rendered == active_count else "partial" if errors else "approved"
     pack["current_step"] = max(int(pack.get("current_step", 7)), 8)
     save_pack(run_path, pack)
     if errors:

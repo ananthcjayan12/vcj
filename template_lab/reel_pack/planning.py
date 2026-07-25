@@ -8,6 +8,8 @@ from typing import Any
 from .common import (
     DEFAULT_DURATION_SECONDS,
     PROMPT_ROOT,
+    active_narration,
+    active_reels,
     extract_json,
     facts_for_brief,
     load_pack,
@@ -86,11 +88,14 @@ def write_scripts(
     input_payload = read_json(run_path / "input.json", {}) or {}
     pack = load_pack(run_path)
     system = (PROMPT_ROOT / "reel_script.system.txt").read_text(encoding="utf-8")
+    all_paragraphs: list[dict[str, Any]] = []
     for batch_number, batch in enumerate(_script_batches(pack["reels"]), start=1):
-        missing = [
-            brief for brief in batch
-            if force or not (reel_path(run_path, brief["reel_id"]) / "script.json").exists()
-        ]
+        cached_ids = {
+            str(item.get("id"))
+            for item in (read_json(run_path / "narration.json", {}) or {}).get("paragraphs", [])
+            if isinstance(item, dict)
+        }
+        missing = [brief for brief in batch if force or brief["reel_id"] not in cached_ids]
         if not missing:
             continue
         if not allow_model_call:
@@ -114,36 +119,51 @@ def write_scripts(
             if parent_id not in raw_by_id:
                 raise RuntimeError(f"Script response omitted {parent_id}")
             script = validate_script(raw_by_id[parent_id], brief=brief)
-            child = reel_path(run_path, parent_id)
-            child.mkdir(parents=True, exist_ok=True)
-            child_input = {
-                **input_payload,
-                "run_id": f"{input_payload['run_id']}--{parent_id}",
-                "parent_pack_run_id": input_payload["run_id"],
-                "parent_reel_id": parent_id,
-                "objective_ids": brief["objective_ids"],
-                "facts": facts_for_brief(input_payload, brief),
-                "target_duration_seconds": script["target_duration_seconds"],
-                "content_product": "topic-reel-pack",
-                "standalone": True,
-            }
-            narration = {
-                "version": "1.0",
+            paragraph = {
+                "id": parent_id,
+                "reel_id": parent_id,
                 "title": script["title"],
-                "paragraphs": [{
-                    "id": "standalone_reel",
-                    "text": script["narration"],
-                    "claim_ids": brief["fact_ids"],
-                }],
-                "elevenlabs_narration": script["narration"],
+                "text": script["narration"],
+                "claim_ids": brief["fact_ids"],
+                "objective_ids": brief["objective_ids"],
+                "hook": script.get("hook") or brief["hook"],
+                "retention_device": script.get("retention_device", ""),
+                "open_loop": script.get("open_loop", ""),
+                "learning_payoff": brief["learning_payoff"],
+                "visual_concept": script.get("visual_direction") or brief["visual_concept"],
+                "target_duration_seconds": script["target_duration_seconds"],
             }
-            write_json_file(child / "input.json", child_input)
-            write_json_file(child / "brief.json", brief)
-            write_json_file(child / "script.json", script)
-            write_json_file(child / "narration.json", narration)
-            write_text(child / "narration.txt", script["narration"])
-            write_text(child / "narration_elevenlabs.txt", script["narration"])
-            brief["status"] = "scripted"
+            all_paragraphs.append(paragraph)
+            record = next(item for item in pack["reels"] if item["reel_id"] == parent_id)
+            record.update({**brief, **script, "status": "scripted", "path": "."})
+    if not all_paragraphs:
+        all_paragraphs = [
+            {
+                "id": record["reel_id"],
+                "reel_id": record["reel_id"],
+                "title": record.get("title") or record.get("working_title", record["reel_id"]),
+                "text": record.get("narration", ""),
+                "claim_ids": record.get("fact_ids", []),
+                "objective_ids": record.get("objective_ids", []),
+                "hook": record.get("hook", ""),
+                "learning_payoff": record.get("learning_payoff", ""),
+                "visual_concept": record.get("visual_concept", ""),
+                "target_duration_seconds": record.get("target_duration_seconds", DEFAULT_DURATION_SECONDS),
+            }
+            for record in pack["reels"] if record.get("narration")
+        ]
+    if all_paragraphs:
+        ordered = [next(item for item in all_paragraphs if item["id"] == record["reel_id"]) for record in pack["reels"] if any(item["id"] == record["reel_id"] for item in all_paragraphs)]
+        narration = {
+            "version": "2.0",
+            "title": pack.get("topic", "Independent Reels"),
+            "content_product": "topic-reel-pack",
+            "paragraphs": ordered,
+            "elevenlabs_narration": " ".join(item["text"] for item in ordered),
+        }
+        write_json_file(run_path / "narration.json", narration)
+        write_text(run_path / "narration.txt", "\n\n".join(item["text"] for item in ordered))
+        write_text(run_path / "narration_elevenlabs.txt", narration["elevenlabs_narration"])
     pack["status"] = "scripts_ready"
     pack["current_step"] = max(int(pack.get("current_step", 2)), 2)
     return save_pack(run_path, pack)
@@ -160,38 +180,37 @@ def generate_pack_audio(
     pack = load_pack(run_path)
     input_payload = read_json(run_path / "input.json", {}) or {}
     selected = [
-        record for record in pack["reels"]
+        record for record in active_reels(pack)
         if target_reel_id is None or record["reel_id"] == require_reel_id(target_reel_id)
     ]
 
     def generate_one(record: dict[str, Any]):
         parent_id = record["reel_id"]
-        child = reel_path(run_path, parent_id)
-        if (child / "audio_generation.json").exists() and not force:
+        if (run_path / "audio_generation.json").exists() and not force:
             return parent_id, "audio_ready", None
         try:
-            narration = read_json(child / "narration.json", {}) or {}
-            script = read_json(child / "script.json", {}) or {}
+            narration = active_narration(read_json(run_path / "narration.json", {}) or {}, pack)
             generate_audio(
-                child,
+                run_path,
                 narration,
-                target_duration=float(script.get("target_duration_seconds") or DEFAULT_DURATION_SECONDS),
+                target_duration=float(input_payload.get("target_duration_seconds") or DEFAULT_DURATION_SECONDS),
                 audio_provider=audio_provider or input_payload.get("audio_provider", "gemini"),
             )
             return parent_id, "audio_ready", None
         except Exception as exc:
             return parent_id, "failed", str(exc)
 
-    with ThreadPoolExecutor(max_workers=max(1, min(int(workers), 3))) as executor:
-        results = [future.result() for future in as_completed(
-            [executor.submit(generate_one, record) for record in selected]
-        )]
+    # Audio is one concatenated master file with one independent chapter chunk
+    # per Reel. Generate it once; the chunk manifest preserves per-Reel ranges.
+    results = [generate_one(selected[0])] if selected else []
     errors = []
     by_id = {item["reel_id"]: item for item in pack["reels"]}
     for parent_id, status, error in results:
-        by_id[parent_id]["status"] = status
+        for item in selected:
+            by_id[item["reel_id"]]["status"] = status
         if error:
-            by_id[parent_id]["error"] = error
+            for item in selected:
+                by_id[item["reel_id"]]["error"] = error
             errors.append(f"{parent_id}: {error}")
     pack["status"] = "partial" if errors else "audio_ready"
     pack["current_step"] = max(int(pack.get("current_step", 2)), 3)
@@ -209,19 +228,19 @@ def derive_pack_timing(
 ) -> dict[str, Any]:
     pack = load_pack(run_path)
     errors = []
-    for record in pack["reels"]:
+    narration = active_narration(read_json(run_path / "narration.json", {}) or {}, pack)
+    for record in active_reels(pack):
         parent_id = record["reel_id"]
         if target_reel_id and parent_id != require_reel_id(target_reel_id):
             continue
-        child = reel_path(run_path, parent_id)
-        if (child / "audio_timing.json").exists() and (child / "audio_word_timestamps.json").exists() and not force:
+        if (run_path / "audio_timing.json").exists() and (run_path / "audio_word_timestamps.json").exists() and not force:
             record["status"] = "timed"
             continue
         try:
-            narration = read_json(child / "narration.json", {}) or {}
-            audio = read_json(child / "audio_generation.json", {}) or {}
-            fallback = float(audio.get("audio_duration_seconds") or audio.get("estimated_duration_seconds") or DEFAULT_DURATION_SECONDS)
-            derive_timing(child, narration, fallback_duration=fallback)
+            narration = active_narration(read_json(run_path / "narration.json", {}) or {}, pack)
+            audio = read_json(run_path / "audio_generation.json", {}) or {}
+            fallback = float(audio.get("audio_duration_seconds") or audio.get("estimated_duration_seconds") or DEFAULT_DURATION_SECONDS * len(pack["reels"]))
+            derive_timing(run_path, narration, fallback_duration=fallback)
             record["status"] = "timed"
         except Exception as exc:
             record["status"] = "failed"

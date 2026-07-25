@@ -35,35 +35,26 @@ def capture_pack_evidence(run_path: Path, pack: dict[str, Any]) -> tuple[dict[st
     evidence_root.mkdir(parents=True, exist_ok=True)
     aggregate = {"version": "1.0", "reels": [], "contact_sheets": []}
     images: list[Path] = []
-    for record in pack["reels"]:
-        parent_id = record["reel_id"]
-        if record.get("status") not in {"visual_ready", "approved", "repaired_pending_review", "flagged"}:
-            continue
-        child = reel_path(run_path, parent_id)
-        manifest = read_json(child / "motion_canvas" / "manifest.json", {}) or {}
-        motion_pipeline.assemble(child, manifest)
-        motion_pipeline._sync_runtime(child)
-        output = evidence_root / parent_id
-        output.mkdir(parents=True, exist_ok=True)
-        result = subprocess.run(
-            ["npm", "run", "reel-pack-evidence", "--", "--output", str(output)],
-            cwd=motion_pipeline.RUNTIME_ROOT,
-            env=runtime_env(child, manifest),
-            capture_output=True,
-            text=True,
-            timeout=900,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Evidence capture failed for {parent_id}: {(result.stderr or result.stdout)[-12_000:]}"
-            )
-        evidence = read_json(output / "evidence.json", {}) or {}
-        aggregate["reels"].extend(evidence.get("reels", []))
-        for name in evidence.get("contact_sheets", []):
-            image = output / name
-            if image.exists():
-                images.append(image)
-                aggregate["contact_sheets"].append(str(image.relative_to(run_path)))
+    manifest = read_json(run_path / "motion_canvas" / "manifest.json", {}) or {}
+    motion_pipeline.assemble(run_path, manifest)
+    motion_pipeline._sync_runtime(run_path)
+    result = subprocess.run(
+        ["npm", "run", "lesson-evidence", "--", "--output", str(evidence_root)],
+        cwd=motion_pipeline.RUNTIME_ROOT,
+        env=runtime_env(run_path, manifest),
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Evidence capture failed: {(result.stderr or result.stdout)[-12_000:]}")
+    evidence = read_json(evidence_root / "evidence.json", {}) or {}
+    aggregate["reels"].extend(evidence.get("reels", []))
+    for name in evidence.get("contact_sheets", []):
+        image = evidence_root / name
+        if image.exists():
+            images.append(image)
+            aggregate["contact_sheets"].append(str(image.relative_to(run_path)))
     write_json_file(review_root / "evidence.json", aggregate)
     if not images:
         raise RuntimeError("No completed Reel evidence was available for screening")
@@ -77,10 +68,9 @@ def screening_context(run_path: Path, pack: dict[str, Any], evidence: dict[str, 
     for evidence_reel in evidence.get("reels", []):
         parent_id = str(evidence_reel.get("reel_id"))
         record = record_by_id.get(parent_id, {})
-        child = reel_path(run_path, parent_id)
-        source_path = child / "motion_canvas" / "reels" / "reel_001.tsx"
+        source_path = run_path / "motion_canvas" / "reels" / f"{parent_id}.tsx"
         if not source_path.exists():
-            source_path = child / "motion_canvas" / "chapters" / "reel_001.tsx"
+            source_path = run_path / "motion_canvas" / "chapters" / f"{parent_id}.tsx"
         source = source_path.read_text(encoding="utf-8") if source_path.exists() else ""
         contract, _ = extract_visual_contract(source, parent_id)
         reels.append({
@@ -138,6 +128,8 @@ def screen_pack(
         by_reel.setdefault(finding["reel_id"], []).append(finding)
     repairs = []
     for record in pack["reels"]:
+        if record.get("status") == "rejected":
+            continue
         parent_id = record["reel_id"]
         if parent_id not in by_reel:
             if record.get("status") == "visual_ready":
@@ -145,6 +137,8 @@ def screen_pack(
             continue
         record["status"] = "flagged"
         if not allow_repairs:
+            continue
+        if not (run_path / "motion_canvas" / "reels" / f"{parent_id}.tsx").exists():
             continue
         try:
             repair_visual(run_path, record, by_reel[parent_id])
@@ -186,14 +180,46 @@ def approve_reel(run_path: Path, parent_reel_id: str) -> dict[str, Any]:
         raise ValueError(f"Unknown Reel: {target}")
     if record.get("status") not in {"visual_ready", "repaired_pending_review", "flagged"}:
         raise ValueError(f"{target} cannot be approved from status {record.get('status')}")
-    preview = reel_path(run_path, target) / "motion_canvas" / "preview" / "contact-sheet.png"
+    preview = run_path / "motion_canvas" / "preview" / "contact-sheet.png"
     if not preview.exists():
         raise ValueError(f"{target} preview evidence is missing")
     record["status"] = "approved"
     record["approved_at"] = now()
     pack["status"] = (
         "approved"
-        if all(item.get("status") in {"approved", "rendered"} for item in pack["reels"])
+        if all(item.get("status") in {"approved", "rendered", "rejected"} for item in pack["reels"])
         else "needs_review"
     )
+    return save_pack(run_path, pack)
+
+
+def reject_reel(run_path: Path, parent_reel_id: str, reason: str = "") -> dict[str, Any]:
+    pack = load_pack(run_path)
+    target = require_reel_id(parent_reel_id)
+    record = next((item for item in pack["reels"] if item["reel_id"] == target), None)
+    if record is None:
+        raise ValueError(f"Unknown Reel: {target}")
+    if record.get("status") not in {"planned", "scripted"}:
+        raise ValueError(f"{target} can only be rejected after scripting and before audio generation")
+    record["status"] = "rejected"
+    record["rejected_at"] = now()
+    record["rejection_reason"] = str(reason or "Rejected during script review").strip()
+    pack["status"] = "partial"
+    return save_pack(run_path, pack)
+
+
+def restore_reel(run_path: Path, parent_reel_id: str) -> dict[str, Any]:
+    pack = load_pack(run_path)
+    target = require_reel_id(parent_reel_id)
+    record = next((item for item in pack["reels"] if item["reel_id"] == target), None)
+    if record is None:
+        raise ValueError(f"Unknown Reel: {target}")
+    if record.get("status") != "rejected":
+        raise ValueError(f"{target} is not rejected")
+    if int(pack.get("current_step") or 1) > 2:
+        raise ValueError("Rejected Reels can only be restored before downstream audio generation starts")
+    record["status"] = "scripted" if record.get("narration") else "planned"
+    record.pop("rejected_at", None)
+    record.pop("rejection_reason", None)
+    pack["status"] = "scripts_ready" if record.get("narration") else "planned"
     return save_pack(run_path, pack)

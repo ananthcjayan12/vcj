@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from reel_pack.pipeline import CONTENT_PRODUCT, create_pack, load_pack
+from reel_pack.pipeline import CONTENT_PRODUCT, create_pack, load_pack, reject_reel, restore_reel
+from reel_pack.common import active_narration
 from reel_pack.schema import validate_plan, validate_script
 
 
@@ -51,13 +52,16 @@ def test_script_must_be_standalone():
         "target_duration_seconds": 45,
     }
     assert validate_script(valid, brief=brief)["status"] == "scripted"
+    long_narration = dict(valid)
+    long_narration["narration"] = " ".join(["physics"] * 216)
+    assert validate_script(long_narration, brief=brief)["narration_word_count"] == 216
     invalid = dict(valid)
     invalid["narration"] = "In the previous Reel " + " ".join(["physics"] * 70)
     with pytest.raises(ValueError, match="not standalone"):
         validate_script(invalid, brief=brief)
 
 
-def test_create_pack_is_additive_and_defaults_to_twelve(tmp_path, monkeypatch):
+def test_create_pack_is_shared_root_run_and_defaults_to_five(tmp_path, monkeypatch):
     from reel_pack import common
 
     monkeypatch.setattr(common, "RUNS_ROOT", tmp_path)
@@ -73,15 +77,15 @@ def test_create_pack_is_additive_and_defaults_to_twelve(tmp_path, monkeypatch):
     assert pack["content_product"] == CONTENT_PRODUCT
     assert pack["render_profile"] == "portrait-short-v1"
     assert pack["canvas"] == {"width": 1080, "height": 1920, "fps": 30}
-    assert len(pack["reels"]) == 12
+    assert len(pack["reels"]) == 5
     assert [item["reel_id"] for item in pack["reels"]] == [
-        f"reel_{index:03d}" for index in range(1, 13)
+        f"reel_{index:03d}" for index in range(1, 6)
     ]
     assert not (tmp_path / "physics-1-5-3-reels-v01" / "motion_canvas").exists()
     assert load_pack(tmp_path / "physics-1-5-3-reels-v01")["status"] == "created"
 
 
-def test_pack_manifest_is_independent_per_child(tmp_path, monkeypatch):
+def test_pack_manifest_uses_one_shared_root(tmp_path, monkeypatch):
     from reel_pack import common
 
     monkeypatch.setattr(common, "RUNS_ROOT", tmp_path)
@@ -96,8 +100,33 @@ def test_pack_manifest_is_independent_per_child(tmp_path, monkeypatch):
         reel_count=3,
     )
     paths = [item["path"] for item in pack["reels"]]
-    assert paths == ["reels/reel_001", "reels/reel_002", "reels/reel_003"]
-    assert len(set(paths)) == 3
+    assert paths == [".", ".", "."]
+
+
+def test_reel_can_be_rejected_after_script_review_and_restored(tmp_path, monkeypatch):
+    from reel_pack import common
+
+    monkeypatch.setattr(common, "RUNS_ROOT", tmp_path)
+    create_pack(
+        run_id="reject-v01",
+        topic="Motion",
+        topic_ref="1.2",
+        objective_ids=[],
+        facts=[],
+        physics_context={},
+        tone="precise",
+        reel_count=2,
+    )
+    run_path = tmp_path / "reject-v01"
+    pack = load_pack(run_path)
+    pack["reels"][0].update({"status": "scripted", "narration": "A standalone explanation."})
+    common.save_pack(run_path, pack)
+    rejected = reject_reel(run_path, "reel_001", "Not catchy enough")
+    assert rejected["reels"][0]["status"] == "rejected"
+    assert rejected["reels"][0]["rejection_reason"] == "Not catchy enough"
+    assert [item["id"] for item in active_narration({"paragraphs": [{"id": "reel_001"}, {"id": "reel_002"}]}, rejected)["paragraphs"]] == ["reel_002"]
+    restored = restore_reel(run_path, "reel_001")
+    assert restored["reels"][0]["status"] == "scripted"
 
 
 def test_runtime_package_keeps_long_form_commands():
