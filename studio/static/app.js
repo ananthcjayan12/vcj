@@ -20,9 +20,9 @@ const percent = (value, total) => total ? Math.round((Number(value) / Number(tot
 const formatNumber = value => Number(value || 0).toLocaleString();
 const formatUsd = value => { const number = Number(value || 0); return number >= 1 ? `$${number.toFixed(2)}` : `$${number.toFixed(4)}`; };
 const activeStatuses = new Set(["running", "rendering"]);
-const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Visual reels", "Compile & QA", "Review", "Approval"];
+const motionCanvasSteps = ["Inputs", "Narration", "Voiceover", "Word timing", "Visual reels", "Compile & QA", "Review", "Approval", "YouTube assets"];
 const stepsForRun = () => motionCanvasSteps;
-const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen"]);
+const visibleModelTasks = new Set(["script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen", "youtube_metadata"]);
 const FULL_LESSON_PRODUCT = "full-lesson";
 const REEL_PACK_PRODUCT = "topic-reel-pack";
 
@@ -377,16 +377,17 @@ function renderPipeline() {
         <button class="secondary-button" id="run-next" ${working || completed >= 8 ? "disabled" : ""}>Run next</button>
         <button class="primary-button" id="run-all" ${working ? "disabled" : ""}>Run to QA</button>
         <button class="secondary-button" id="render-button" ${working || completed < 7 ? "disabled" : ""}>Render MP4</button>
+        <button class="secondary-button" id="youtube-assets-button" ${working || completed < 8 ? "disabled" : ""}>Create YouTube assets</button>
       </div>
     </div>
     <div class="stepper">${steps.map((name, index) => {
       const number = index + 1;
-      return `<button class="step${completed >= number ? " is-done" : ""}${working && completed + 1 === number ? " is-current" : ""}" data-step="${number}" ${working ? "disabled" : ""}><span>${completed >= number ? "✓" : number}</span><b>${name}</b></button>`;
+      return `<button class="step${completed >= number ? " is-done" : ""}${working && completed + 1 === number ? " is-current" : ""}" data-step="${number}" ${working || number === 9 ? "disabled" : ""}><span>${completed >= number ? "✓" : number}</span><b>${name}</b></button>`;
     }).join("")}</div>
     <div class="run-workspace">
       <div class="preview-shell"><div class="preview-toolbar"><span>LIVE MOTION CANVAS · PRE-RENDER VIDEO + SYNCHRONIZED VOICEOVER</span>${artifacts.preview_url ? `<a href="${escapeHtml(artifacts.preview_url)}" target="_blank" rel="noreferrer">OPEN EDITOR ↗</a>` : "LOCAL EDITOR PREVIEW"}</div>${artifacts.preview_url ? `<iframe class="preview-frame editor-preview" src="${escapeHtml(artifacts.preview_url)}" title="Motion Canvas lesson preview" allow="autoplay"></iframe>` : `<div class="preview-placeholder preview-launch"><span>Start the live Motion Canvas player to review animation and voiceover immediately. Rendering is not required.</span><button class="primary-button start-preview" ${working || completed < 6 ? "disabled" : ""}>Start live preview</button></div>`}</div>
       <div class="run-side">
-        <div class="run-control-card"><h3>Run or regenerate a stage</h3><div class="step-control"><select id="step-select">${steps.map((name,index) => `<option value="${index+1}">${index+1}. ${name}</option>`).join("")}</select><button class="secondary-button" id="run-step" ${working ? "disabled" : ""}>Run selected step</button><button class="danger-button" id="regenerate-step" ${working ? "disabled" : ""}>Regenerate from step</button></div><label class="paid-check" style="margin-top:9px"><input type="checkbox" id="run-paid-confirm" checked disabled> Paid model and voice APIs authorized</label><p class="control-help">Regenerate removes the selected stage and every downstream artifact before starting that stage again.</p></div>
+        <div class="run-control-card"><h3>Run or regenerate a stage</h3><div class="step-control"><select id="step-select">${steps.slice(0, 8).map((name,index) => `<option value="${index+1}">${index+1}. ${name}</option>`).join("")}</select><button class="secondary-button" id="run-step" ${working ? "disabled" : ""}>Run selected step</button><button class="danger-button" id="regenerate-step" ${working ? "disabled" : ""}>Regenerate from step</button></div><label class="paid-check" style="margin-top:9px"><input type="checkbox" id="run-paid-confirm" checked disabled> Paid model and voice APIs authorized</label><p class="control-help">Regenerate removes the selected stage and every downstream artifact before starting that stage again.</p></div>
         <div class="run-control-card"><h3>Optional AI visual review</h3><p class="control-help">Runs separately after technical Compile & QA. It captures fresh evidence, screens it with the selected reviewer model, and can regenerate only flagged reels.</p><label class="paid-check" style="margin:9px 0"><input type="checkbox" id="lesson-review-auto-repair" checked> Automatically regenerate flagged reels</label><button class="primary-button" id="run-lesson-review" ${working || completed < 6 ? "disabled" : ""}>Run optional AI visual review</button></div>
         <div class="run-control-card"><h3>Generated artifacts</h3>${artifacts.validation_preview_url ? `<a class="validation-evidence-link" href="${escapeHtml(artifacts.validation_preview_url)}" target="_blank" rel="noreferrer">Open deterministic contact sheet ↗</a>` : ""}<div class="artifact-list">${artifacts.files?.length ? artifacts.files.map(path => `<a href="${artifactUrl(run.id, path)}" target="_blank" title="${escapeHtml(path)}"><span>${escapeHtml(artifactLabel(path))}</span><small>${escapeHtml(path)}</small><b>OPEN ↗</b></a>`).join("") : `<p class="artifact-empty">Artifacts appear after each completed stage.</p>`}</div></div>
         <pre class="log-box" id="run-log">Loading logs…</pre>
@@ -704,6 +705,18 @@ document.addEventListener("click", async event => {
   }
   if (event.target.closest("#render-button")) {
     try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/render`, { method: "POST", body: JSON.stringify({ quality: "high", fps: 30, workers: 1 }) }); state.activeRun = response.run; renderPipeline(); await refreshRuns(); toast("High-quality MP4 added to the render queue. Existing frames will be resumed when available."); } catch (error) { showError(error); }
+    return;
+  }
+  if (event.target.closest("#youtube-assets-button")) {
+    const button = event.target.closest("button");
+    setBusy(button, true, "Creating YouTube assets…");
+    try {
+      const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/youtube-assets`, {
+        method: "POST", body: JSON.stringify({ task_models: collectTaskModels() })
+      });
+      state.activeRun = response.run; renderPipeline();
+      toast("YouTube title, description, metadata, and Gemini thumbnail generation started.");
+    } catch (error) { showError(error); setBusy(button, false); }
     return;
   }
   if (event.target.closest(".start-preview")) {

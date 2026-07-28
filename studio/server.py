@@ -129,9 +129,9 @@ def _run_dir(run_id: str) -> Path:
 def model_map_payload() -> dict[str, Any]:
     payload = _read_json(MODEL_MAP_PATH, {"tasks": {}}) or {"tasks": {}}
     tasks = []
-    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5, "motion_canvas_lesson_screen": 7}
-    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair", "motion_canvas_lesson_screen": "Optional AI visual reviewer"}
-    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen"}
+    step_by_task = {"script_structure": 2, "script_writing": 2, "audio_generation": 3, "scene_asset_shortlister": 5, "scene_asset_router": 5, "module_parameterizer": 5, "v3_creative_director": 5, "v3_scene_coder": 5, "direct_html_composer": 5, "direct_html_repair": 6, "direct_html_review": 8, "motion_canvas_batch": 5, "motion_canvas_repair": 5, "motion_canvas_lesson_screen": 7, "youtube_metadata": 9}
+    labels = {"script_structure": "Script structure", "script_writing": "Script writing", "audio_generation": "Voice generation", "scene_asset_shortlister": "Asset shortlister", "scene_asset_router": "Asset router", "module_parameterizer": "Module parameterizer", "v3_creative_director": "Creative director", "v3_scene_coder": "Scene coder", "direct_html_composer": "Direct HTML composer", "direct_html_repair": "Chapter repair", "direct_html_review": "Visual reviewer", "motion_canvas_batch": "Motion Canvas reel coder", "motion_canvas_repair": "Motion Canvas compile repair", "motion_canvas_lesson_screen": "Optional AI visual reviewer", "youtube_metadata": "YouTube metadata and thumbnail brief"}
+    retained_tasks = {"script_structure", "script_writing", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen", "youtube_metadata"}
     for task, config in payload.get("tasks", {}).items():
         if task not in retained_tasks:
             continue
@@ -524,7 +524,10 @@ def _artifact_snapshot(run_id: str) -> dict[str, Any]:
         "motion_canvas/scenes.ts", "motion_canvas/validation.json",
         "motion_canvas/robot-report.json", "motion_canvas/preview/contact-sheet.png",
         "motion_canvas/lesson-review.json",
-        "motion_canvas/final.mp4",
+        "motion_canvas/final.mp4", "youtube/metadata.json", "youtube/copy-paste.txt",
+        "youtube/title.txt", "youtube/description.txt", "youtube/tags.txt",
+        "youtube/hashtags.txt", "youtube/pinned-comment.txt", "youtube/chapters.txt",
+        "youtube/upload-checklist.txt", "youtube/thumbnail.jpg",
     ):
         if (run_path / relative).exists():
             files.append(relative)
@@ -760,7 +763,7 @@ def _start_process(run_id: str, command: list[str], env: dict[str, str], *, mode
                     latest["error"] = f"Motion Canvas chapters are partial ({len(failures)} batch failures). Resume step 5."
                     _append_log(run_id, latest["error"])
                 else:
-                    latest["status"] = "rendered" if mode == "render" else "completed"
+                    latest["status"] = "rendered" if mode in {"render", "youtube_assets"} else "completed"
                     latest["current_step"] = max(int(latest.get("current_step", 0)), target_step)
                     latest["error"] = None
                     latest.pop("process_started_at", None)
@@ -887,6 +890,18 @@ def _read_render_queue() -> dict[str, Any]:
 def render_queue_payload() -> dict[str, Any]:
     with _render_queue_lock:
         payload = _read_render_queue()
+    # Queue state and process output are requested together by the Studio UI.
+    # Include a bounded log tail for active entries so a retry cannot look
+    # stalled merely because a second client-side request races or fails.
+    for entry in payload["entries"]:
+        if entry.get("status") != "running":
+            continue
+        log_path = _log_path(str(entry.get("run_id") or ""))
+        try:
+            entry["live_log"] = log_path.read_text(encoding="utf-8")[-80_000:] if log_path.exists() else ""
+        except OSError:
+            # The render itself must never be affected by a transient log read.
+            entry["live_log"] = ""
     payload["summary"] = dict(Counter(str(item.get("status")) for item in payload["entries"]))
     return payload
 
@@ -1072,6 +1087,21 @@ def enqueue_render_runs(run_ids: list[str], payload: dict[str, Any]) -> dict[str
 def render_run(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     enqueue_render_runs([run_id], payload)
     return run_detail(run_id)
+
+
+def generate_youtube_assets(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Start Stage 9 after the lesson MP4 is available."""
+    meta = _load_meta(run_id)
+    if not (_run_dir(run_id) / "motion_canvas" / "final.mp4").is_file():
+        raise RuntimeError("Render the MP4 before generating YouTube publishing assets")
+    if "task_models" in payload:
+        meta.setdefault("settings", {})["task_models"] = _validate_task_models(payload.get("task_models"))
+        _save_meta(meta)
+    # Reuse the established task-model environment builder so the saved
+    # Gemini/Codex/Grok selection for youtube_metadata reaches the CLI.
+    _, env = build_generation_command(meta, {"from_step": 1, "stop_after_step": 1, "confirm_paid_api": True})
+    command = [PYTHON_EXECUTABLE, str(TEMPLATE_LAB_ROOT / "scripts" / "mav_youtube_assets.py"), "--run-id", run_id]
+    return _start_process(run_id, command, env, mode="youtube_assets", target_step=9)
 
 
 def regenerate_motion_chapter(run_id: str, chapter_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1558,6 +1588,9 @@ class StudioHandler(BaseHTTPRequestHandler):
             match = re.fullmatch(r"/api/runs/([^/]+)/render", path)
             if match:
                 return self._json({"run": render_run(match.group(1), body)}, 202)
+            match = re.fullmatch(r"/api/runs/([^/]+)/youtube-assets", path)
+            if match:
+                return self._json({"run": generate_youtube_assets(match.group(1), body)}, 202)
             match = re.fullmatch(r"/api/runs/([^/]+)/preview", path)
             if match:
                 result = start_motion_preview(match.group(1))

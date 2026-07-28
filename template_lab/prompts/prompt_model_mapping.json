@@ -209,6 +209,25 @@
       "provider_env_var": "MAV_DIRECT_HTML_REVIEW_PROVIDER",
       "env_var": "MAV_DIRECT_HTML_REVIEW_MODEL",
       "prompt_files": ["direct_html_review.system.txt", "direct_html_design_system.txt"]
+    },
+    "youtube_metadata": {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash",
+      "provider_models": {
+        "gemini": "gemini-3.5-flash",
+        "codex": "gpt-5.6-sol",
+        "grok": "grok-4.5"
+      },
+      "provider_model_options": {
+        "gemini": ["gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+        "codex": ["gpt-5.6-sol", "gpt-5.6-terra"],
+        "grok": ["grok-4.5"]
+      },
+      "max_tokens": 8000,
+      "timeout_seconds": 1200,
+      "provider_env_var": "MAV_YOUTUBE_METADATA_PROVIDER",
+      "env_var": "MAV_YOUTUBE_METADATA_MODEL",
+      "prompt_files": ["youtube_metadata.system.txt", "youtube_copy_reference.txt"]
     }
   }
 }

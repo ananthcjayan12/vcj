@@ -1,0 +1,187 @@
+Recommended title
+
+Energy Stores & Transfers Explained: Where Does Falling Energy Go? | IGCSE Physics
+
+Alternative titles
+
+Search-led:
+IGCSE Physics: Energy Stores, Transfers, Kinetic Energy & GPE
+
+Curiosity-led:
+A Falling Ball Speeds Up—Where Does the Extra Motion Come From?
+
+Best thumbnail concept
+WHERE DOES THE ENERGY GO?
+
+Visual:
+
+A ball shown at two heights
+Top: stationary, high gravitational potential energy
+Bottom: fast-moving, high kinetic energy
+One clean downward motion path
+Subtle GPE ↓ and KE ↑
+Your official IGCSE Visualised logo
+No crowded list of energy stores or multiple equations
+Ready-to-paste description
+A falling ball speeds up even though nothing is pushing it harder—so where does that extra motion come from?
+
+In this IGCSE Physics lesson, you will learn how energy moves between stores, how energy is transferred, and how to calculate kinetic and gravitational potential energy.
+
+By the end of this lesson, you will understand:
+
+• The principle of conservation of energy
+• Why energy is transferred rather than created or destroyed
+• The main energy stores used in physics
+• Kinetic energy
+• Gravitational potential energy
+• Chemical energy
+• Elastic energy
+• Nuclear energy
+• Electrostatic energy
+• Internal or thermal energy
+• The four main energy-transfer pathways
+• Mechanical work
+• Electrical work
+• Heating
+• Energy transfer by waves
+• How to interpret simple energy-flow diagrams
+• How to calculate kinetic energy using Ek = ½mv²
+• Why doubling speed quadruples kinetic energy
+• How to calculate changes in gravitational potential energy using ΔEp = mgΔh
+• Why friction does not destroy energy
+• How to read Sankey diagrams
+• How arrow width represents energy transfer
+• How useful and wasted energy appear in real systems
+
+Worked examples include:
+
+1. Calculating the kinetic energy of a 2 kg object moving at 3 m/s
+2. Comparing kinetic-energy gain with gravitational-potential-energy loss
+3. Describing energy transfers in a kettle
+4. Comparing GPE and KE when a motor lifts a moving load
+5. Reading useful and wasted transfers from a Sankey diagram
+
+🧠 Try this challenge:
+
+A 4 kg object falls through a height of 5 m.
+
+Take g = 10 N/kg.
+
+1. How much gravitational potential energy does it lose?
+2. If all of that energy becomes kinetic energy, what is its kinetic energy just before impact?
+
+Write your answer in the comments.
+
+📘 Complete IGCSE Physics course:
+[ADD PLAYLIST LINK]
+
+▶ Previous lesson — Momentum:
+[ADD PREVIOUS VIDEO LINK]
+
+▶ Next lesson — Work, Energy Resources and Power:
+[ADD NEXT VIDEO LINK]
+
+Subscribe to IGCSE Visualised for animated IGCSE Physics lessons, worked examples, exam-style questions and visual revision.
+
+See it. Understand it. Solve it.
+
+This is an independent educational channel and is not affiliated with or endorsed by Cambridge International Education.
+
+#IGCSEPhysics #EnergyTransfers #ConservationOfEnergy
+Tags
+IGCSE Physics
+energy stores
+energy transfers
+conservation of energy
+energy stores and transfers
+kinetic energy
+gravitational potential energy
+GPE
+kinetic energy formula
+Ek equals half mv squared
+half mv squared
+gravitational potential energy formula
+mgh
+delta Ep equals mg delta h
+energy transfer pathways
+mechanical work
+electrical work
+heating energy transfer
+waves transfer energy
+energy flow diagram
+Sankey diagram
+useful energy
+wasted energy
+thermal energy
+internal energy
+friction energy transfer
+falling ball energy
+Cambridge IGCSE Physics
+GCSE energy
+IGCSE Physics revision
+IGCSE Visualised
+IGCSE Visualized
+Hashtags
+#IGCSEPhysics #EnergyTransfers #ConservationOfEnergy
+Pinned comment
+⚡ ENERGY CHALLENGE:
+
+A 4 kg object falls through a height of 5 m.
+
+Take g = 10 N/kg.
+
+1️⃣ How much gravitational potential energy does it lose?
+
+2️⃣ If all of that energy becomes kinetic energy, what is its kinetic energy just before impact?
+
+A) 20 J
+B) 50 J
+C) 200 J
+D) 400 J
+
+Comment your answer and explain your reasoning 👇
+
+Bonus question:
+
+If air resistance is present, where does some of the energy go?
+Chapter template
+00:00 Where does the extra motion come from?
+00:00 Conservation of energy
+00:00 GPE changes into kinetic energy
+00:00 The main energy stores
+00:00 Energy-transfer pathways
+00:00 Energy-flow diagrams
+00:00 Kinetic-energy equation
+00:00 Calculating kinetic energy
+00:00 Gravitational-potential-energy equation
+00:00 Comparing GPE loss and KE gain
+00:00 Friction and thermal energy
+00:00 Closed systems
+00:00 Reading Sankey diagrams
+00:00 Energy transfers in a kettle
+00:00 Motor-lifting example
+00:00 Final recap
+
+Replace the repeated timestamps with the exact times from the final rendered video.
+
+Filename
+igcse-physics-energy-stores-transfers-kinetic-gpe-sankey.mp4
+Playlist placement
+
+Add this video to:
+
+IGCSE Physics — Complete Animated Course
+Motion, Forces and Energy
+Energy Stores, Transfers and Conservation
+Upload settings
+Audience: No, it’s not made for kids
+Category: Education
+Language: English
+Licence: Standard YouTube Licence
+Comments: On
+Allow embedding: Yes
+Publish to subscriptions: Yes
+Captions: Upload corrected English subtitles
+Automatic chapters: Off if manual chapters are added
+Remixing: Allow
+Paid promotion: No, unless applicable
