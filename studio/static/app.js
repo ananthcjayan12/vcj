@@ -377,6 +377,7 @@ function renderPipeline() {
         <button class="secondary-button" id="run-next" ${working || completed >= 8 ? "disabled" : ""}>Run next</button>
         <button class="primary-button" id="run-all" ${working ? "disabled" : ""}>Run to QA</button>
         <button class="secondary-button" id="render-button" ${working || completed < 7 ? "disabled" : ""}>Render MP4</button>
+        <button class="danger-button" id="force-render-button" ${working || completed < 7 ? "disabled" : ""}>Force re-render</button>
         <button class="secondary-button" id="youtube-assets-button" ${working || completed < 8 ? "disabled" : ""}>Create YouTube assets</button>
       </div>
     </div>
@@ -615,18 +616,20 @@ document.addEventListener("click", async event => {
   const runOpen = event.target.closest(".run-open"); if (runOpen) return selectRun(runOpen.dataset.run);
   if (event.target.closest("#refresh-button")) return boot();
   if (event.target.closest("#runs-refresh")) return refreshRuns();
-  if (event.target.closest("#queue-selected-renders")) {
+  const selectedRenderButton = event.target.closest("#queue-selected-renders, #force-queue-selected-renders");
+  if (selectedRenderButton) {
     const runIds = $$(".render-run-select:checked").map(input => input.value);
     if (!runIds.length) return showError(new Error("Select at least one completed run to render."));
+    const force = selectedRenderButton.id === "force-queue-selected-renders";
     try {
       const response = await request("/api/render-queue", {
         method: "POST",
-        body: JSON.stringify({run_ids: runIds, quality: "high", fps: 30, workers: 1})
+        body: JSON.stringify({run_ids: runIds, quality: "high", fps: 30, workers: 1, force})
       });
       state.renderQueue = await hydrateRenderQueueLogs(response.queue);
       renderRuns();
       manageQueuePolling();
-      toast(`${runIds.length} run${runIds.length === 1 ? "" : "s"} added to the MP4 render queue.`);
+      toast(`${runIds.length} run${runIds.length === 1 ? "" : "s"} added to the MP4 render queue${force ? " from frame 0" : ""}.`);
     } catch (error) { showError(error); }
     return;
   }
@@ -703,8 +706,10 @@ document.addEventListener("click", async event => {
     } catch (error) { showError(error); setBusy(button, false); }
     return;
   }
-  if (event.target.closest("#render-button")) {
-    try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/render`, { method: "POST", body: JSON.stringify({ quality: "high", fps: 30, workers: 1 }) }); state.activeRun = response.run; renderPipeline(); await refreshRuns(); toast("High-quality MP4 added to the render queue. Existing frames will be resumed when available."); } catch (error) { showError(error); }
+  const renderButton = event.target.closest("#render-button, #force-render-button");
+  if (renderButton) {
+    const force = renderButton.id === "force-render-button";
+    try { const response = await request(`/api/runs/${encodeURIComponent(state.activeRunId)}/render`, { method: "POST", body: JSON.stringify({ quality: "high", fps: 30, workers: 1, force }) }); state.activeRun = response.run; renderPipeline(); await refreshRuns(); toast(force ? "Force re-render queued. Saved frames will be cleared and rendering will restart from frame 0." : "High-quality MP4 added to the render queue. Existing frames will be resumed when available."); } catch (error) { showError(error); }
     return;
   }
   if (event.target.closest("#youtube-assets-button")) {

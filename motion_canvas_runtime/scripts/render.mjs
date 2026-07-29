@@ -215,11 +215,54 @@ try {
     );
   }
 
-  const canvas = await page.$('#robot-canvas');
-  if (!canvas) throw new Error('Motion Canvas render surface was not found.');
+  const initialCanvas = await page.$('#robot-canvas');
+  if (!initialCanvas) throw new Error('Motion Canvas render surface was not found.');
+  await initialCanvas.dispose();
+
+  const transientCaptureError = error => {
+    const message = String(error?.message || error);
+    return message.includes('Execution context was destroyed') ||
+      message.includes('Cannot find context with specified id') ||
+      message.includes('Node is detached from document') ||
+      message.includes('Navigating frame was detached') ||
+      message.includes('Session closed');
+  };
+
   const capture = async (time, target) => {
-    await page.evaluate(at => window.MotionCanvasRobot.seek(at), selectedUnit ? startTime + time : time);
-    await canvas.screenshot({path: target, type: 'png'});
+    const seekTime = selectedUnit ? startTime + time : time;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      let liveCanvas;
+      try {
+        await page.waitForFunction(
+          () => window.__motionCanvasRobotReady === true,
+          {timeout: 120000},
+        );
+        await page.evaluate(at => window.MotionCanvasRobot.seek(at), seekTime);
+        liveCanvas = await page.$('#robot-canvas');
+        if (!liveCanvas) throw new Error('Motion Canvas render surface was not found.');
+        await liveCanvas.screenshot({path: target, type: 'png'});
+        return;
+      } catch (error) {
+        fs.rmSync(target, {force: true});
+        if (!transientCaptureError(error) || attempt === 4 || page.isClosed()) throw error;
+        renderLog(
+          `Render host reloaded while capturing ${time.toFixed(3)}s; ` +
+          `recovering frame (attempt ${attempt + 1}/4)`,
+        );
+        await new Promise(resolve => setTimeout(resolve, 250));
+      } finally {
+        if (liveCanvas) await liveCanvas.dispose().catch(() => {});
+      }
+    }
+  };
+
+  const refreshRenderHost = async frame => {
+    renderLog(`Refreshing the render host at frame ${frame.toLocaleString()} to keep the browser session stable`);
+    await page.reload({waitUntil: 'networkidle0', timeout: 60000});
+    await page.waitForFunction(
+      () => window.__motionCanvasRobotReady === true,
+      {timeout: 120000},
+    );
   };
 
   if (previewMode) {
@@ -329,6 +372,13 @@ try {
     }
 
     for (let frame = resumeFrame; frame <= frameCount; frame++) {
+      // Long lessons previously kept one Motion Canvas/Chrome document alive
+      // for 30-50 minutes. Chrome eventually closed the target after thousands
+      // of seeks. A periodic document refresh releases accumulated scene and
+      // canvas state without affecting the deterministic frame checkpoint.
+      if (frame > resumeFrame && frame % 1500 === 0) {
+        await refreshRenderHost(frame);
+      }
       const target = framePath(frame);
       const temporary = path.join(FRAME_ROOT, `.${String(frame).padStart(6, '0')}.tmp-${process.pid}.png`);
       await capture(frame / fps, temporary);

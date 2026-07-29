@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from pathlib import Path
 
-from studio.server import _artifact_snapshot, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, approve_motion_lesson_review, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, start_motion_lesson_review, topic_detail, update_run_models
+from studio.server import _artifact_snapshot, _finish_external_render, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, approve_motion_lesson_review, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, start_motion_lesson_review, topic_detail, update_run_models
 
 
 class StudioPayloadTest(unittest.TestCase):
@@ -44,6 +44,41 @@ class StudioPayloadTest(unittest.TestCase):
             )
         self.assertEqual([item["run_id"] for item in queue["entries"]], ["physics-1-1-v01", "physics-1-2-v01"])
         self.assertTrue(all(item["status"] == "queued" for item in queue["entries"]))
+        self.assertTrue(all(item["settings"]["force"] is False for item in queue["entries"]))
+
+    def test_force_render_setting_is_saved_for_selected_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "studio.server.RENDER_QUEUE_PATH", Path(directory) / "render_queue.json"
+        ), patch(
+            "studio.server._load_meta",
+            return_value={"id": "physics-1-7-1-v01", "topic": "Energy", "current_step": 7},
+        ), patch("studio.server._ensure_render_queue_worker"):
+            queue = enqueue_render_runs(
+                ["physics-1-7-1-v01"],
+                {"quality": "high", "fps": 30, "workers": 1, "force": True},
+            )
+        self.assertTrue(queue["entries"][0]["settings"]["force"])
+
+    def test_stopped_external_render_is_paused_instead_of_requeued(self) -> None:
+        updates = {}
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "studio.server.RUNS_ROOT", Path(directory)
+        ), patch(
+            "studio.server._pid_is_alive", return_value=False
+        ), patch(
+            "studio.server._load_meta", return_value={"id": "physics-1-7-2-v01", "status": "stopped"}
+        ), patch(
+            "studio.server._read_render_queue",
+            return_value={"version": 1, "entries": [{"id": "entry", "report_mtime_before": 0}]},
+        ), patch(
+            "studio.server._set_queue_entry",
+            side_effect=lambda _entry_id, **values: updates.update(values),
+        ), patch("studio.server._ensure_render_queue_worker"):
+            run_path = Path(directory) / "physics-1-7-2-v01"
+            run_path.mkdir()
+            _finish_external_render("entry", "physics-1-7-2-v01", 12345)
+        self.assertEqual(updates["status"], "paused")
+        self.assertEqual(updates["error"], "Stopped by user; requeue to resume")
 
     def test_byte_ranges_support_open_ended_and_suffix_requests(self) -> None:
         self.assertEqual(_parse_byte_range("bytes=10-19", 100), (10, 19))

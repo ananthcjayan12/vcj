@@ -5,6 +5,7 @@ import json
 import mimetypes
 import os
 import re
+import signal
 import shutil
 import socket
 import sqlite3
@@ -867,7 +868,14 @@ def _render_settings(payload: dict[str, Any]) -> dict[str, Any]:
     workers = int(payload.get("workers", 1))
     if quality not in RENDER_QUALITIES or fps not in {24, 25, 30, 50, 60} or not 1 <= workers <= 8:
         raise ValueError("Invalid render settings")
-    return {"quality": quality, "fps": fps, "workers": workers}
+    return {"quality": quality, "fps": fps, "workers": workers, "force": bool(payload.get("force", False))}
+
+
+def _clear_render_checkpoint(run_id: str) -> None:
+    """Discard resumable frame state while preserving the last completed MP4."""
+    motion_root = _run_dir(run_id) / "motion_canvas"
+    shutil.rmtree(motion_root / "frames", ignore_errors=True)
+    (motion_root / "render-checkpoint.json").unlink(missing_ok=True)
 
 
 def _render_command(run_id: str, settings: dict[str, Any]) -> list[str]:
@@ -943,15 +951,17 @@ def _finish_external_render(entry_id: str, run_id: str, pid: int) -> None:
             report and output.is_file() and report_path.exists()
             and report_path.stat().st_mtime_ns > previous_report_mtime
         )
+        meta = _load_meta(run_id)
+        stopped = meta.get("status") == "stopped"
         _set_queue_entry(
             entry_id,
-            status="completed" if completed else "queued",
-            finished_at=_now() if completed else None,
+            status="completed" if completed else "paused" if stopped else "queued",
+            finished_at=_now() if completed or stopped else None,
             pid=None,
-            error=None if completed else "Renderer stopped before completion; queued for checkpoint resume",
+            error=None if completed else "Stopped by user; requeue to resume" if stopped
+            else "Renderer stopped before completion; queued for checkpoint resume",
         )
         if completed:
-            meta = _load_meta(run_id)
             meta.update({"status": "rendered", "current_step": max(int(meta.get("current_step", 0)), 8), "error": None})
             _save_meta(meta)
     finally:
@@ -981,6 +991,9 @@ def _render_queue_worker() -> None:
                 meta = _load_meta(run_id)
                 meta.update({"status": "rendering", "error": None})
                 _save_meta(meta)
+                if entry["settings"].get("force"):
+                    _clear_render_checkpoint(run_id)
+                    _append_log(run_id, "Force re-render requested; discarded saved frames and restarting from frame 0")
                 _append_log(run_id, f"Starting queued render: {' '.join(command[:3])} …")
                 report_path = _run_dir(run_id) / "render_report.json"
                 _set_queue_entry(
@@ -989,7 +1002,7 @@ def _render_queue_worker() -> None:
                 )
                 process = subprocess.Popen(
                     command, cwd=REPO_ROOT, env=os.environ.copy(), stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT, text=True, bufsize=1,
+                    stderr=subprocess.STDOUT, text=True, bufsize=1, start_new_session=True,
                 )
                 with _process_lock:
                     _processes[run_id] = process
@@ -1306,7 +1319,16 @@ def stop_run(run_id: str) -> dict[str, Any]:
     with _process_lock:
         process = _processes.get(run_id)
         if process and process.poll() is None:
-            process.terminate()
+            # Render workers own npm, Node, Vite and Chrome descendants. New
+            # workers run in their own process group so Stop terminates the
+            # whole pipeline instead of leaving an orphan renderer blocking
+            # the queue. Fall back safely for older in-flight workers that
+            # share Studio's process group.
+            process_group = os.getpgid(process.pid)
+            if process_group == process.pid:
+                os.killpg(process_group, signal.SIGTERM)
+            else:
+                process.terminate()
     meta.update({"status": "stopped", "error": None})
     with _render_queue_lock:
         queue = _read_render_queue()

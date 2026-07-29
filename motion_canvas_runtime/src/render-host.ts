@@ -11,6 +11,11 @@ const FPS = 30;
 const env = (import.meta as any).env ?? {};
 const WIDTH = Number(env.VITE_MAV_CANVAS_WIDTH || 1920);
 const HEIGHT = Number(env.VITE_MAV_CANVAS_HEIGHT || 1080);
+// The Motion Canvas editor is the visual source of truth. Automatic
+// choreography mutates actor positions after a seek, which made exported
+// frames differ from the editor preview. Keep that repair pass available for
+// explicit diagnostics, but never enable it implicitly during normal renders.
+const ENABLE_RENDER_RESTAGING = env.VITE_MAV_ENABLE_RENDER_RESTAGING === 'true';
 const SIZE = new Vector2(WIDTH, HEIGHT);
 const PORTRAIT_SAFE = {
   left: -WIDTH / 2 + 64,
@@ -57,25 +62,28 @@ async function seek(timeSeconds: number) {
   await playback.reset();
   await playback.seek(frame);
   const activeScene = playback.currentScene as any;
-  try {
-    const run = () => choreographScene(
-      activeScene,
-      frame,
-      HEIGHT > WIDTH ? PORTRAIT_SAFE : undefined,
-    );
-    lastChoreography = typeof activeScene.execute === 'function'
-      ? activeScene.execute(run)
-      : run();
-  } catch (error) {
-    lastChoreography = {
-      frame,
-      scene: String(activeScene?.name || 'unknown'),
-      actors: 0,
-      labels: 0,
-      corrections: [],
-      unresolved: [],
-      errors: [String(error)],
-    } as KineticFrameReport;
+  lastChoreography = null;
+  if (ENABLE_RENDER_RESTAGING) {
+    try {
+      const run = () => choreographScene(
+        activeScene,
+        frame,
+        HEIGHT > WIDTH ? PORTRAIT_SAFE : undefined,
+      );
+      lastChoreography = typeof activeScene.execute === 'function'
+        ? activeScene.execute(run)
+        : run();
+    } catch (error) {
+      lastChoreography = {
+        frame,
+        scene: String(activeScene?.name || 'unknown'),
+        actors: 0,
+        labels: 0,
+        corrections: [],
+        unresolved: [],
+        errors: [String(error)],
+      } as KineticFrameReport;
+    }
   }
   await stage.render(playback.currentScene, playback.previousScene);
   return {frame, durationFrames: playback.duration, choreography: lastChoreography};
