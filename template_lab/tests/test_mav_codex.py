@@ -29,6 +29,12 @@ class CodexDiscoveryTest(unittest.TestCase):
         self.assertIn('key={`mapped-0-${String(index)}`}', normalized)
         self.assertIn('key={`mapped-1-${String(index)}`}', normalized)
 
+    def test_unsupported_circle_blur_is_removed_mechanically(self) -> None:
+        normalized = _normalize_chapter_source(
+            "<Circle x={20} fill={'#fff'} blur={28} /><Rect blur={12} />"
+        )
+        self.assertEqual(normalized, "<Circle x={20} fill={'#fff'} /><Rect blur={12} />")
+
     def test_numeric_cue_property_is_rejected_if_not_normalized(self) -> None:
         source = "import x from '../../presentation'; import './chapter_11.cues'; makeScene2D(); const x = CUES.148[0];"
         with self.assertRaisesRegex(RuntimeError, "invalid numeric cue access"):
@@ -49,6 +55,14 @@ class CodexDiscoveryTest(unittest.TestCase):
         source = "import x from '../../presentation'; import './chapter_01.cues'; makeScene2D(); <TwoColumnComparison leftTitle={'Mass'} rightTitle={'Weight'} />"
         with self.assertRaisesRegex(RuntimeError, "left/right TextItem"):
             _validate_chapter_source(source, "chapter_01")
+
+    def test_raw_text_size_range_is_warning_only(self) -> None:
+        source = "import x from '../../presentation'; import './chapter_01.cues'; makeScene2D(); <Txt text='Mass' fontSize={44} />"
+        warnings = _validate_chapter_source(source, "chapter_01")
+        self.assertEqual(
+            warnings,
+            ["chapter_01 raw diagram-label fontSize values [44] are outside the preferred 26-32px range"],
+        )
 
     def test_codex_schema_is_strict_at_every_object_level(self) -> None:
         schema = {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}}, "required": ["items"]}

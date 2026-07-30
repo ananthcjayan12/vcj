@@ -151,8 +151,9 @@ def normalize_brief(raw: dict[str, Any], *, expected_id: str) -> dict[str, Any]:
     if len(set(beat_ids)) != len(beat_ids):
         raise ValueError(f"{expected_id} blueprint contains duplicate beat IDs")
     budget_total = sum(item["time_budget"] for item in beats)
+    validation_warnings: list[str] = []
     if budget_total > target_duration * 1.2:
-        raise ValueError(
+        validation_warnings.append(
             f"{expected_id} beat budgets total {budget_total:g}s, above the allowed target range"
         )
     return {
@@ -172,6 +173,7 @@ def normalize_brief(raw: dict[str, Any], *, expected_id: str) -> dict[str, Any]:
         "continuity_entity": _required_text(raw, "continuity_entity"),
         "visual_thesis": _required_text(raw, "visual_thesis", fallback=visual),
         "beats": beats,
+        "validation_warnings": validation_warnings,
         "independent": True,
         "status": "planned",
     }
@@ -220,14 +222,7 @@ def validate_script(raw: dict[str, Any], *, brief: dict[str, Any]) -> dict[str, 
     if any(phrase in lowered for phrase in forbidden):
         raise ValueError(f"{reel} depends on another Reel and is not standalone")
     target_duration = bounded_duration(raw.get("target_duration_seconds", brief["target_duration_seconds"]))
-    word_count = len(narration.split())
-    minimum_words = round(target_duration * 2.0)
-    maximum_words = round(target_duration * 2.7)
-    if not minimum_words <= word_count <= maximum_words:
-        raise ValueError(
-            f"{reel} has {word_count} words; expected {minimum_words}-{maximum_words} "
-            f"for a {target_duration:g}-second Reel"
-        )
+    validation_warnings = list(brief.get("validation_warnings") or [])
     raw_beats = raw.get("beats")
     if not isinstance(raw_beats, list):
         raise ValueError(f"{reel} script must contain a beats array")
@@ -245,7 +240,19 @@ def validate_script(raw: dict[str, Any], *, brief: dict[str, Any]) -> dict[str, 
         merged_beats.append({**blueprint, "spoken_text": spoken_text, "delivery": delivery})
     beat_narration = " ".join(item["spoken_text"] for item in merged_beats).strip()
     if " ".join(beat_narration.split()) != " ".join(narration.split()):
-        raise ValueError(f"{reel} narration must be the exact concatenation of beat spoken_text values")
+        validation_warnings.append(
+            f"{reel} narration differed from its beat spoken_text values; "
+            "the beat text was used as the canonical narration"
+        )
+        narration = beat_narration
+    word_count = len(narration.split())
+    minimum_words = round(target_duration * 2.0)
+    maximum_words = round(target_duration * 2.7)
+    if not minimum_words <= word_count <= maximum_words:
+        validation_warnings.append(
+            f"{reel} has {word_count} words; expected {minimum_words}-{maximum_words} "
+            f"for a {target_duration:g}-second Reel"
+        )
     return {
         "reel_id": reel,
         "title": str(raw.get("title") or brief["working_title"]).strip(),
@@ -258,6 +265,7 @@ def validate_script(raw: dict[str, Any], *, brief: dict[str, Any]) -> dict[str, 
         "fact_ids": brief["fact_ids"],
         "objective_ids": brief["objective_ids"],
         "target_duration_seconds": target_duration,
+        "validation_warnings": validation_warnings,
         "status": "scripted",
     }
 

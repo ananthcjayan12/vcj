@@ -43,7 +43,12 @@ function visualSourceFiles() {
 
 function renderFingerprint({fps, duration, frameCount, startFrame = 0, endFrame = frameCount}) {
   const hash = crypto.createHash('sha256');
-  hash.update(JSON.stringify({version: 2, fps, duration, frameCount, startFrame, endFrame, selectedUnitId}));
+  const identity = {version: 2, fps, duration, frameCount, startFrame, endFrame, selectedUnitId};
+  // Full long-form render fingerprints intentionally remain unchanged.
+  // Selected Reel renders must invalidate landscape checkpoints when their
+  // portrait surface dimensions differ.
+  if (selectedUnitId) identity.canvas = {width: canvasWidth, height: canvasHeight};
+  hash.update(JSON.stringify(identity));
   for (const file of visualSourceFiles()) {
     hash.update(path.relative(ROOT, file));
     hash.update(fs.readFileSync(file));
@@ -218,6 +223,34 @@ try {
   const initialCanvas = await page.$('#robot-canvas');
   if (!initialCanvas) throw new Error('Motion Canvas render surface was not found.');
   await initialCanvas.dispose();
+  if (selectedUnit) {
+    const surface = await page.evaluate(({width, height}) => {
+      const canvas = document.querySelector('#robot-canvas');
+      if (!(canvas instanceof HTMLCanvasElement)) return null;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        displayWidth: Math.round(bounds.width),
+        displayHeight: Math.round(bounds.height),
+        bufferWidth: canvas.width,
+        bufferHeight: canvas.height,
+      };
+    }, {width: canvasWidth, height: canvasHeight});
+    if (
+      !surface ||
+      surface.displayWidth !== canvasWidth ||
+      surface.displayHeight !== canvasHeight ||
+      surface.bufferWidth !== canvasWidth ||
+      surface.bufferHeight !== canvasHeight
+    ) {
+      throw new Error(
+        `Selected Reel render surface mismatch: ${JSON.stringify(surface)}, ` +
+        `expected ${canvasWidth}x${canvasHeight}`,
+      );
+    }
+    renderLog(`Selected Reel render surface locked to ${canvasWidth}×${canvasHeight}`);
+  }
 
   const transientCaptureError = error => {
     const message = String(error?.message || error);

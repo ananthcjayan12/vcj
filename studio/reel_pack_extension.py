@@ -8,14 +8,15 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from template_lab.reel_pack.common import create_pack, load_pack, read_json, reel_path
+from template_lab.reel_pack.common import create_pack, load_pack, read_json, reel_path, save_pack
 from template_lab.reel_pack.pipeline import approve_reel, reject_reel, restore_reel
-from template_lab.reel_pack.schema import CONTENT_PRODUCT, require_reel_id
+from template_lab.reel_pack.schema import CONTENT_PRODUCT, bounded_reel_count, reel_id, require_reel_id
 
 FULL_LESSON_PRODUCT = "full-lesson"
 _INSTALLED = False
@@ -208,6 +209,7 @@ def install(server: Any) -> None:
     original_artifact_snapshot = server._artifact_snapshot
     original_create_run = server.create_run
     original_build_generation_command = server.build_generation_command
+    original_reset_run_from_step = server.reset_run_from_step
     original_do_post = server.StudioHandler.do_POST
 
     def infer_step(run_path: Path) -> int:
@@ -264,6 +266,138 @@ def install(server: Any) -> None:
         if _is_pack_path(server._run_dir(run_id)):
             return _pack_artifacts(server, run_id)
         return original_artifact_snapshot(run_id)
+
+    def reset_run_from_step(run_id: str, step: int) -> dict[str, Any]:
+        run_path = server._run_dir(run_id)
+        if not _is_pack_path(run_path):
+            return original_reset_run_from_step(run_id, step)
+        if step not in range(1, 9):
+            raise ValueError("Reset step must be between 1 and 8")
+        if step == 1:
+            return original_reset_run_from_step(run_id, step)
+        with server._process_lock:
+            process = server._processes.get(run_id)
+            if process and process.poll() is None:
+                raise RuntimeError("Stop the active process before regenerating from a step")
+
+        def remove(relative: str) -> None:
+            path = run_path / relative
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink(missing_ok=True)
+
+        if step <= 2:
+            for relative in (
+                "pack_plan.json",
+                "narration.json",
+                "narration.txt",
+                "narration_elevenlabs.txt",
+                "responses",
+            ):
+                remove(relative)
+        if step <= 3:
+            for relative in (
+                "voiceover.mp3",
+                "voiceover.wav",
+                "audio_generation.json",
+                "audio_alignment.json",
+                "audio_chunks",
+            ):
+                remove(relative)
+        if step <= 4:
+            for relative in (
+                "audio_timing.json",
+                "audio_word_timestamps.json",
+                "beat_timing.json",
+            ):
+                remove(relative)
+        if step <= 5:
+            remove("motion_canvas")
+            remove("validation-report.json")
+        elif step <= 6:
+            for relative in (
+                "motion_canvas/validation.json",
+                "motion_canvas/robot-report.json",
+                "motion_canvas/preview",
+                "motion_canvas/frames",
+                "motion_canvas/renders",
+                "validation-report.json",
+            ):
+                remove(relative)
+        if step <= 7:
+            for relative in ("review", "pack-review.json"):
+                remove(relative)
+        if step <= 8:
+            for relative in (
+                "motion_canvas/renders",
+                "publishing_manifest.json",
+                "render_report.json",
+            ):
+                remove(relative)
+
+        pack = load_pack(run_path)
+        status_before_step = {
+            2: "planned",
+            3: "scripted",
+            4: "audio_ready",
+            5: "timed",
+            6: "visual_ready",
+            7: "visual_ready",
+            8: "approved",
+        }[step]
+        pack_status_before_step = {
+            2: "created",
+            3: "scripts_ready",
+            4: "audio_ready",
+            5: "timing_ready",
+            6: "visuals_ready",
+            7: "visuals_ready",
+            8: "approved",
+        }[step]
+        if step == 2:
+            input_payload = read_json(run_path / "input.json", {}) or {}
+            duration = float(input_payload.get("target_duration_seconds") or 35)
+            pack["reels"] = [
+                {
+                    "reel_id": record["reel_id"],
+                    "status": "planned",
+                    "target_duration_seconds": duration,
+                    "path": ".",
+                }
+                for record in pack.get("reels", [])
+            ]
+        else:
+            for record in pack.get("reels", []):
+                if record.get("status") == "rejected":
+                    continue
+                if step == 8:
+                    if record.get("status") == "rendered":
+                        record["status"] = "approved"
+                else:
+                    record["status"] = status_before_step
+                record.pop("error", None)
+                if step <= 7:
+                    record.pop("approved_at", None)
+                record.pop("rendered_at", None)
+        pack["status"] = pack_status_before_step
+        pack["current_step"] = step - 1
+        save_pack(run_path, pack)
+
+        meta = server._load_meta(run_id)
+        meta.update({
+            "status": "paused",
+            "current_step": step - 1,
+            "error": None,
+            "settings": {
+                **meta.get("settings", {}),
+                "confirm_paid_api": True,
+                "animation_mode": server.MOTION_CANVAS_MODE,
+            },
+        })
+        server._save_meta(meta)
+        server._append_log(run_id, f"Reset Reel pack from step {step}; downstream artifacts removed")
+        return server.run_detail(run_id)
 
     def create_run(payload: dict[str, Any]) -> dict[str, Any]:
         if str(payload.get("content_product") or FULL_LESSON_PRODUCT) != CONTENT_PRODUCT:
@@ -343,7 +477,7 @@ def install(server: Any) -> None:
         if not 1 <= from_step <= stop_after_step <= 8:
             raise ValueError("Reel-pack steps must satisfy 1 <= from <= stop <= 8")
         settings = {**meta.get("settings", {}), **request.get("settings", {})}
-        paid = any(step in {2, 3, 5, 7} for step in range(from_step, stop_after_step + 1))
+        paid = any(step in {2, 3, 5, 6, 7} for step in range(from_step, stop_after_step + 1))
         confirmed = bool(request.get("confirm_paid_api", settings.get("confirm_paid_api", False)))
         if paid and not confirmed:
             raise PermissionError("Reel-pack planning, audio, visual generation, and screening require paid-API confirmation")
@@ -390,9 +524,64 @@ def install(server: Any) -> None:
         env["MAV_RUN_ID"] = str(meta["id"])
         return command, env
 
+    def resize_pack(run_id: str, requested_count: Any) -> dict[str, Any]:
+        run_id = server._require_run_id(run_id)
+        run_path = server._run_dir(run_id)
+        meta = server._load_meta(run_id)
+        if not _is_pack_meta(meta, server):
+            raise ValueError("Run is not a Reel pack")
+        count = bounded_reel_count(requested_count)
+        with server._process_lock:
+            process = server._processes.get(run_id)
+            if process and process.poll() is None:
+                raise RuntimeError("Stop the active generation before changing the Reel count")
+        current_count = int((meta.get("settings") or {}).get("reel_count") or 0)
+        if current_count == count:
+            return server.run_detail(run_id)
+
+        input_payload = read_json(run_path / "input.json", {}) or {}
+        duration = float(
+            input_payload.get("target_duration_seconds")
+            or (meta.get("settings") or {}).get("duration")
+            or 35
+        )
+        input_payload["reel_count"] = count
+        server._write_json(run_path / "input.json", input_payload)
+
+        pack = load_pack(run_path)
+        pack["target_reel_count"] = count
+        pack["reels"] = [
+            {
+                "reel_id": reel_id(index),
+                "status": "planned",
+                "target_duration_seconds": duration,
+                "path": ".",
+            }
+            for index in range(1, count + 1)
+        ]
+        save_pack(run_path, pack)
+        meta["settings"] = {**meta.get("settings", {}), "reel_count": count}
+        server._save_meta(meta)
+
+        result = reset_run_from_step(run_id, 2)
+        server._append_log(
+            run_id,
+            f"Reel count changed from {current_count or 'unknown'} to {count}; "
+            "planning and downstream artifacts were reset",
+        )
+        return result
+
+    server._resize_reel_pack = resize_pack
+
     def do_post(self: Any) -> None:
         path = urlparse(self.path).path
         try:
+            match = re.fullmatch(r"/api/runs/([^/]+)/reel-pack/settings", path)
+            if match:
+                body = self._body()
+                return self._json({
+                    "run": resize_pack(match.group(1), body.get("reel_count")),
+                })
             match = re.fullmatch(r"/api/runs/([^/]+)/reel-pack/reels/([^/]+)/approve", path)
             if match:
                 run_id = server._require_run_id(match.group(1))
@@ -455,4 +644,5 @@ def install(server: Any) -> None:
     server._artifact_snapshot = artifact_snapshot
     server.create_run = create_run
     server.build_generation_command = build_generation_command
+    server.reset_run_from_step = reset_run_from_step
     server.StudioHandler.do_POST = do_post

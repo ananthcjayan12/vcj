@@ -169,6 +169,7 @@ def build_immutable_timeline(words_payload: dict[str, Any], audio_manifest: dict
     beats: list[dict[str, Any]] = []
     previous_frame = 0
     records = list(audio_manifest.get("chapters") or [])
+    used_reel_ids: set[str] = set()
     for reel_index, record in enumerate(records, start=1):
         reel_start = float(record["absolute_start"])
         reel_end = float(record["absolute_end"])
@@ -176,7 +177,11 @@ def build_immutable_timeline(words_payload: dict[str, Any], audio_manifest: dict
             word for word in all_words
             if float(word["start"]) < reel_end and float(word["end"]) > reel_start
         ]
-        reel_id = f"reel_{reel_index:03d}"
+        source_id = str(record.get("id") or "").strip()
+        reel_id = source_id if re.fullmatch(r"reel_\d{3}", source_id) and source_id not in used_reel_ids else f"reel_{reel_index:03d}"
+        while reel_id in used_reel_ids:
+            reel_id = f"reel_{len(used_reel_ids) + 1:03d}"
+        used_reel_ids.add(reel_id)
         is_final_reel = reel_index == len(records)
         reel_end_frame = math.ceil(reel_end * MOTION_CANVAS_FPS) if is_final_reel else round(reel_end * MOTION_CANVAS_FPS)
         reel_end_frame = max(previous_frame + 1, reel_end_frame)
@@ -226,8 +231,8 @@ def build_immutable_timeline(words_payload: dict[str, Any], audio_manifest: dict
             "id": reel_id,
             "scene_id": reel_id,
             "reel_id": reel_id,
-            "source_id": str(record["id"]),
-            "source_paragraph_id": str(record["id"]),
+            "source_id": source_id,
+            "source_paragraph_id": source_id,
             "audio_path": str(record.get("path") or ""),
             "audio_cache_key": str(record.get("cache_key") or ""),
             "absolute_start": reel_start,
@@ -465,6 +470,7 @@ def _batch_prompt(
     prompt_root = Path(__file__).with_name("prompts")
     system = (prompt_root / "batch.system.txt").read_text(encoding="utf-8")
     approved = (prompt_root / "approved-api.md").read_text(encoding="utf-8")
+    scaffold = (prompt_root / "scene-template.txt").read_text(encoding="utf-8")
     chapter_by_id = {chapter["scene_id"]: chapter for chapter in _timeline_units(manifest)}
     chapters = [chapter_by_id[chapter_id] for chapter_id in batch["chapter_ids"]]
     markers = "\n".join(f"=== {chapter['scene_id']}.tsx ===" for chapter in chapters)
@@ -476,7 +482,10 @@ def _batch_prompt(
         f"{markers}\n\nFIXED VISUAL THEME\nCanvas {width}x{height}; background #07111f; panel #0e1d31; text #eaf3ff; muted #91a8c5; "
         "cyan #46d9ff; amber #ffc857; coral #ff6b6b; minimum important text 30px. Motion Canvas origin is the CENTER at (0,0), "
         f"visible x={-width//2}..{width//2} and y={-height//2}..{height//2}; keep complete important content inside x={-safe_x}..{safe_x} and y={-safe_y}..{safe_y}. Do not use browser/top-left coordinates.\n\n"
-        f"APPROVED API\n{approved}\n\nFIXED CONTINUOUS REEL DATA\n{json.dumps(chapters, ensure_ascii=False, separators=(',', ':'))}\n\n"
+        f"APPROVED API\n{approved}\n\nMANDATORY SOURCE SCAFFOLD\n"
+        "Start every returned file from this exact import-ownership and scene-clock structure, "
+        "then adapt only the used components, exact cue filename, duration, and scene body:\n"
+        f"{scaffold}\n\nFIXED CONTINUOUS REEL DATA\n{json.dumps(chapters, ensure_ascii=False, separators=(',', ':'))}\n\n"
         "Each reel is one continuous visual scene on the master audio timeline. Its beats are edit markers, not scene boundaries. "
         "Use the supplied reel-local word times and evolve a persistent composition across beats. "
         "Set CHAPTER_DURATION to render_duration exactly. The sum of frame-aligned render durations is assembled locally; "
@@ -493,7 +502,8 @@ def _batch_prompt(
     return system, user
 
 
-def _validate_chapter_source(content: str, chapter_id: str) -> None:
+def _validate_chapter_source(content: str, chapter_id: str) -> list[str]:
+    warnings: list[str] = []
     if not content or "```" in content or "from 'http" in content or 'from "http' in content:
         raise RuntimeError(f"Unsafe or empty chapter: {chapter_id}")
     if "makeScene2D" in content:
@@ -518,14 +528,28 @@ def _validate_chapter_source(content: str, chapter_id: str) -> None:
                 raise RuntimeError(f"{chapter_id} uses raw Txt for prose: {raw_text!r}")
             if re.search(r"\\(?:text|frac|dfrac|sqrt|vec|mathbf|mathrm|quad|Rightarrow|uparrow|downarrow)\b", raw_text):
                 raise RuntimeError(f"{chapter_id} exposes LaTeX through raw Txt; use EquationCard instead: {raw_text!r}")
-        for size in re.findall(r"<Txt\b[\s\S]*?\bfontSize=\{(\d+)\}[\s\S]*?/?>", content):
-            if int(size) < 26 or int(size) > 32:
-                raise RuntimeError(f"{chapter_id} raw diagram-label fontSize must be 26-32")
+        out_of_range_sizes = sorted({
+            int(size)
+            for size in re.findall(r"<Txt\b[\s\S]*?\bfontSize=\{(\d+)\}[\s\S]*?/?>", content)
+            if int(size) < 26 or int(size) > 32
+        })
+        if out_of_range_sizes:
+            warnings.append(
+                f"{chapter_id} raw diagram-label fontSize values "
+                f"{out_of_range_sizes} are outside the preferred 26-32px range"
+            )
+    return warnings
 
 
 def _normalize_chapter_source(content: str) -> str:
     """Repair syntax-safe mechanical drift without another model call."""
     content = re.sub(r"\bCUES\.(\d[\w$]*)", lambda match: f'CUES["{match.group(1)}"]', content)
+    content = re.sub(
+        r"(<Circle\b[^>]*?)\s+blur=\{[^}]+\}",
+        r"\1",
+        content,
+        flags=re.DOTALL,
+    )
     key_group = 0
     def unique_index_key(_match: re.Match[str]) -> str:
         nonlocal key_group

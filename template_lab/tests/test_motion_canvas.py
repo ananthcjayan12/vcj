@@ -99,6 +99,30 @@ class MotionCanvasPipelineTest(unittest.TestCase):
             self.assertEqual(previous["render_end_frame"], following["render_start_frame"])
             self.assertEqual(previous["audio_end_sample"], following["audio_start_sample"])
 
+    def test_rejected_reel_gap_preserves_source_reel_ids(self) -> None:
+        words = {
+            "words": [
+                {"word": "second", "start": 0.1, "end": 0.5},
+                {"word": "third", "start": 2.1, "end": 2.5},
+            ]
+        }
+        audio = {
+            "sample_rate": 24_000,
+            "chapters": [
+                {"id": "reel_002", "path": "two.wav", "absolute_start": 0, "absolute_end": 2},
+                {"id": "reel_003", "path": "three.wav", "absolute_start": 2, "absolute_end": 4},
+            ],
+        }
+        timeline = build_immutable_timeline(words, audio)
+        self.assertEqual(
+            [item["scene_id"] for item in timeline["reels"]],
+            ["reel_002", "reel_003"],
+        )
+        self.assertEqual(
+            [item["source_id"] for item in timeline["reels"]],
+            ["reel_002", "reel_003"],
+        )
+
     def test_immutable_timeline_rejects_boundary_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             import json

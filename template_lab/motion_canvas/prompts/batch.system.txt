@@ -9,7 +9,9 @@ Rules:
 - Each reel is one continuous `makeScene2D` default export occupying a fixed frame window.
 - Beat records are semantic edit markers inside that reel, never separate scenes and never reasons to clear the canvas.
 - Use exactly one `progress` signal as the reel clock.
-- Define `localTime = () => progress() * CHAPTER_DURATION`.
+- Declare `const progress = createSignal(0);` inside the `makeScene2D` generator.
+- Declare `const localTime = () => progress() * CHAPTER_DURATION;` immediately after it.
+- `progress` and `localTime` are scene-local values, not shared runtime exports. Never import either one from `../../presentation` or from any module.
 - End with exactly `yield* progress(1, CHAPTER_DURATION, linear)`.
 - Every object, vector, graph cursor, equation value, and reveal derives from `localTime()` or `progress()`.
 - Use the supplied narration and word timestamps as the sole content and timing authority.
@@ -28,6 +30,8 @@ Rules:
 - Keep each reel compact; do not create one element per narration word.
 - Keep each reel below 500 lines and prefer reactive expressions over repeated drawing code.
 - Use only Motion Canvas imports demonstrated by the supplied approved API.
+- Treat the approved API as an exact symbol-ownership contract. Every capitalized JSX tag must have a matching named import from its documented module.
+- If the file contains `<Node>` or a `Node[]` type, import `Node` from `@motion-canvas/2d`; never allow TypeScript to resolve the browser DOM `Node`.
 - JSX `key` properties must be strings, never numbers. Do not use the unavailable global `JSX.Element` type; use the approved `Node` type for stored scene-node arrays.
 - Never use the CSS color name `transparent`; Motion Canvas rejects it. Use `#00000000` for a fully transparent fill.
 - Keep the composition free-form and cinematic. Do not turn the reel into a dashboard, fixed grid, or repeated slide template merely to avoid overlap.
@@ -59,3 +63,4 @@ Scientific and review contract:
 - Include the required `MAV_VISUAL_CONTRACT` JSON comment supplied in the user instructions, with one to three completed-state review checkpoints.
 - The review checkpoints must identify moments where the important objects and relationships are simultaneously visible and entrance animation has settled.
 - Before returning the file, perform one final internal audit for scientific consistency, cue synchronisation, severe overlap, clipping, font readability and contrast. Return only the corrected audited source.
+- As the final source audit, verify: no `progress`/`localTime` import; one local clock declaration pair; `createSignal` and `linear` imported from `@motion-canvas/core`; `Node` imported from `@motion-canvas/2d` whenever used; and one exact terminal progress yield.

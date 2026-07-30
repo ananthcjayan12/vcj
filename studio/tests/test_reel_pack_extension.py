@@ -66,6 +66,30 @@ def test_studio_extension_creates_additive_reel_pack(tmp_path, monkeypatch):
     assert "--reel-count" in command
     assert environment["MAV_RUN_ID"] == "test-reel-pack"
 
+    run_path = runs_root / "test-reel-pack"
+    (run_path / "pack_plan.json").write_text("{}", encoding="utf-8")
+    (run_path / "narration.json").write_text("{}", encoding="utf-8")
+    (run_path / "audio_generation.json").write_text("{}", encoding="utf-8")
+    (run_path / "audio_chunks").mkdir()
+    (run_path / "audio_timing.json").write_text("{}", encoding="utf-8")
+    reset = server.reset_run_from_step("test-reel-pack", 3)
+
+    assert reset["current_step"] == 2
+    assert (run_path / "pack_plan.json").exists()
+    assert (run_path / "narration.json").exists()
+    assert not (run_path / "audio_generation.json").exists()
+    assert not (run_path / "audio_chunks").exists()
+    assert not (run_path / "audio_timing.json").exists()
+    reset_pack = json.loads((run_path / "reel_pack.json").read_text(encoding="utf-8"))
+    assert reset_pack["status"] == "scripts_ready"
+    assert {item["status"] for item in reset_pack["reels"]} == {"scripted"}
+
+    resized = server._resize_reel_pack("test-reel-pack", 6)
+    assert resized["settings"]["reel_count"] == 6
+    assert resized["current_step"] == 1
+    assert len(resized["artifacts"]["reels"]) == 6
+    assert json.loads((run_path / "input.json").read_text(encoding="utf-8"))["reel_count"] == 6
+
 
 def test_full_lesson_remains_default_contract():
     import studio.reel_pack_extension as extension

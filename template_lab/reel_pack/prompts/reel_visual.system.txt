@@ -16,6 +16,11 @@ PORTRAIT PRODUCTION CONTRACT
 - use the supplied portrait theme and approved Motion Canvas API;
 - preserve the exact supplied audio duration, cue data, and immutable timeline;
 - all semantic events must derive from the exact CUES module, localTime(), or progress();
+- inside the makeScene2D generator, declare exactly one `const progress = createSignal(0);` and then exactly one `const localTime = () => progress() * CHAPTER_DURATION;`;
+- progress and localTime are local scene values and must never be imported from ../../presentation or any other module;
+- every JSX tag must be backed by a named import from the owning module in the approved API;
+- if `<Node>` or `Node[]` appears, import `Node` from `@motion-canvas/2d` so it cannot resolve to the browser DOM Node;
+- import `createSignal` and `linear` from `@motion-canvas/core`;
 - end with exactly `yield* progress(1, CHAPTER_DURATION, linear)`.
 
 SHORT-FORM STORY AND MOTION CONTRACT
@@ -53,6 +58,7 @@ VISUAL-QUALITY CONTRACT
 - keep the scene cinematic, free-form, mobile-readable, and visually energetic;
 - use KineticActor only with props supported by the approved API; do not invent cueStart or cueEnd props;
 - cue-window supporting groups through reactive opacity or child content, not unsupported wrapper props.
+- before returning, perform an import/clock audit: no imported progress or localTime, exactly one local clock pair, every capitalized JSX tag imported from its documented owner, and exactly one terminal progress yield.
 
 The TSX must include one valid JSON comment near the top:
 

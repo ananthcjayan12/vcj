@@ -170,7 +170,11 @@ def create_pack(
     audio_provider: str = "gemini",
 ) -> dict[str, Any]:
     run_path = pack_path(run_id)
-    if run_path.exists() and any(run_path.iterdir()):
+    preserved_studio_files = {"studio_run.json", "studio.log"}
+    if run_path.exists() and any(
+        child.name not in preserved_studio_files
+        for child in run_path.iterdir()
+    ):
         raise FileExistsError(f"Run already exists: {run_id}")
     run_path.mkdir(parents=True, exist_ok=True)
     count = bounded_reel_count(reel_count)

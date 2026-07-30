@@ -7,6 +7,7 @@
   let activeRequest = null;
   let pollTimer = null;
   let lastSignature = '';
+  const autoPreviewAttempts = new Set();
 
   const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, character => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[character]));
   const artifactUrl = (runId, relative) => `/artifacts/runs/${encodeURIComponent(runId)}/${String(relative).split('/').map(encodeURIComponent).join('/')}`;
@@ -26,12 +27,13 @@
     style.id = 'reel-pack-ui-styles';
     style.textContent = `
       .pack-product-field select{font-weight:750}.pack-only-field.is-hidden,.lesson-only-field.is-hidden{display:none!important}
-      .reel-pack-workspace{display:grid;gap:18px}.reel-pack-header{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;padding:22px;border:1px solid rgba(70,217,255,.22);border-radius:20px;background:linear-gradient(145deg,rgba(14,29,49,.98),rgba(7,17,31,.98))}.reel-pack-header h2{margin:4px 0 5px}.reel-pack-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.reel-pack-subtitle{color:#91a8c5}.pack-stepper{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:7px}.pack-step{border:1px solid rgba(145,168,197,.16);background:rgba(14,29,49,.8);color:#91a8c5;border-radius:12px;padding:10px 7px;text-align:left;cursor:pointer}.pack-step span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.06);font-weight:800;margin-bottom:6px}.pack-step b{font-size:11px}.pack-step.is-done{color:#eaf3ff;border-color:rgba(70,217,255,.3)}.pack-step.is-done span{background:rgba(70,217,255,.16);color:#46d9ff}.pack-step:disabled{cursor:not-allowed;opacity:.65}
+      .reel-pack-workspace{display:grid;gap:18px}.reel-pack-header{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;padding:22px;border:1px solid rgba(70,217,255,.22);border-radius:20px;background:linear-gradient(145deg,rgba(14,29,49,.98),rgba(7,17,31,.98))}.reel-pack-header h2{margin:4px 0 5px}.reel-pack-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.reel-pack-subtitle{color:#91a8c5}.pack-stepper{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:7px}.pack-step{border:1px solid rgba(145,168,197,.16);background:rgba(14,29,49,.8);color:#91a8c5;border-radius:12px;padding:10px 7px;text-align:left;cursor:pointer}.pack-step span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.06);font-weight:800;margin-bottom:6px}.pack-step b{font-size:11px}.pack-step.is-done{color:#eaf3ff;border-color:rgba(70,217,255,.3)}.pack-step.is-done span{background:rgba(70,217,255,.16);color:#46d9ff}.pack-step:disabled{cursor:not-allowed;opacity:.65}.pack-stage-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;align-items:center;padding:12px;border:1px solid rgba(145,168,197,.16);border-radius:14px;background:rgba(14,29,49,.65)}.pack-stage-controls select{min-width:0}
       .pack-summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.pack-summary article{padding:14px;border-radius:15px;background:rgba(14,29,49,.86);border:1px solid rgba(145,168,197,.12)}.pack-summary span{display:block;color:#91a8c5;font-size:12px}.pack-summary strong{display:block;font-size:25px;color:#eaf3ff;margin-top:5px}
       .pack-review{padding:17px;border-radius:17px;background:rgba(14,29,49,.86);border:1px solid rgba(255,200,87,.18)}.pack-section-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.pack-section-head h3{margin:2px 0}.pack-review-links{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.pack-review-links a{padding:7px 10px;border-radius:9px;background:rgba(70,217,255,.08)}.pack-findings{display:grid;gap:8px}.pack-finding{display:grid;grid-template-columns:130px 1fr 70px;gap:12px;padding:11px;border-radius:12px;background:rgba(255,255,255,.035)}.pack-finding p{margin:3px 0}.pack-finding small{color:#91a8c5}.pack-finding>strong:last-child{text-align:right;color:#46d9ff}
       .pack-model-panel{padding:17px;border-radius:17px;background:rgba(14,29,49,.86);border:1px solid rgba(145,168,197,.12)}.pack-model-list{display:grid;gap:8px}.pack-model-row{display:grid;grid-template-columns:115px minmax(180px,1fr) 160px 210px 135px;gap:9px;align-items:center;padding:10px;border-radius:12px;background:rgba(255,255,255,.03)}.pack-model-row small{display:block;color:#91a8c5}.pack-model-row select{min-width:0}
+      .pack-live-preview{overflow:hidden;border:1px solid rgba(70,217,255,.22);border-radius:18px;background:#050c16}.pack-live-preview-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 14px;background:rgba(14,29,49,.96);color:#91a8c5;font-size:11px;font-weight:800;letter-spacing:.05em}.pack-live-preview iframe{display:block;width:100%;height:min(72vh,760px);border:0;background:#07111f}.pack-live-preview-empty{min-height:280px;display:grid;place-items:center;align-content:center;gap:14px;padding:30px;text-align:center;color:#91a8c5}
       .pack-reels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.pack-reel-card{display:flex;flex-direction:column;min-width:0;border:1px solid rgba(145,168,197,.14);border-radius:17px;background:rgba(14,29,49,.88);overflow:hidden}.pack-reel-preview{position:relative;aspect-ratio:9/16;background:#07111f;display:grid;place-items:center;overflow:hidden}.pack-reel-preview img,.pack-reel-preview iframe{width:100%;height:100%;border:0;display:block}.pack-reel-preview img{object-fit:cover}.pack-reel-preview span{padding:20px;text-align:center;color:#91a8c5}.pack-preview-evidence{position:absolute;top:10px;right:10px;padding:5px 7px;border-radius:8px;background:rgba(5,12,22,.9);color:#91a8c5;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.pack-reel-preview .pack-script-review{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(5,12,22,.9);backdrop-filter:blur(8px)}.pack-reel-body{display:grid;gap:9px;padding:14px;flex:1}.pack-reel-head{display:flex;justify-content:space-between;gap:9px;align-items:flex-start}.pack-reel-head h4{margin:2px 0;font-size:16px}.pack-reel-meta{display:flex;gap:8px;flex-wrap:wrap;color:#91a8c5;font-size:12px}.pack-reel-copy{margin:0;color:#cbd9ea;font-size:13px;line-height:1.45}.pack-reel-findings{padding:9px;border-radius:10px;background:rgba(255,107,107,.07);color:#ffadad;font-size:12px}.pack-reel-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto}.pack-reel-actions button,.pack-reel-actions a{font-size:11px;padding:7px 9px}.pack-log{max-height:210px;overflow:auto;padding:13px;border-radius:13px;background:#050c16;color:#91a8c5;font-size:11px;white-space:pre-wrap}.pack-script-dialog{width:min(760px,calc(100vw - 30px));max-height:85vh;padding:0;border:1px solid rgba(70,217,255,.35);border-radius:18px;background:#0b192a;color:#eaf3ff;box-shadow:0 30px 100px rgba(0,0,0,.55)}.pack-script-dialog::backdrop{background:rgba(0,0,0,.72)}.pack-script-dialog-content{padding:22px;overflow:auto;max-height:72vh}.pack-script-dialog h3{margin:3px 0 5px}.pack-script-dialog p{line-height:1.55;color:#cbd9ea}.pack-script-dialog .pack-script-label{color:#46d9ff;text-transform:uppercase;font-size:10px;letter-spacing:.08em;font-weight:800;margin:14px 0 3px}.pack-script-dialog-actions{display:flex;justify-content:flex-end;padding:12px 22px;border-top:1px solid rgba(145,168,197,.14)}.pack-status{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.05em;background:rgba(145,168,197,.11);color:#b9c8d9}.pack-status-approved,.pack-status-rendered,.pack-status-complete,.pack-status-passed{background:rgba(52,211,153,.12);color:#6ee7b7}.pack-status-rejected{background:rgba(255,107,107,.12);color:#ff9a9a}.pack-status-flagged,.pack-status-failed,.pack-status-needs-review{background:rgba(255,107,107,.12);color:#ff9a9a}.pack-status-repaired-pending-review{background:rgba(255,200,87,.12);color:#ffc857}.pack-status-visual-ready,.pack-status-timed,.pack-status-audio-ready,.pack-status-scripted{background:rgba(70,217,255,.1);color:#46d9ff}
-      @media(max-width:1200px){.pack-reels{grid-template-columns:repeat(2,minmax(0,1fr))}.pack-model-row{grid-template-columns:100px 1fr 140px 180px}.pack-model-row .pack-reasoning{grid-column:4}.pack-summary{grid-template-columns:repeat(3,1fr)}}@media(max-width:800px){.reel-pack-header{display:grid}.reel-pack-header-actions{justify-content:flex-start}.pack-stepper{grid-template-columns:repeat(4,1fr)}.pack-reels{grid-template-columns:1fr}.pack-summary{grid-template-columns:repeat(2,1fr)}.pack-model-row,.pack-finding{grid-template-columns:1fr}.pack-finding>strong:last-child{text-align:left}}
+      @media(max-width:1200px){.pack-reels{grid-template-columns:repeat(2,minmax(0,1fr))}.pack-model-row{grid-template-columns:100px 1fr 140px 180px}.pack-model-row .pack-reasoning{grid-column:4}.pack-summary{grid-template-columns:repeat(3,1fr)}}@media(max-width:800px){.reel-pack-header{display:grid}.reel-pack-header-actions{justify-content:flex-start}.pack-stepper{grid-template-columns:repeat(4,1fr)}.pack-stage-controls{grid-template-columns:1fr}.pack-reels{grid-template-columns:1fr}.pack-summary{grid-template-columns:repeat(2,1fr)}.pack-model-row,.pack-finding{grid-template-columns:1fr}.pack-finding>strong:last-child{text-align:left}}
     `;
     document.head.append(style);
   }
@@ -72,8 +74,7 @@
   function topicTaskModels() {
     const chapterProvider = document.getElementById('chapter-provider')?.value || 'moonshot';
     const scriptSelection = document.getElementById('model-provider')?.value || 'gemini';
-    const scriptProvider = scriptSelection.startsWith('codex:') ? 'codex' : scriptSelection;
-    const scriptModel = scriptProvider === 'codex' ? scriptSelection.split(':', 2)[1] : null;
+    const [scriptProvider, scriptModel = null] = scriptSelection.split(':', 2);
     const taskModels = {
       motion_canvas_batch: {
         provider: chapterProvider,
@@ -84,8 +85,14 @@
         ? {provider: 'grok', model: document.getElementById('grok-model')?.value || 'grok-4.5', reasoning_effort: 'high'}
         : {provider: 'codex', model: document.getElementById('codex-model')?.value || 'gpt-5.6-sol', reasoning_effort: 'high'},
     };
-    if (scriptProvider === 'codex') {
-      for (const task of ['script_structure', 'script_writing']) taskModels[task] = {provider: 'codex', model: scriptModel, reasoning_effort: document.getElementById('script-reasoning')?.value || 'high'};
+    if (['codex', 'antigravity', 'copilot'].includes(scriptProvider)) {
+      for (const task of ['script_structure', 'script_writing']) taskModels[task] = {
+        provider: scriptProvider,
+        model: scriptModel,
+        ...(scriptProvider === 'codex'
+          ? {reasoning_effort: document.getElementById('script-reasoning')?.value || 'high'}
+          : {}),
+      };
     }
     return taskModels;
   }
@@ -98,7 +105,7 @@
       run_id: document.getElementById('run-id-input')?.value.trim() || '',
       reel_count: Number(document.getElementById('reel-count-input')?.value || 5),
       duration: Number(document.getElementById('reel-duration-input')?.value || 35),
-      model_provider: scriptSelection.startsWith('codex:') ? 'configured' : scriptSelection,
+      model_provider: scriptSelection.includes(':') ? 'configured' : scriptSelection,
       audio_provider: document.getElementById('audio-provider')?.value || 'gemini',
       scene_concurrency: Number(document.getElementById('scene-concurrency')?.value || 2),
       task_models: topicTaskModels(),
@@ -177,6 +184,14 @@
     })}`;
   }
 
+  function livePreviewMarkup(run, working, completed) {
+    const previewUrl = run.artifacts?.preview_url;
+    if (previewUrl) {
+      return `<section class="pack-live-preview"><div class="pack-live-preview-toolbar"><span>LIVE MOTION CANVAS · PRE-RENDER REELS + SYNCHRONIZED AUDIO</span><a href="${escapeHtml(previewUrl)}" target="_blank" rel="noreferrer">OPEN EDITOR ↗</a></div><iframe src="${escapeHtml(previewUrl)}" title="Reel pack live Motion Canvas preview" allow="autoplay"></iframe></section>`;
+    }
+    return `<section class="pack-live-preview"><div class="pack-live-preview-toolbar"><span>LIVE MOTION CANVAS · PRE-RENDER REELS + SYNCHRONIZED AUDIO</span><span>LOCAL EDITOR PREVIEW</span></div><div class="pack-live-preview-empty"><span>${completed >= 6 ? 'Starting the playable Reel preview. No MP4 render is required.' : 'Complete Step 6 to watch the Reels before rendering.'}</span><button class="primary-button pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>Start live video preview</button></div></section>`;
+  }
+
   function reviewMarkup(run) {
     const artifacts = run.artifacts || {};
     const review = artifacts.pack_review || {};
@@ -197,10 +212,8 @@
     const playerUrl = reelPlayerUrl(run.artifacts?.preview_url, reel);
     const preview = playerUrl
       ? `<iframe src="${escapeHtml(playerUrl)}" title="${escapeHtml(reel.reel_id)} live video preview" allow="autoplay"></iframe>`
-      : reel.preview
-        ? `<a href="${artifactUrl(run.id, reel.preview)}" target="_blank" rel="noreferrer"><img src="${artifactUrl(run.id, reel.preview)}" alt="${escapeHtml(reel.reel_id)} validation contact sheet"></a><a class="pack-preview-evidence" href="${artifactUrl(run.id, reel.preview)}" target="_blank" rel="noreferrer">QA evidence</a>`
-        : `<span>${reel.source_ready ? 'Start the live preview to watch this Reel with synchronized audio.' : 'Portrait visual source not generated yet.'}</span>`;
-    return `<article class="pack-reel-card"><div class="pack-reel-preview">${preview}</div><div class="pack-reel-body"><div class="pack-reel-head"><div><p class="eyebrow">${escapeHtml(reel.reel_id)}</p><h4>${escapeHtml(reel.title)}</h4></div>${statusPill(reel.status)}</div><div class="pack-reel-meta"><span>${Number(reel.duration || 0).toFixed(1)}s</span><span>${(reel.fact_ids || []).length} facts</span><span>${(reel.objective_ids || []).length} objectives</span></div><p class="pack-reel-copy"><strong>Hook:</strong> ${escapeHtml(reel.hook || '—')}</p><p class="pack-reel-copy"><strong>Payoff:</strong> ${escapeHtml(reel.learning_payoff || '—')}</p>${reel.status === 'rejected' && reel.rejection_reason ? `<div class="pack-reel-findings">Rejected: ${escapeHtml(reel.rejection_reason)}</div>` : ''}${findings.length ? `<div class="pack-reel-findings">${findings.map(item => escapeHtml(item.visible_evidence)).join('<br>')}</div>` : ''}${reel.error ? `<div class="alert">${escapeHtml(reel.error)}</div>` : ''}<div class="pack-reel-actions">${reviewButton}${reel.audio ? `<a class="secondary-button" href="${artifactUrl(run.id, reel.audio)}" target="_blank">Audio ↗</a>` : ''}${playerUrl ? `<a class="secondary-button" href="${escapeHtml(playerUrl)}" target="_blank" rel="noreferrer">Open video ↗</a>` : ''}${reel.video ? `<a class="primary-button" href="${artifactUrl(run.id, reel.video)}" target="_blank">MP4 ↗</a>` : ''}${nextButton}${rejectButton}<button class="danger-button pack-reel-regenerate" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.source_ready ? 'disabled' : ''}>Regenerate visual</button><button class="secondary-button pack-reel-approve" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.preview || !['visual_ready', 'flagged', 'repaired_pending_review'].includes(reel.status) ? 'disabled' : ''}>Approve</button><button class="primary-button pack-reel-render" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || reel.status !== 'approved' ? 'disabled' : ''}>Render</button></div></div></article>`;
+      : `<span>${reel.source_ready ? 'The playable preview will appear here when the live player starts.' : 'Portrait visual source not generated yet.'}</span>`;
+    return `<article class="pack-reel-card"><div class="pack-reel-preview">${preview}</div><div class="pack-reel-body"><div class="pack-reel-head"><div><p class="eyebrow">${escapeHtml(reel.reel_id)}</p><h4>${escapeHtml(reel.title)}</h4></div>${statusPill(reel.status)}</div><div class="pack-reel-meta"><span>${Number(reel.duration || 0).toFixed(1)}s</span><span>${(reel.fact_ids || []).length} facts</span><span>${(reel.objective_ids || []).length} objectives</span></div><p class="pack-reel-copy"><strong>Hook:</strong> ${escapeHtml(reel.hook || '—')}</p><p class="pack-reel-copy"><strong>Payoff:</strong> ${escapeHtml(reel.learning_payoff || '—')}</p>${reel.status === 'rejected' && reel.rejection_reason ? `<div class="pack-reel-findings">Rejected: ${escapeHtml(reel.rejection_reason)}</div>` : ''}${findings.length ? `<div class="pack-reel-findings">${findings.map(item => escapeHtml(item.visible_evidence)).join('<br>')}</div>` : ''}${(reel.validation_warnings || []).length ? `<div class="pack-reel-findings">Warning: ${(reel.validation_warnings || []).map(item => escapeHtml(item)).join('<br>')}</div>` : ''}${reel.error ? `<div class="alert">${escapeHtml(reel.error)}</div>` : ''}<div class="pack-reel-actions">${reviewButton}${reel.audio ? `<a class="secondary-button" href="${artifactUrl(run.id, reel.audio)}" target="_blank">Audio ↗</a>` : ''}${playerUrl ? `<a class="secondary-button" href="${escapeHtml(playerUrl)}" target="_blank" rel="noreferrer">Open video ↗</a>` : ''}${reel.video ? `<a class="primary-button" href="${artifactUrl(run.id, reel.video)}" target="_blank">MP4 ↗</a>` : ''}${nextButton}${rejectButton}<button class="danger-button pack-reel-regenerate" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.source_ready ? 'disabled' : ''}>Regenerate visual</button><button class="secondary-button pack-reel-approve" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.preview || !['visual_ready', 'flagged', 'repaired_pending_review'].includes(reel.status) ? 'disabled' : ''}>Approve</button><button class="primary-button pack-reel-render" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || reel.status !== 'approved' ? 'disabled' : ''}>Render</button></div></div></article>`;
   }
 
   function scriptDialogMarkup() {
@@ -225,6 +238,17 @@
     return `LIVE · ${step} · elapsed ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
   }
 
+  async function autoStartPreview(run, working, completed) {
+    if (working || completed < 6 || run.artifacts?.preview_url || autoPreviewAttempts.has(run.id)) return;
+    autoPreviewAttempts.add(run.id);
+    try {
+      const response = await request(`/api/runs/${encodeURIComponent(run.id)}/preview`, {method: 'POST', body: '{}'});
+      renderPackWorkspace(response.run);
+    } catch (error) {
+      console.warn('Automatic Reel preview start failed:', error);
+    }
+  }
+
   function renderPackWorkspace(run) {
     ensureStyles();
     const root = document.getElementById('pipeline-panel');
@@ -238,7 +262,8 @@
     const approved = Number(counts.approved || 0) + Number(counts.rendered || 0);
     const ready = Number(counts.visual_ready || 0) + approved + Number(counts.flagged || 0) + Number(counts.repaired_pending_review || 0);
     root.dataset.reelPackId = run.id;
-    root.innerHTML = `<div class="reel-pack-workspace"><section class="reel-pack-header"><div><p class="eyebrow">Standalone portrait production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><p class="reel-pack-subtitle"><span class="run-id">${escapeHtml(run.id)} · TOPIC REEL PACK</span><br>${reels.length} independent 1080×1920 productions · ${Number(run.settings?.duration || 45)}s target each</p></div><div class="reel-pack-header-actions"><button class="secondary-button" id="pack-refresh">Refresh</button><button class="secondary-button pack-start-preview" id="pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live preview' : 'Start live preview'}</button><button class="danger-button" id="pack-stop" ${working ? '' : 'disabled'}>Stop</button><button class="danger-button" id="pack-delete" ${working ? 'disabled' : ''}>Delete</button><button class="secondary-button" id="pack-run-next" ${working || completed >= 8 ? 'disabled' : ''}>Run next</button><button class="primary-button" id="pack-run-review" ${working || completed >= 7 ? 'disabled' : ''}>Run to screening</button><button class="secondary-button" id="pack-screen" ${working || completed < 6 ? 'disabled' : ''}>Screen pack</button><button class="primary-button" id="pack-render-approved" ${working || !approved ? 'disabled' : ''}>Render approved</button></div></section><div class="pack-stepper">${PACK_STEPS.map((name, index) => { const step = index + 1; return `<button class="pack-step${completed >= step ? ' is-done' : ''}" data-pack-step="${step}" ${working ? 'disabled' : ''}><span>${completed >= step ? '✓' : step}</span><b>${escapeHtml(name)}</b></button>`; }).join('')}</div><section class="pack-summary"><article><span>Total Reels</span><strong>${reels.length}</strong></article><article><span>Scripts ready</span><strong>${Number(counts.scripted || 0) + ready}</strong></article><article><span>Rejected</span><strong>${Number(counts.rejected || 0)}</strong></article><article><span>Visual evidence</span><strong>${ready}</strong></article><article><span>Approved</span><strong>${approved}</strong></article><article><span>Rendered</span><strong>${Number(counts.rendered || 0)}</strong></article></section>${reviewMarkup(run)}${modelMapMarkup(run, working)}<section><div class="pack-section-head"><div><p class="eyebrow">Independent child productions</p><h3>${reels.length} standalone Reels</h3></div><div class="reel-pack-header-actions"><span class="reel-pack-subtitle">${artifacts.preview_url ? 'Each card is a synchronized video player with audio.' : 'Start this to replace validation contact sheets with video.'}</span><button class="primary-button pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live video + audio' : 'Start live video + audio'}</button></div></div><div class="pack-reels">${reels.map(reel => reelCard(run, reel, working)).join('')}</div></section>${scriptDialogMarkup()}<pre class="pack-log" id="pack-run-log">Loading logs…</pre>${run.error ? `<div class="alert">${escapeHtml(run.error)}</div>` : ''}</div>`;
+    root.innerHTML = `<div class="reel-pack-workspace"><section class="reel-pack-header"><div><p class="eyebrow">Standalone portrait production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><p class="reel-pack-subtitle"><span class="run-id">${escapeHtml(run.id)} · TOPIC REEL PACK</span><br>${reels.length} independent 1080×1920 productions · ${Number(run.settings?.duration || 45)}s target each</p></div><div class="reel-pack-header-actions"><button class="secondary-button" id="pack-refresh">Refresh</button><button class="secondary-button pack-start-preview" id="pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live preview' : 'Start live preview'}</button><button class="danger-button" id="pack-stop" ${working ? '' : 'disabled'}>Stop</button><button class="danger-button" id="pack-delete" ${working ? 'disabled' : ''}>Delete</button><button class="secondary-button" id="pack-run-next" ${working || completed >= 8 ? 'disabled' : ''}>Run next</button><button class="primary-button" id="pack-run-review" ${working || completed >= 7 ? 'disabled' : ''}>Run to screening</button><button class="secondary-button" id="pack-screen" ${working || completed < 6 ? 'disabled' : ''}>Screen pack</button><button class="primary-button" id="pack-render-approved" ${working || !approved ? 'disabled' : ''}>Render approved</button></div></section><div class="pack-stepper">${PACK_STEPS.map((name, index) => { const step = index + 1; return `<button class="pack-step${completed >= step ? ' is-done' : ''}" data-pack-step="${step}" ${working ? 'disabled' : ''}><span>${completed >= step ? '✓' : step}</span><b>${escapeHtml(name)}</b></button>`; }).join('')}</div><div class="pack-stage-controls"><select id="pack-stage-select" ${working ? 'disabled' : ''}>${PACK_STEPS.map((name, index) => `<option value="${index + 1}">${index + 1}. ${escapeHtml(name)}</option>`).join('')}</select><button class="secondary-button" id="pack-run-stage" ${working ? 'disabled' : ''}>Run selected step</button><button class="danger-button" id="pack-regenerate-stage" ${working ? 'disabled' : ''}>Regenerate from step</button></div><div class="pack-stage-controls"><label class="field"><span>Reels in this pack</span><input id="pack-reel-count" type="number" min="1" max="24" step="1" value="${Number(run.settings?.reel_count || reels.length || 5)}" ${working ? 'disabled' : ''}></label><span class="reel-pack-subtitle">Changing the count rebuilds planning and clears downstream artifacts.</span><button class="secondary-button" id="pack-save-reel-count" ${working ? 'disabled' : ''}>Apply count</button></div><section class="pack-summary"><article><span>Total Reels</span><strong>${reels.length}</strong></article><article><span>Scripts ready</span><strong>${Number(counts.scripted || 0) + ready}</strong></article><article><span>Rejected</span><strong>${Number(counts.rejected || 0)}</strong></article><article><span>Visual evidence</span><strong>${ready}</strong></article><article><span>Approved</span><strong>${approved}</strong></article><article><span>Rendered</span><strong>${Number(counts.rendered || 0)}</strong></article></section>${reviewMarkup(run)}${modelMapMarkup(run, working)}<section><div class="pack-section-head"><div><p class="eyebrow">Independent child productions</p><h3>${reels.length} standalone Reels</h3></div><div class="reel-pack-header-actions"><span class="reel-pack-subtitle">${artifacts.preview_url ? 'Each card is a synchronized video player with audio.' : 'Start this to replace validation contact sheets with video.'}</span><button class="primary-button pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live video + audio' : 'Start live video + audio'}</button></div></div><div class="pack-reels">${reels.map(reel => reelCard(run, reel, working)).join('')}</div></section>${scriptDialogMarkup()}<pre class="pack-log" id="pack-run-log">Loading logs…</pre>${run.error ? `<div class="alert">${escapeHtml(run.error)}</div>` : ''}</div>`;
+    root.querySelector('.pack-stage-controls')?.insertAdjacentHTML('afterend', livePreviewMarkup(run, working, completed));
     const live = liveProcessLabel(run);
     if (live) {
       const eyebrow = root.querySelector('.reel-pack-header .eyebrow');
@@ -246,11 +271,12 @@
     }
     loadLog(run.id);
     if (working) startPolling(run.id); else stopPolling();
+    void autoStartPreview(run, working, completed);
   }
 
   function signatureFor(run) {
     const pack = run.artifacts?.pack || {};
-    return JSON.stringify([run.id, run.updated_at, run.status, run.process_active, run.current_step, pack.updated_at, pack.summary, run.artifacts?.pack_review?.status]);
+    return JSON.stringify([run.id, run.updated_at, run.status, run.process_active, run.current_step, pack.updated_at, pack.summary, run.artifacts?.pack_review?.status, run.artifacts?.preview_url]);
   }
 
   async function syncActiveWorkspace(force = false) {
@@ -310,11 +336,14 @@
       '.pack-start-preview',
       '#pack-stop',
       '#pack-delete',
+      '#pack-save-reel-count',
       '#pack-save-models',
       '#pack-run-next',
       '#pack-run-review',
       '#pack-screen',
       '#pack-render-approved',
+      '#pack-run-stage',
+      '#pack-regenerate-stage',
       '#pack-script-dialog-close',
       '[data-pack-step]',
       '.pack-script-review',
@@ -339,9 +368,24 @@
         renderPackWorkspace(response.run); return true;
       }
       if (button.id === 'pack-delete') {
-        if (!window.confirm(`Delete Reel pack ${runId} and all 12 child productions?`)) return true;
+        const count = Number(document.getElementById('pack-reel-count')?.value || 0);
+        if (!window.confirm(`Delete Reel pack ${runId} and all ${count} child productions?`)) return true;
         await request(`/api/runs/${encodeURIComponent(runId)}`, {method: 'DELETE'});
         localStorage.removeItem('mav-open-reel-pack'); window.location.reload(); return true;
+      }
+      if (button.id === 'pack-save-reel-count') {
+        const count = Number(document.getElementById('pack-reel-count')?.value);
+        if (!Number.isInteger(count) || count < 1 || count > 24) {
+          throw new Error('Reel count must be a whole number between 1 and 24.');
+        }
+        const current = Number(root.querySelector('.pack-summary article:first-child strong')?.textContent || 0);
+        if (count === current) return true;
+        if (!window.confirm(`Change this pack from ${current} to ${count} Reels? Planning and every downstream artifact will be cleared.`)) return true;
+        const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/settings`, {
+          method: 'POST',
+          body: JSON.stringify({reel_count: count}),
+        });
+        renderPackWorkspace(response.run); return true;
       }
       if (button.id === 'pack-save-models') {
         const response = await request(`/api/runs/${encodeURIComponent(runId)}/models`, {method: 'POST', body: JSON.stringify({task_models: collectPackTaskModels()})});
@@ -362,6 +406,19 @@
       if (button.id === 'pack-render-approved') {
         const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/render`, {method: 'POST', body: JSON.stringify({task_models: collectPackTaskModels()})});
         renderPackWorkspace(response.run); return true;
+      }
+      if (button.id === 'pack-run-stage') {
+        const step = Number(document.getElementById('pack-stage-select')?.value || 1);
+        await executePack(runId, {from_step: step, stop_after_step: step}); return true;
+      }
+      if (button.id === 'pack-regenerate-stage') {
+        const step = Number(document.getElementById('pack-stage-select')?.value || 1);
+        if (!window.confirm(`Regenerate this Reel pack from step ${step}? The selected stage and every downstream artifact will be removed.`)) return true;
+        const taskModels = collectPackTaskModels();
+        const reset = await request(`/api/runs/${encodeURIComponent(runId)}/reset`, {method: 'POST', body: JSON.stringify({step})});
+        renderPackWorkspace(reset.run);
+        await executePack(runId, {from_step: step, stop_after_step: step, task_models: taskModels});
+        return true;
       }
       if (button.id === 'pack-script-dialog-close') {
         document.getElementById('pack-script-dialog')?.close(); return true;

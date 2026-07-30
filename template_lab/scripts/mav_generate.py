@@ -588,7 +588,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-claude", action="store_true", help="Use Anthropic/Claude for script generation.")
     parser.add_argument(
         "--model-provider",
-        choices=("configured", "gemini", "anthropic", "zai", "moonshot"),
+        choices=(
+            "configured", "gemini", "anthropic", "zai", "moonshot",
+            "codex", "grok", "antigravity", "copilot",
+        ),
         default="configured",
         help="Override the script provider. Scene providers use their task-specific environment settings.",
     )

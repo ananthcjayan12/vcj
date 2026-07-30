@@ -7,6 +7,7 @@ import pytest
 
 from reel_pack.pipeline import CONTENT_PRODUCT, create_pack, load_pack, reject_reel, restore_reel
 from reel_pack.common import active_narration
+from reel_pack.planning import _paragraph_from_script, _validate_audio_durations, write_scripts
 from reel_pack.schema import validate_plan, validate_script
 
 
@@ -94,16 +95,32 @@ def test_plan_requires_five_to_seven_story_beats():
         validate_plan({"reels": [brief]}, reel_count=1)
 
 
+def test_plan_beat_budget_overrun_is_warning_only():
+    brief = _brief(1)
+    for beat in brief["beats"]:
+        beat["time_budget"] = 10
+    result = validate_plan({"reels": [brief]}, reel_count=1)[0]
+    assert result["status"] == "planned"
+    assert result["validation_warnings"] == [
+        "reel_001 beat budgets total 50s, above the allowed target range"
+    ]
+
+
 def test_script_must_be_standalone_and_reel_length():
     brief = validate_plan({"reels": [_brief(1)]}, reel_count=1)[0]
     valid = _script(brief)
     result = validate_script(valid, brief=brief)
     assert result["status"] == "scripted"
     assert result["narration_word_count"] == 80
+    assert result["validation_warnings"] == []
 
     long_narration = _script(brief, words_per_beat=22)
-    with pytest.raises(ValueError, match="expected 70-94"):
-        validate_script(long_narration, brief=brief)
+    long_result = validate_script(long_narration, brief=brief)
+    assert long_result["status"] == "scripted"
+    assert long_result["narration_word_count"] == 110
+    assert long_result["validation_warnings"] == [
+        "reel_001 has 110 words; expected 70-94 for a 35-second Reel"
+    ]
 
     invalid = _script(brief)
     invalid["beats"][0]["spoken_text"] = "In the previous Reel " + invalid["beats"][0]["spoken_text"]
@@ -119,6 +136,76 @@ def test_script_beats_must_match_blueprint_order():
     invalid["narration"] = " ".join(item["spoken_text"] for item in invalid["beats"])
     with pytest.raises(ValueError, match="exactly match"):
         validate_script(invalid, brief=brief)
+
+
+def test_script_narration_mismatch_is_normalized_with_warning():
+    brief = validate_plan({"reels": [_brief(1)]}, reel_count=1)[0]
+    script = _script(brief)
+    canonical = script["narration"]
+    script["narration"] = "Top-level narration accidentally omitted a beat."
+
+    result = validate_script(script, brief=brief)
+
+    assert result["narration"] == canonical
+    assert result["narration_word_count"] == len(canonical.split())
+    assert result["validation_warnings"] == [
+        "reel_001 narration differed from its beat spoken_text values; "
+        "the beat text was used as the canonical narration"
+    ]
+
+
+def test_audio_duration_range_is_warning_only(tmp_path, capsys):
+    (tmp_path / "audio_chunks").mkdir()
+    (tmp_path / "audio_chunks" / "manifest.json").write_text(json.dumps({
+        "chapters": [{
+            "id": "reel_001",
+            "absolute_start": 0,
+            "absolute_end": 44.9,
+        }],
+    }), encoding="utf-8")
+    pack = {
+        "reels": [{
+            "reel_id": "reel_001",
+            "status": "scripted",
+            "target_duration_seconds": 35,
+        }],
+    }
+    _validate_audio_durations(tmp_path, pack)
+    record = pack["reels"][0]
+    assert record["audio_duration_seconds"] == 44.9
+    assert record["validation_warnings"] == [
+        "reel_001 audio duration 44.9s is outside the allowed 28.0-42.0s range for a 35.0s Reel"
+    ]
+    assert "WARNING:" in capsys.readouterr().out
+
+
+def test_cached_narration_restores_scripted_beats_after_plan_reload(tmp_path):
+    brief = validate_plan({"reels": [_brief(1)]}, reel_count=1)[0]
+    script = validate_script(_script(brief), brief=brief)
+    paragraph = _paragraph_from_script(brief, script)
+    (tmp_path / "input.json").write_text(json.dumps({
+        "topic": "Density",
+        "tone": "precise",
+    }), encoding="utf-8")
+    (tmp_path / "reel_pack.json").write_text(json.dumps({
+        "run_id": "cached-pack",
+        "content_product": "topic-reel-pack",
+        "status": "planned",
+        "current_step": 2,
+        "reels": [brief],
+    }), encoding="utf-8")
+    (tmp_path / "narration.json").write_text(json.dumps({
+        "paragraphs": [paragraph],
+    }), encoding="utf-8")
+
+    result = write_scripts(tmp_path, allow_model_call=False)
+
+    record = result["reels"][0]
+    assert record["status"] == "scripted"
+    assert record["narration_word_count"] == 80
+    assert [beat["spoken_text"] for beat in record["beats"]] == [
+        beat["spoken_text"] for beat in script["beats"]
+    ]
 
 
 def test_create_pack_is_shared_root_run_and_defaults_to_five(tmp_path, monkeypatch):
@@ -143,6 +230,32 @@ def test_create_pack_is_shared_root_run_and_defaults_to_five(tmp_path, monkeypat
     ]
     assert not (tmp_path / "physics-1-5-3-reels-v01" / "motion_canvas").exists()
     assert load_pack(tmp_path / "physics-1-5-3-reels-v01")["status"] == "created"
+
+
+def test_create_pack_can_restart_after_step_one_reset_preserves_studio_files(tmp_path, monkeypatch):
+    from reel_pack import common
+
+    monkeypatch.setattr(common, "RUNS_ROOT", tmp_path)
+    run_path = tmp_path / "restart-reels-v01"
+    run_path.mkdir()
+    (run_path / "studio_run.json").write_text('{"status":"paused"}', encoding="utf-8")
+    (run_path / "studio.log").write_text("Reset from step 1\n", encoding="utf-8")
+
+    pack = create_pack(
+        run_id="restart-reels-v01",
+        topic="Motion",
+        topic_ref="1.2",
+        objective_ids=["O1"],
+        facts=[{"id": "F1", "text": "Motion fact"}],
+        physics_context={},
+        tone="precise",
+        reel_count=2,
+    )
+
+    assert pack["status"] == "created"
+    assert (run_path / "reel_pack.json").exists()
+    assert (run_path / "studio_run.json").exists()
+    assert (run_path / "studio.log").exists()
 
 
 def test_pack_manifest_uses_one_shared_root(tmp_path, monkeypatch):
@@ -197,3 +310,6 @@ def test_runtime_package_keeps_long_form_commands():
     assert scripts["render-video"] == "node scripts/render.mjs --video"
     assert scripts["reel-pack-preview"] == "node scripts/reel-pack-render.mjs --preview"
     assert scripts["reel-pack-render"] == "node scripts/reel-pack-render.mjs --video"
+
+    from mav_render import MOTION_CANVAS_RUNTIME_ROOT
+    assert MOTION_CANVAS_RUNTIME_ROOT == package_path.parent

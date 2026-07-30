@@ -13,6 +13,7 @@ from typing import Any
 import sys
 
 TEMPLATE_LAB_ROOT = Path(__file__).resolve().parents[1]
+MOTION_CANVAS_RUNTIME_ROOT = TEMPLATE_LAB_ROOT.parent / "motion_canvas_runtime"
 if str(TEMPLATE_LAB_ROOT) not in sys.path:
     sys.path.insert(0, str(TEMPLATE_LAB_ROOT))
 
@@ -422,7 +423,7 @@ def render_reel_mp4(
     env["VITE_MAV_CANVAS_HEIGHT"] = str(int(canvas.get("height") or 1080))
     result = subprocess.run(
         ["npm", "run", "render-video"],
-        cwd=LAB_ROOT / "motion_canvas_runtime",
+        cwd=MOTION_CANVAS_RUNTIME_ROOT,
         env=env,
         check=False,
         text=True,

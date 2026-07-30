@@ -10,6 +10,7 @@ from unittest.mock import patch
 from pathlib import Path
 
 from studio.server import _artifact_snapshot, _finish_external_render, _infer_step, _normalized_meta, _parse_byte_range, _require_run_id, approve_motion_lesson_review, build_generation_command, build_server, dashboard_payload, delete_run, enqueue_render_runs, model_map_payload, regenerate_motion_chapter, reset_run_from_step, start_motion_lesson_review, topic_detail, update_run_models
+from studio.server import ANTIGRAVITY_MODELS
 
 
 class StudioPayloadTest(unittest.TestCase):
@@ -146,6 +147,51 @@ class StudioPayloadTest(unittest.TestCase):
     def test_model_map_covers_all_paid_pipeline_tasks(self) -> None:
         tasks = {item["task"] for item in model_map_payload()["tasks"]}
         self.assertEqual(tasks, {"script_structure", "script_writing", "audio_generation", "motion_canvas_batch", "motion_canvas_repair", "motion_canvas_lesson_screen"})
+
+    def test_subscription_clis_are_available_for_both_script_phases(self) -> None:
+        catalog = {item["task"]: item for item in model_map_payload()["tasks"]}
+        for task in ("script_structure", "script_writing"):
+            self.assertEqual(catalog[task]["provider_models"]["antigravity"], "authenticated-default")
+            self.assertEqual(
+                catalog[task]["provider_model_options"]["antigravity"],
+                list(ANTIGRAVITY_MODELS),
+            )
+            self.assertEqual(
+                catalog[task]["provider_model_options"]["copilot"],
+                [
+                    "claude-sonnet-4.6", "claude-haiku-4.5",
+                    "claude-sonnet-5", "claude-opus-5",
+                ],
+            )
+
+    def test_antigravity_and_copilot_script_overrides_reach_generation_environment(self) -> None:
+        meta = {
+            "id": "physics-1-1-cli-script-test",
+            "facts_path": "video_engine/topics/1.1/facts.json",
+            "settings": {
+                "duration": 480,
+                "model_provider": "configured",
+                "audio_provider": "gemini",
+                "task_models": {
+                    "script_structure": {
+                        "provider": "antigravity",
+                        "model": "claude-opus-4-6-thinking",
+                    },
+                    "script_writing": {
+                        "provider": "copilot",
+                        "model": "claude-sonnet-4.6",
+                    },
+                },
+            },
+        }
+        _command, env = build_generation_command(
+            meta, {"from_step": 2, "stop_after_step": 2, "confirm_paid_api": True},
+        )
+        self.assertEqual(env["MAV_SCRIPT_STRUCTURE_PROVIDER"], "antigravity")
+        self.assertEqual(env["MAV_SCRIPT_STRUCTURE_MODEL"], "claude-opus-4-6-thinking")
+        self.assertNotIn("MAV_SCRIPT_STRUCTURE_REASONING_EFFORT", env)
+        self.assertEqual(env["MAV_SCRIPT_WRITING_PROVIDER"], "copilot")
+        self.assertEqual(env["MAV_SCRIPT_WRITING_MODEL"], "claude-sonnet-4.6")
 
     def test_kimi_visual_review_uses_latest_multimodal_model(self) -> None:
         task = next(item for item in model_map_payload()["tasks"] if item["task"] == "motion_canvas_lesson_screen")

@@ -91,7 +91,11 @@ def run_pack_step(
             target_reel_id=target_reel_id,
         )
     if step == 6:
-        return validate_visuals(run_path, target_reel_id=target_reel_id)
+        return validate_visuals(
+            run_path,
+            target_reel_id=target_reel_id,
+            allow_model_call=allow_model_call,
+        )
     if step == 7:
         return screen_pack(run_path, allow_repairs=auto_repair)
     if step == 8:

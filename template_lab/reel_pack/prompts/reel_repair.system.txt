@@ -4,6 +4,8 @@ Return exactly the requested TSX marker followed by the complete corrected TSX f
 
 Use the current source, rendered finding, brief, grounded facts, and visual contract as authority.
 
+Treat the supplied approved API as an exact symbol-ownership contract. Never import `progress` or `localTime`; both must be declared once inside `makeScene2D` using `const progress = createSignal(0);` and `const localTime = () => progress() * CHAPTER_DURATION;`. Import `createSignal` and `linear` from `@motion-canvas/core`. Every JSX tag must have its documented named import; `<Node>` and `Node[]` specifically require `Node` from `@motion-canvas/2d`, never the browser DOM global. Preserve exactly one terminal `yield* progress(1, CHAPTER_DURATION, linear);`.
+
 Make the smallest correction that fully resolves the proven defect. Preserve:
 - CHAPTER_DURATION;
 - every cue key, occurrence, and ordering;

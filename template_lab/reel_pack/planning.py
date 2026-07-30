@@ -111,6 +111,35 @@ def _paragraph_from_script(brief: dict[str, Any], script: dict[str, Any]) -> dic
     }
 
 
+def _hydrate_record_from_paragraph(record: dict[str, Any], paragraph: dict[str, Any]) -> None:
+    """Restore script fields that plan loading may have replaced with blueprint fields."""
+    narration = str(paragraph.get("narration") or paragraph.get("text") or "").strip()
+    beats = list(paragraph.get("beats") or [])
+    if not narration or not beats:
+        return
+    record.update({
+        "title": str(paragraph.get("title") or record.get("working_title") or "").strip(),
+        "hook": str(paragraph.get("hook") or record.get("hook") or "").strip(),
+        "narration": narration,
+        "narration_word_count": len(narration.split()),
+        "closing_line": str(paragraph.get("closing_line") or record.get("closing_line") or "").strip(),
+        "visual_direction": str(
+            paragraph.get("visual_direction")
+            or paragraph.get("visual_concept")
+            or record.get("visual_concept")
+            or ""
+        ).strip(),
+        "beats": beats,
+        "target_duration_seconds": float(
+            paragraph.get("target_duration_seconds")
+            or record.get("target_duration_seconds")
+            or DEFAULT_DURATION_SECONDS
+        ),
+        "status": "scripted" if record.get("status") != "rejected" else "rejected",
+        "path": ".",
+    })
+
+
 def write_scripts(
     run_path: Path,
     *,
@@ -127,6 +156,11 @@ def write_scripts(
         for item in existing_narration.get("paragraphs", [])
         if isinstance(item, dict)
     }
+    if not force:
+        for record in pack["reels"]:
+            cached = paragraph_by_id.get(record["reel_id"])
+            if cached:
+                _hydrate_record_from_paragraph(record, cached)
     batch_size = max(1, int(pack.get("script_batch_size", 1)))
     for batch_number, batch in enumerate(_script_batches(pack["reels"], size=batch_size), start=1):
         missing = [
@@ -156,6 +190,8 @@ def write_scripts(
             if parent_id not in raw_by_id:
                 raise RuntimeError(f"Script response omitted {parent_id}")
             script = validate_script(raw_by_id[parent_id], brief=brief)
+            for warning in script.get("validation_warnings", []):
+                print(f"WARNING: {warning}", flush=True)
             paragraph_by_id[parent_id] = _paragraph_from_script(brief, script)
             record = next(item for item in pack["reels"] if item["reel_id"] == parent_id)
             record.update({**brief, **script, "status": "scripted", "path": "."})
@@ -200,10 +236,14 @@ def _validate_audio_durations(run_path: Path, pack: dict[str, Any]) -> None:
         actual = _chapter_duration(chapter)
         target = float(record.get("target_duration_seconds") or DEFAULT_DURATION_SECONDS)
         if actual < target * 0.8 or actual > target * 1.2:
-            raise RuntimeError(
+            warning = (
                 f"{record['reel_id']} audio duration {actual:.1f}s is outside the allowed "
                 f"{target * 0.8:.1f}-{target * 1.2:.1f}s range for a {target:.1f}s Reel"
             )
+            warnings = record.setdefault("validation_warnings", [])
+            if warning not in warnings:
+                warnings.append(warning)
+            print(f"WARNING: {warning}", flush=True)
         record["audio_duration_seconds"] = round(actual, 3)
 
 
@@ -295,10 +335,14 @@ def derive_reel_beat_timing(run_path: Path, pack: dict[str, Any]) -> dict[str, A
         requested_total = sum(requested_counts)
         tolerance = max(2, round(len(words) * 0.05))
         if abs(requested_total - len(words)) > tolerance:
-            raise RuntimeError(
+            warning = (
                 f"{reel} beat text has {requested_total} words but alignment contains {len(words)}; "
-                "regenerate timing from the approved narration"
+                "timing will use the available aligned words"
             )
+            warnings = record.setdefault("validation_warnings", [])
+            if warning not in warnings:
+                warnings.append(warning)
+            print(f"WARNING: {warning}", flush=True)
         cursor = 0
         timed = []
         for index, (beat, requested_count) in enumerate(zip(beats, requested_counts)):

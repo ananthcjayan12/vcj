@@ -1,15 +1,25 @@
 Structural reference only. Generated chapters are independent scenes.
 
 ```tsx
-import {Circle, makeScene2D} from '@motion-canvas/2d';
+import {Circle, Node, makeScene2D} from '@motion-canvas/2d';
 import {createSignal, linear} from '@motion-canvas/core';
+import {KineticActor, SceneTitle} from '../../presentation';
+import {CUES} from './reel_NNN.cues';
 
 const CHAPTER_DURATION = 4;
 export default makeScene2D(function* (view) {
   const progress = createSignal(0);
   const localTime = () => progress() * CHAPTER_DURATION;
-  const state = () => stateAt(localTime());
-  view.add(<Circle position={() => [state().position.x, -state().position.y]} />);
+  void CUES;
+  void localTime;
+  view.add(
+    <Node>
+      <SceneTitle text={'Example'} />
+      <KineticActor id={'example'} role={'primary'} priority={900}>
+        <Circle />
+      </KineticActor>
+    </Node>,
+  );
   yield* progress(1, CHAPTER_DURATION, linear);
 });
 ```

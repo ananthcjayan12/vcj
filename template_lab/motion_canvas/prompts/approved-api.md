@@ -9,6 +9,17 @@ import {ComparisonTable, EquationCard, KineticActor, SceneTitle, StatReadout, Te
 import {CUES} from './reel_NNN.cues';
 ```
 
+Import ownership and scene-clock contract:
+
+- The import list above is an ownership map, not merely an example. Import every JSX component and helper you use from its displayed module.
+- `Node` means the Motion Canvas scene node from `@motion-canvas/2d`. If the source contains `<Node>` or a `Node[]` annotation, `Node` must be present in the named import from `@motion-canvas/2d`. Never rely on the browser DOM global named `Node`.
+- `progress` and `localTime` are scene-local values. They are not exported by `../../presentation` or any other module and must never appear in an import.
+- Inside the `makeScene2D` generator, declare exactly:
+  `const progress = createSignal(0);`
+  `const localTime = () => progress() * CHAPTER_DURATION;`
+- Import both `createSignal` and `linear` from `@motion-canvas/core`, and finish the generator exactly once with `yield* progress(1, CHAPTER_DURATION, linear);`.
+- Before returning source, compare every capitalized JSX tag with the named imports. A tag without its owning import is a contract failure.
+
 Kinetic choreography contract:
 
 - `KineticActor` wraps one independent visual group without imposing a layout. Example: `<KineticActor id={'force-rig'} role={'primary'} priority={900}>...</KineticActor>`. Keep freely authored coordinates and animation inside it.

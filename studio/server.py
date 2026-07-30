@@ -57,12 +57,31 @@ TOPIC_REF_RE = re.compile(r"^\d+(?:\.\d+){1,2}$")
 SCENE_ID_RE = re.compile(r"^scene_\d{2,3}$")
 CHAPTER_ID_RE = re.compile(r"^chapter_\d{2,3}$")
 MOTION_UNIT_ID_RE = re.compile(r"^(?:chapter|shot|reel|beat)_\d{2,3}$")
-MODEL_PROVIDERS = {"configured", "gemini", "anthropic", "codex", "grok"}
+MODEL_PROVIDERS = {
+    "configured", "gemini", "anthropic", "codex", "grok", "antigravity", "copilot",
+}
 AUDIO_PROVIDERS = {"gemini", "elevenlabs"}
 CODEX_MODELS = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini")
 CODEX_REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 GROK_MODELS = ("grok-4.5",)
 GROK_REASONING_EFFORTS = ("low", "medium", "high")
+ANTIGRAVITY_MODELS = (
+    "authenticated-default",
+    "gemini-3.6-flash-high",
+    "gemini-3.6-flash-medium",
+    "gemini-3.6-flash-low",
+    "gemini-3.5-flash-high",
+    "gemini-3.5-flash-medium",
+    "gemini-3.5-flash-low",
+    "gemini-3.1-pro-high",
+    "gemini-3.1-pro-low",
+    "claude-sonnet-4-6",
+    "claude-opus-4-6-thinking",
+    "gpt-oss-120b-medium",
+)
+COPILOT_MODELS = (
+    "claude-sonnet-4.6", "claude-haiku-4.5", "claude-sonnet-5", "claude-opus-5",
+)
 RENDER_QUALITIES = {"draft", "standard", "high"}
 
 _processes: dict[str, subprocess.Popen[str]] = {}
@@ -148,6 +167,11 @@ def model_map_payload() -> dict[str, Any]:
             provider_model_options["codex"] = list(CODEX_MODELS)
             provider_models["grok"] = GROK_MODELS[0]
             provider_model_options["grok"] = list(GROK_MODELS)
+        if task in {"script_structure", "script_writing"}:
+            provider_models["antigravity"] = ANTIGRAVITY_MODELS[0]
+            provider_model_options["antigravity"] = list(ANTIGRAVITY_MODELS)
+            provider_models["copilot"] = COPILOT_MODELS[0]
+            provider_model_options["copilot"] = list(COPILOT_MODELS)
         tasks.append({"task": task, "label": labels.get(task, task.replace("_", " ").title()), "step": step_by_task.get(task), "provider": config.get("provider"), "model": config.get("model"), "provider_models": provider_models, "provider_model_options": provider_model_options, "reasoning_efforts": list(CODEX_REASONING_EFFORTS), "prompt_files": config.get("prompt_files", []), "max_tokens": config.get("max_tokens")})
     tasks.append({"task": "audio_generation", "label": labels["audio_generation"], "step": 3, "provider": "gemini", "model": os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview"), "provider_models": {"gemini": "gemini-3.1-flash-tts-preview", "elevenlabs": os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3")}, "prompt_files": [], "max_tokens": None})
     return {"version": payload.get("version"), "tasks": sorted(tasks, key=lambda item: (item.get("step") or 99, item["task"]))}

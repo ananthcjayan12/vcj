@@ -70,7 +70,7 @@ def main() -> int:
     if args.stop_after_step < args.from_step:
         print("--stop-after-step must be >= --from-step", file=sys.stderr)
         return 2
-    paid_step = any(step in {2, 3, 5, 7} for step in range(args.from_step, args.stop_after_step + 1))
+    paid_step = any(step in {2, 3, 5, 6, 7} for step in range(args.from_step, args.stop_after_step + 1))
     if paid_step and not args.confirm_paid_api:
         print("Paid/API Reel-pack stages require --confirm-paid-api", file=sys.stderr)
         return 2

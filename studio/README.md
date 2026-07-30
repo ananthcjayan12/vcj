@@ -118,6 +118,75 @@ ELEVENLABS_API_KEY=your_key_here
 
 `.env` is ignored by Git. Never commit, paste into a run note, or expose an API key in a screenshot.
 
+Subscription-authenticated CLIs can also drive both Script Structure and Script
+Writing for full lessons and Independent Reels:
+
+- **Antigravity CLI** — install the official headless `agy` CLI from
+  <https://antigravity.google/docs/cli/overview>, then run `agy` once and sign in.
+  The Studio exposes every model reported by the authenticated `agy models`
+  catalog. The older Antigravity desktop launcher also uses the name `agy`, but
+  is detected and rejected because it has no headless `--print` mode.
+- **GitHub Copilot CLI** — install and authenticate it using
+  <https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli>. The
+  Studio exposes the documented `claude-sonnet-4.6` and `claude-haiku-4.5`
+  model choices, plus forward-compatible `claude-sonnet-5` and
+  `claude-opus-5` choices.
+
+If either executable is outside `PATH`, set `MAV_ANTIGRAVITY_BIN` or
+`MAV_COPILOT_BIN` to its absolute path. Optional request timeouts are controlled
+with `MAV_ANTIGRAVITY_TIMEOUT_SECONDS` and `MAV_COPILOT_TIMEOUT_SECONDS`.
+CLI requests run non-interactively in an isolated temporary directory and are
+instructed to return only the script artifact without editing the repository.
+
+### CLI authentication and catalog checks
+
+The official installers place both executables in `~/.local/bin`. Open a fresh
+Terminal, or run `source ~/.zshrc`, before completing these steps.
+
+For Antigravity:
+
+```bash
+agy
+# Choose Google OAuth and approve the browser login.
+# Use /model to select the model for the authenticated account, then /exit.
+agy models
+```
+
+For GitHub Copilot:
+
+```bash
+copilot login
+# Approve the GitHub device login shown in the terminal.
+copilot
+# Use /models to inspect account-enabled model identifiers, then /exit.
+```
+
+The Antigravity choices mirror the authenticated `agy models` output:
+
+```text
+gemini-3.6-flash-high
+gemini-3.6-flash-medium
+gemini-3.6-flash-low
+gemini-3.5-flash-high
+gemini-3.5-flash-medium
+gemini-3.5-flash-low
+gemini-3.1-pro-high
+gemini-3.1-pro-low
+claude-sonnet-4-6
+claude-opus-4-6-thinking
+gpt-oss-120b-medium
+```
+
+Gemini reasoning effort is already encoded in these exact model slugs, so the
+Studio does not apply a second Antigravity reasoning override.
+`authenticated-default` uses the model selected inside `agy`. The adapter checks
+the live authenticated catalog before every request and reports the available
+models if a saved run references a model that is no longer offered.
+
+Copilot's `claude-sonnet-5` and `claude-opus-5` remain forward-compatible
+choices. Use Copilot's `/models` picker after login to confirm that the signed-in
+account supports them.
+
 ### Load the keys before starting the Studio
 
 The Studio reads keys from the environment of the server process. Export the contents of `.env` in the same Terminal before launch:
@@ -210,7 +279,9 @@ Set the production fields:
 
 - **Run ID** — unique permanent identifier, for example `physics-1-1-v01`.
 - **Duration** — target duration of 5, 8, 10, or 12 minutes. Eight minutes is a good default for a full concept lesson.
-- **Script model** — Gemini is the recommended default; Claude is optional; Configured uses the pipeline's configured provider.
+- **Script model** — Gemini is the recommended default; Claude API,
+  Antigravity CLI, GitHub Copilot CLI, and Codex CLI are optional; Configured
+  uses the pipeline's configured provider.
 - **Voice** — Gemini TTS is the default; ElevenLabs is an optional alternative.
 - **Scene workers** — number of custom scenes generated concurrently. Start with `1`; use `2` or `4` only when provider rate limits and the computer/network can support it.
 
@@ -282,7 +353,7 @@ choice is grounded against that selected module's full JSON Schema by the Module
 Parameterizer. Only `custom` choices continue to the Creative Director and Scene
 Coder.
 
-You may change each provider/model pair while the run is paused, then click **Save model map**. The choices are stored in that run's `studio_run.json` and applied to its next execution. This allows, for example, Script Structure to remain on Gemini while Script Writing uses Claude. A model change is not retroactive: existing artifacts and usage records retain the model that actually produced them. Rerunning a paid task with a different model creates a new usage record and incurs a new provider charge.
+You may change each provider/model pair while the run is paused, then click **Save model map**. The choices are stored in that run's `studio_run.json` and applied to its next execution. This allows, for example, Script Structure to use Antigravity while Script Writing uses a Claude model through GitHub Copilot. A model change is not retroactive: existing artifacts and usage records retain the model that actually produced them. Rerunning a paid task with a different model creates a new usage record and incurs a new provider charge or subscription allowance.
 
 The **Model cost** panel displays estimated USD cost, calls, input tokens, output tokens, cached tokens, total tokens, and per-task cost. Detailed records remain available in `costs/model_usage.json`; aggregate totals are in `costs/summary.json`. Costs depend on `template_lab/model_pricing.json`. Calls whose provider pricing is absent are clearly counted as unpriced rather than incorrectly reported as free.
 
