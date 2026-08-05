@@ -58,6 +58,12 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
     review = server._read_json(run_path / "pack-review.json", {}) or {}
     evidence = server._read_json(run_path / "review" / "evidence.json", {}) or {}
     publishing = server._read_json(run_path / "publishing_manifest.json", {}) or {}
+    youtube_manifest = server._read_json(run_path / "youtube" / "reel-assets.json", {}) or {}
+    youtube_by_reel = {
+        str(item.get("reel_id") or ""): item
+        for item in youtube_manifest.get("reels", [])
+        if isinstance(item, dict)
+    }
     findings_by_reel: dict[str, list[dict[str, Any]]] = {}
     for finding in review.get("findings", []) if isinstance(review.get("findings"), list) else []:
         findings_by_reel.setdefault(str(finding.get("reel_id") or ""), []).append(finding)
@@ -70,6 +76,7 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
         "pack_plan.json",
         "pack-review.json",
         "publishing_manifest.json",
+        "youtube/reel-assets.json",
         "generation_summary.json",
         "review/evidence.json",
         "costs/summary.json",
@@ -103,6 +110,7 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
         video_relative = f"motion_canvas/renders/{parent_id}.mp4"
         evidence_payload = read_json(run_path / "review" / "evidence" / parent_id / "evidence.json", {}) or {}
         timeline_unit = next((item for item in motion_manifest.get("reels", []) if item.get("scene_id") == parent_id), {})
+        youtube = youtube_by_reel.get(parent_id, {})
         reels.append(
             {
                 **record,
@@ -123,6 +131,7 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
                 "audio": audio_relative if (run_path / audio_relative).exists() else None,
                 "preview": preview_relative if (run_path / preview_relative).exists() else None,
                 "video": video_relative if (run_path / video_relative).exists() else None,
+                "youtube": youtube,
                 "validation": validation,
                 "findings": findings_by_reel.get(parent_id, []),
                 "evidence_frames": evidence_payload.get("reels", [{}])[0].get("frames", [])
@@ -138,8 +147,13 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
             source_relative,
             preview_relative,
             video_relative,
+            str(youtube.get("metadata") or ""),
+            str(youtube.get("thumbnail") or ""),
+            str(youtube.get("copy_paste") or ""),
+            str(youtube.get("thumbnail_note") or ""),
+            str(youtube.get("youtube_video") or ""),
         ):
-            if (run_path / relative).exists():
+            if relative and (run_path / relative).exists():
                 files.append(relative)
 
     return {
@@ -155,6 +169,7 @@ def _pack_artifacts(server: Any, run_id: str) -> dict[str, Any]:
         "pack_review": review,
         "review_contact_sheets": list(evidence.get("contact_sheets") or []),
         "publishing_manifest": publishing,
+        "youtube_reel_assets": youtube_manifest,
         "preview_url": preview_url,
         "validation_preview_url": (
             f"/artifacts/runs/{run_id}/motion_canvas/preview/contact-sheet.png"
@@ -215,7 +230,7 @@ def install(server: Any) -> None:
     def infer_step(run_path: Path) -> int:
         if _is_pack_path(run_path):
             pack = server._read_json(run_path / "reel_pack.json", {}) or {}
-            return max(1, min(8, int(pack.get("current_step") or 1)))
+            return max(1, min(9, int(pack.get("current_step") or 1)))
         return original_infer_step(run_path)
 
     def synthesized_meta(run_path: Path) -> dict[str, Any]:
@@ -271,8 +286,8 @@ def install(server: Any) -> None:
         run_path = server._run_dir(run_id)
         if not _is_pack_path(run_path):
             return original_reset_run_from_step(run_id, step)
-        if step not in range(1, 9):
-            raise ValueError("Reset step must be between 1 and 8")
+        if step not in range(1, 10):
+            raise ValueError("Reset step must be between 1 and 9")
         if step == 1:
             return original_reset_run_from_step(run_id, step)
         with server._process_lock:
@@ -333,8 +348,11 @@ def install(server: Any) -> None:
                 "motion_canvas/renders",
                 "publishing_manifest.json",
                 "render_report.json",
+                "youtube",
             ):
                 remove(relative)
+        elif step == 9:
+            remove("youtube")
 
         pack = load_pack(run_path)
         status_before_step = {
@@ -345,6 +363,7 @@ def install(server: Any) -> None:
             6: "visual_ready",
             7: "visual_ready",
             8: "approved",
+            9: "rendered",
         }[step]
         pack_status_before_step = {
             2: "created",
@@ -354,6 +373,7 @@ def install(server: Any) -> None:
             6: "visuals_ready",
             7: "visuals_ready",
             8: "approved",
+            9: "complete",
         }[step]
         if step == 2:
             input_payload = read_json(run_path / "input.json", {}) or {}
@@ -573,6 +593,40 @@ def install(server: Any) -> None:
 
     server._resize_reel_pack = resize_pack
 
+    def generate_reel_youtube_assets(run_id: str, request: dict[str, Any]) -> dict[str, Any]:
+        run_id = server._require_run_id(run_id)
+        meta = server._load_meta(run_id)
+        if not _is_pack_meta(meta, server):
+            raise ValueError("Run is not a Reel pack")
+        if "task_models" in request:
+            meta.setdefault("settings", {})["task_models"] = server._validate_task_models(
+                request.get("task_models")
+            )
+            server._save_meta(meta)
+        command = [
+            server.PYTHON_EXECUTABLE,
+            str(server.TEMPLATE_LAB_ROOT / "scripts" / "mav_youtube_reel_assets.py"),
+            "--run-id",
+            run_id,
+        ]
+        target = request.get("target_reel_id")
+        if target:
+            command.extend(["--reel-id", require_reel_id(str(target))])
+        settings = dict(meta.get("settings") or {})
+        env = _task_environment(server, settings=settings, request=request)
+        server._append_log(
+            run_id,
+            "Generating YouTube publishing assets for "
+            + (str(target) if target else "all rendered Reels"),
+        )
+        return server._start_process(
+            run_id,
+            command,
+            env,
+            mode="youtube_assets",
+            target_step=9,
+        )
+
     def do_post(self: Any) -> None:
         path = urlparse(self.path).path
         try:
@@ -582,6 +636,12 @@ def install(server: Any) -> None:
                 return self._json({
                     "run": resize_pack(match.group(1), body.get("reel_count")),
                 })
+            match = re.fullmatch(r"/api/runs/([^/]+)/reel-pack/youtube-assets", path)
+            if match:
+                body = self._body()
+                return self._json({
+                    "run": generate_reel_youtube_assets(match.group(1), body),
+                }, 202)
             match = re.fullmatch(r"/api/runs/([^/]+)/reel-pack/reels/([^/]+)/approve", path)
             if match:
                 run_id = server._require_run_id(match.group(1))

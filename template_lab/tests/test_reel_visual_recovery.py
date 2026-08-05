@@ -11,10 +11,46 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from reel_pack.visuals import _generate_one_reel, generate_visual_sources, validate_visuals
+from reel_pack.visuals import _generate_one_reel, generate_visual_sources, render_pack, validate_visuals
 
 
 class ReelVisualRecoveryTest(unittest.TestCase):
+    def test_compile_ready_reel_can_render_without_screening(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            pack = {
+                "run_id": "optional-screening-test",
+                "status": "visuals_ready",
+                "current_step": 6,
+                "reels": [{"reel_id": "reel_001", "status": "visual_ready"}],
+            }
+            (run / "reel_pack.json").write_text(json.dumps(pack), encoding="utf-8")
+            rendered_file = run / "motion_canvas" / "renders" / "reel_001.mp4"
+            rendered_file.parent.mkdir(parents=True)
+            rendered_file.write_bytes(b"mp4")
+
+            fake_render = Mock(return_value=rendered_file)
+            with patch.dict(sys.modules, {"mav_render": type("MavRender", (), {"render_reel_mp4": fake_render})}):
+                result = render_pack(run, target_reel_id="reel_001")
+
+            fake_render.assert_called_once_with(run.name, "reel_001")
+            self.assertEqual(result["current_step"], 8)
+            self.assertEqual(result["reels"][0]["status"], "rendered")
+
+    def test_flagged_reel_remains_gated_after_optional_screening(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            pack = {
+                "run_id": "screening-gate-test",
+                "status": "screened",
+                "current_step": 7,
+                "reels": [{"reel_id": "reel_001", "status": "flagged"}],
+            }
+            (run / "reel_pack.json").write_text(json.dumps(pack), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "compile & preview"):
+                render_pack(run, target_reel_id="reel_001")
+
     def test_raw_response_is_not_reused_when_accepted_source_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

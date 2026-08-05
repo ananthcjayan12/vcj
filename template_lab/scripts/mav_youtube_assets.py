@@ -378,6 +378,20 @@ def _generate_thumbnail(
     supporting_text: str,
 ) -> tuple[bytes, str, str, list[str]]:
     """Generate the complete thumbnail using approved multimodal references."""
+    return _generate_image_with_references(
+        _thumbnail_prompt(prompt, overlay_text, supporting_text),
+        aspect_ratio=ASPECT_RATIO,
+        image_size=os.getenv("MAV_YOUTUBE_THUMBNAIL_IMAGE_SIZE", THUMBNAIL_IMAGE_SIZE),
+    )
+
+
+def _generate_image_with_references(
+    full_prompt: str,
+    *,
+    aspect_ratio: str,
+    image_size: str,
+) -> tuple[bytes, str, str, list[str]]:
+    """Generate one publishing image using the approved thumbnail reference pair."""
     from google import genai
     from google.genai import types
 
@@ -386,7 +400,6 @@ def _generate_thumbnail(
         raise RuntimeError("Gemini thumbnail generation requires GEMINI_API_KEY or GOOGLE_API_KEY")
     model = os.getenv("MAV_YOUTUBE_THUMBNAIL_IMAGE_MODEL", "gemini-3-pro-image")
     client = genai.Client(api_key=api_key)
-    full_prompt = _thumbnail_prompt(prompt, overlay_text, supporting_text)
     references = _thumbnail_references()
     contents: list[Any] = [full_prompt]
     for reference in references:
@@ -403,8 +416,8 @@ def _generate_thumbnail(
             config=types.GenerateContentConfig(
                 response_modalities=["IMAGE"],
                 image_config=types.ImageConfig(
-                    aspect_ratio=ASPECT_RATIO,
-                    image_size=os.getenv("MAV_YOUTUBE_THUMBNAIL_IMAGE_SIZE", THUMBNAIL_IMAGE_SIZE),
+                    aspect_ratio=aspect_ratio,
+                    image_size=image_size,
                 ),
             ),
         )
@@ -425,17 +438,22 @@ def _generate_thumbnail(
     raise RuntimeError("Gemini image model returned no image data")
 
 
-def _normalize_thumbnail(image_data: bytes, target: Path) -> None:
+def _normalize_thumbnail(
+    image_data: bytes,
+    target: Path,
+    *,
+    target_size: tuple[int, int] = THUMBNAIL_SIZE,
+) -> None:
     try:
         from PIL import Image
     except ImportError as exc:
         raise RuntimeError("Thumbnail compositing requires Pillow. Install it with `pip install Pillow`.") from exc
     image = Image.open(io.BytesIO(image_data)).convert("RGB")
-    scale = max(THUMBNAIL_SIZE[0] / image.width, THUMBNAIL_SIZE[1] / image.height)
+    scale = max(target_size[0] / image.width, target_size[1] / image.height)
     resized = image.resize((round(image.width * scale), round(image.height * scale)), Image.Resampling.LANCZOS)
-    left = (resized.width - THUMBNAIL_SIZE[0]) // 2
-    top = (resized.height - THUMBNAIL_SIZE[1]) // 2
-    canvas = resized.crop((left, top, left + THUMBNAIL_SIZE[0], top + THUMBNAIL_SIZE[1]))
+    left = (resized.width - target_size[0]) // 2
+    top = (resized.height - target_size[1]) // 2
+    canvas = resized.crop((left, top, left + target_size[0], top + target_size[1]))
     target.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(target, "JPEG", quality=94, optimize=True)
 

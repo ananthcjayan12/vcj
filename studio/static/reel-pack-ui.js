@@ -1,8 +1,8 @@
 (() => {
   const PRODUCT = 'topic-reel-pack';
   const ACTIVE = new Set(['running', 'rendering']);
-  const PACK_STEPS = ['Inputs', 'Plan & scripts', 'Independent audio', 'Word timing', 'Portrait visuals', 'Compile & preview', 'Pack screening', 'Export MP4s'];
-  const MODEL_TASKS = new Set(['script_structure', 'script_writing', 'audio_generation', 'motion_canvas_batch', 'motion_canvas_repair', 'motion_canvas_lesson_screen']);
+  const PACK_STEPS = ['Inputs', 'Plan & scripts', 'Independent audio', 'Word timing', 'Portrait visuals', 'Compile & preview', 'Optional screening', 'Export MP4s', 'Optional YouTube assets'];
+  const MODEL_TASKS = new Set(['script_structure', 'script_writing', 'audio_generation', 'motion_canvas_batch', 'motion_canvas_repair', 'motion_canvas_lesson_screen', 'youtube_metadata']);
   let activePackId = '';
   let activeRequest = null;
   let pollTimer = null;
@@ -27,7 +27,7 @@
     style.id = 'reel-pack-ui-styles';
     style.textContent = `
       .pack-product-field select{font-weight:750}.pack-only-field.is-hidden,.lesson-only-field.is-hidden{display:none!important}
-      .reel-pack-workspace{display:grid;gap:18px}.reel-pack-header{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;padding:22px;border:1px solid rgba(70,217,255,.22);border-radius:20px;background:linear-gradient(145deg,rgba(14,29,49,.98),rgba(7,17,31,.98))}.reel-pack-header h2{margin:4px 0 5px}.reel-pack-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.reel-pack-subtitle{color:#91a8c5}.pack-stepper{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:7px}.pack-step{border:1px solid rgba(145,168,197,.16);background:rgba(14,29,49,.8);color:#91a8c5;border-radius:12px;padding:10px 7px;text-align:left;cursor:pointer}.pack-step span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.06);font-weight:800;margin-bottom:6px}.pack-step b{font-size:11px}.pack-step.is-done{color:#eaf3ff;border-color:rgba(70,217,255,.3)}.pack-step.is-done span{background:rgba(70,217,255,.16);color:#46d9ff}.pack-step:disabled{cursor:not-allowed;opacity:.65}.pack-stage-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;align-items:center;padding:12px;border:1px solid rgba(145,168,197,.16);border-radius:14px;background:rgba(14,29,49,.65)}.pack-stage-controls select{min-width:0}
+      .reel-pack-workspace{display:grid;gap:18px}.reel-pack-header{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;padding:22px;border:1px solid rgba(70,217,255,.22);border-radius:20px;background:linear-gradient(145deg,rgba(14,29,49,.98),rgba(7,17,31,.98))}.reel-pack-header h2{margin:4px 0 5px}.reel-pack-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.reel-pack-subtitle{color:#91a8c5}.pack-stepper{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:7px}.pack-step{border:1px solid rgba(145,168,197,.16);background:rgba(14,29,49,.8);color:#91a8c5;border-radius:12px;padding:10px 7px;text-align:left;cursor:pointer}.pack-step span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.06);font-weight:800;margin-bottom:6px}.pack-step b{font-size:11px}.pack-step.is-done{color:#eaf3ff;border-color:rgba(70,217,255,.3)}.pack-step.is-done span{background:rgba(70,217,255,.16);color:#46d9ff}.pack-step:disabled{cursor:not-allowed;opacity:.65}.pack-stage-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;align-items:center;padding:12px;border:1px solid rgba(145,168,197,.16);border-radius:14px;background:rgba(14,29,49,.65)}.pack-stage-controls select{min-width:0}
       .pack-summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.pack-summary article{padding:14px;border-radius:15px;background:rgba(14,29,49,.86);border:1px solid rgba(145,168,197,.12)}.pack-summary span{display:block;color:#91a8c5;font-size:12px}.pack-summary strong{display:block;font-size:25px;color:#eaf3ff;margin-top:5px}
       .pack-review{padding:17px;border-radius:17px;background:rgba(14,29,49,.86);border:1px solid rgba(255,200,87,.18)}.pack-section-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.pack-section-head h3{margin:2px 0}.pack-review-links{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.pack-review-links a{padding:7px 10px;border-radius:9px;background:rgba(70,217,255,.08)}.pack-findings{display:grid;gap:8px}.pack-finding{display:grid;grid-template-columns:130px 1fr 70px;gap:12px;padding:11px;border-radius:12px;background:rgba(255,255,255,.035)}.pack-finding p{margin:3px 0}.pack-finding small{color:#91a8c5}.pack-finding>strong:last-child{text-align:right;color:#46d9ff}
       .pack-model-panel{padding:17px;border-radius:17px;background:rgba(14,29,49,.86);border:1px solid rgba(145,168,197,.12)}.pack-model-list{display:grid;gap:8px}.pack-model-row{display:grid;grid-template-columns:115px minmax(180px,1fr) 160px 210px 135px;gap:9px;align-items:center;padding:10px;border-radius:12px;background:rgba(255,255,255,.03)}.pack-model-row small{display:block;color:#91a8c5}.pack-model-row select{min-width:0}
@@ -160,7 +160,8 @@
     if (!reel.audio) return 3;
     if (!reel.source_ready) return 5;
     if (!reel.preview) return 6;
-    if (['visual_ready', 'flagged', 'repaired_pending_review'].includes(reel.status)) return 7;
+    if (reel.status === 'visual_ready') return 8;
+    if (['flagged', 'repaired_pending_review'].includes(reel.status)) return 7;
     if (reel.status === 'approved') return 8;
     if (reel.status === 'scripted') return 3;
     if (reel.status === 'audio_ready') return 4;
@@ -210,10 +211,17 @@
     const canRestore = reel.status === 'rejected' && Number(run.current_step || 1) <= 2;
     const rejectButton = rejectable ? `<button class="danger-button pack-reel-reject" data-reel-id="${escapeHtml(reel.reel_id)}" ${working ? 'disabled' : ''}>Reject Reel</button>` : reel.status === 'rejected' ? `<button class="secondary-button pack-reel-restore" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !canRestore ? 'disabled' : ''}>Restore Reel</button>` : '';
     const playerUrl = reelPlayerUrl(run.artifacts?.preview_url, reel);
+    const youtube = reel.youtube || {};
+    const youtubeButton = reel.video
+      ? `<button class="secondary-button pack-reel-youtube" data-reel-id="${escapeHtml(reel.reel_id)}" ${working ? 'disabled' : ''}>${youtube.status === 'generated' ? 'Regenerate YouTube assets' : 'Create YouTube assets'}</button>`
+      : '';
+    const youtubeLinks = youtube.status === 'generated'
+      ? `<a class="primary-button" href="${artifactUrl(run.id, youtube.youtube_video)}" target="_blank">YouTube MP4 ↗</a><a class="secondary-button" href="${artifactUrl(run.id, youtube.thumbnail)}" target="_blank">9:16 cover ↗</a><a class="secondary-button" href="${artifactUrl(run.id, youtube.copy_paste)}" target="_blank">YouTube copy ↗</a><a class="secondary-button" href="${artifactUrl(run.id, youtube.thumbnail_note)}" target="_blank">Thumbnail instructions ↗</a><span class="reel-pack-subtitle">Select frame at ${Number(youtube.thumbnail_frame_seconds || 0).toFixed(1)}s</span>`
+      : '';
     const preview = playerUrl
       ? `<iframe src="${escapeHtml(playerUrl)}" title="${escapeHtml(reel.reel_id)} live video preview" allow="autoplay"></iframe>`
       : `<span>${reel.source_ready ? 'The playable preview will appear here when the live player starts.' : 'Portrait visual source not generated yet.'}</span>`;
-    return `<article class="pack-reel-card"><div class="pack-reel-preview">${preview}</div><div class="pack-reel-body"><div class="pack-reel-head"><div><p class="eyebrow">${escapeHtml(reel.reel_id)}</p><h4>${escapeHtml(reel.title)}</h4></div>${statusPill(reel.status)}</div><div class="pack-reel-meta"><span>${Number(reel.duration || 0).toFixed(1)}s</span><span>${(reel.fact_ids || []).length} facts</span><span>${(reel.objective_ids || []).length} objectives</span></div><p class="pack-reel-copy"><strong>Hook:</strong> ${escapeHtml(reel.hook || '—')}</p><p class="pack-reel-copy"><strong>Payoff:</strong> ${escapeHtml(reel.learning_payoff || '—')}</p>${reel.status === 'rejected' && reel.rejection_reason ? `<div class="pack-reel-findings">Rejected: ${escapeHtml(reel.rejection_reason)}</div>` : ''}${findings.length ? `<div class="pack-reel-findings">${findings.map(item => escapeHtml(item.visible_evidence)).join('<br>')}</div>` : ''}${(reel.validation_warnings || []).length ? `<div class="pack-reel-findings">Warning: ${(reel.validation_warnings || []).map(item => escapeHtml(item)).join('<br>')}</div>` : ''}${reel.error ? `<div class="alert">${escapeHtml(reel.error)}</div>` : ''}<div class="pack-reel-actions">${reviewButton}${reel.audio ? `<a class="secondary-button" href="${artifactUrl(run.id, reel.audio)}" target="_blank">Audio ↗</a>` : ''}${playerUrl ? `<a class="secondary-button" href="${escapeHtml(playerUrl)}" target="_blank" rel="noreferrer">Open video ↗</a>` : ''}${reel.video ? `<a class="primary-button" href="${artifactUrl(run.id, reel.video)}" target="_blank">MP4 ↗</a>` : ''}${nextButton}${rejectButton}<button class="danger-button pack-reel-regenerate" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.source_ready ? 'disabled' : ''}>Regenerate visual</button><button class="secondary-button pack-reel-approve" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.preview || !['visual_ready', 'flagged', 'repaired_pending_review'].includes(reel.status) ? 'disabled' : ''}>Approve</button><button class="primary-button pack-reel-render" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || reel.status !== 'approved' ? 'disabled' : ''}>Render</button></div></div></article>`;
+    return `<article class="pack-reel-card"><div class="pack-reel-preview">${preview}</div><div class="pack-reel-body"><div class="pack-reel-head"><div><p class="eyebrow">${escapeHtml(reel.reel_id)}</p><h4>${escapeHtml(reel.title)}</h4></div>${statusPill(reel.status)}</div><div class="pack-reel-meta"><span>${Number(reel.duration || 0).toFixed(1)}s</span><span>${(reel.fact_ids || []).length} facts</span><span>${(reel.objective_ids || []).length} objectives</span></div><p class="pack-reel-copy"><strong>Hook:</strong> ${escapeHtml(reel.hook || '—')}</p><p class="pack-reel-copy"><strong>Payoff:</strong> ${escapeHtml(reel.learning_payoff || '—')}</p>${reel.status === 'rejected' && reel.rejection_reason ? `<div class="pack-reel-findings">Rejected: ${escapeHtml(reel.rejection_reason)}</div>` : ''}${findings.length ? `<div class="pack-reel-findings">${findings.map(item => escapeHtml(item.visible_evidence)).join('<br>')}</div>` : ''}${(reel.validation_warnings || []).length ? `<div class="pack-reel-findings">Warning: ${(reel.validation_warnings || []).map(item => escapeHtml(item)).join('<br>')}</div>` : ''}${reel.error ? `<div class="alert">${escapeHtml(reel.error)}</div>` : ''}${youtube.status === 'failed' ? `<div class="alert">YouTube assets: ${escapeHtml(youtube.error || 'generation failed')}</div>` : ''}<div class="pack-reel-actions">${reviewButton}${reel.audio ? `<a class="secondary-button" href="${artifactUrl(run.id, reel.audio)}" target="_blank">Audio ↗</a>` : ''}${playerUrl ? `<a class="secondary-button" href="${escapeHtml(playerUrl)}" target="_blank" rel="noreferrer">Open video ↗</a>` : ''}${reel.video ? `<a class="primary-button" href="${artifactUrl(run.id, reel.video)}" target="_blank">MP4 ↗</a>` : ''}${youtubeLinks}${youtubeButton}${nextButton}${rejectButton}<button class="danger-button pack-reel-regenerate" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.source_ready ? 'disabled' : ''}>Regenerate visual</button><button class="secondary-button pack-reel-approve" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || !reel.preview || !['visual_ready', 'flagged', 'repaired_pending_review'].includes(reel.status) ? 'disabled' : ''}>Approve</button><button class="primary-button pack-reel-render" data-reel-id="${escapeHtml(reel.reel_id)}" ${working || reel.status !== 'approved' ? 'disabled' : ''}>Render</button></div></div></article>`;
   }
 
   function scriptDialogMarkup() {
@@ -259,10 +267,38 @@
     const working = ACTIVE.has(run.status) || run.process_active;
     const completed = Number(run.current_step || pack.current_step || 1);
     const counts = pack.summary || {};
+    const visualReady = Number(counts.visual_ready || 0);
     const approved = Number(counts.approved || 0) + Number(counts.rendered || 0);
-    const ready = Number(counts.visual_ready || 0) + approved + Number(counts.flagged || 0) + Number(counts.repaired_pending_review || 0);
+    const renderReady = visualReady + approved;
+    const rendered = Number(counts.rendered || 0);
+    const youtubeZip = artifacts.youtube_reel_assets?.download_zip;
+    const ready = visualReady + approved + Number(counts.flagged || 0) + Number(counts.repaired_pending_review || 0);
     root.dataset.reelPackId = run.id;
-    root.innerHTML = `<div class="reel-pack-workspace"><section class="reel-pack-header"><div><p class="eyebrow">Standalone portrait production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><p class="reel-pack-subtitle"><span class="run-id">${escapeHtml(run.id)} · TOPIC REEL PACK</span><br>${reels.length} independent 1080×1920 productions · ${Number(run.settings?.duration || 45)}s target each</p></div><div class="reel-pack-header-actions"><button class="secondary-button" id="pack-refresh">Refresh</button><button class="secondary-button pack-start-preview" id="pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live preview' : 'Start live preview'}</button><button class="danger-button" id="pack-stop" ${working ? '' : 'disabled'}>Stop</button><button class="danger-button" id="pack-delete" ${working ? 'disabled' : ''}>Delete</button><button class="secondary-button" id="pack-run-next" ${working || completed >= 8 ? 'disabled' : ''}>Run next</button><button class="primary-button" id="pack-run-review" ${working || completed >= 7 ? 'disabled' : ''}>Run to screening</button><button class="secondary-button" id="pack-screen" ${working || completed < 6 ? 'disabled' : ''}>Screen pack</button><button class="primary-button" id="pack-render-approved" ${working || !approved ? 'disabled' : ''}>Render approved</button></div></section><div class="pack-stepper">${PACK_STEPS.map((name, index) => { const step = index + 1; return `<button class="pack-step${completed >= step ? ' is-done' : ''}" data-pack-step="${step}" ${working ? 'disabled' : ''}><span>${completed >= step ? '✓' : step}</span><b>${escapeHtml(name)}</b></button>`; }).join('')}</div><div class="pack-stage-controls"><select id="pack-stage-select" ${working ? 'disabled' : ''}>${PACK_STEPS.map((name, index) => `<option value="${index + 1}">${index + 1}. ${escapeHtml(name)}</option>`).join('')}</select><button class="secondary-button" id="pack-run-stage" ${working ? 'disabled' : ''}>Run selected step</button><button class="danger-button" id="pack-regenerate-stage" ${working ? 'disabled' : ''}>Regenerate from step</button></div><div class="pack-stage-controls"><label class="field"><span>Reels in this pack</span><input id="pack-reel-count" type="number" min="1" max="24" step="1" value="${Number(run.settings?.reel_count || reels.length || 5)}" ${working ? 'disabled' : ''}></label><span class="reel-pack-subtitle">Changing the count rebuilds planning and clears downstream artifacts.</span><button class="secondary-button" id="pack-save-reel-count" ${working ? 'disabled' : ''}>Apply count</button></div><section class="pack-summary"><article><span>Total Reels</span><strong>${reels.length}</strong></article><article><span>Scripts ready</span><strong>${Number(counts.scripted || 0) + ready}</strong></article><article><span>Rejected</span><strong>${Number(counts.rejected || 0)}</strong></article><article><span>Visual evidence</span><strong>${ready}</strong></article><article><span>Approved</span><strong>${approved}</strong></article><article><span>Rendered</span><strong>${Number(counts.rendered || 0)}</strong></article></section>${reviewMarkup(run)}${modelMapMarkup(run, working)}<section><div class="pack-section-head"><div><p class="eyebrow">Independent child productions</p><h3>${reels.length} standalone Reels</h3></div><div class="reel-pack-header-actions"><span class="reel-pack-subtitle">${artifacts.preview_url ? 'Each card is a synchronized video player with audio.' : 'Start this to replace validation contact sheets with video.'}</span><button class="primary-button pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live video + audio' : 'Start live video + audio'}</button></div></div><div class="pack-reels">${reels.map(reel => reelCard(run, reel, working)).join('')}</div></section>${scriptDialogMarkup()}<pre class="pack-log" id="pack-run-log">Loading logs…</pre>${run.error ? `<div class="alert">${escapeHtml(run.error)}</div>` : ''}</div>`;
+    root.innerHTML = `<div class="reel-pack-workspace"><section class="reel-pack-header"><div><p class="eyebrow">Standalone portrait production · ${statusPill(run.status)}</p><h2>${escapeHtml(run.topic)}</h2><p class="reel-pack-subtitle"><span class="run-id">${escapeHtml(run.id)} · TOPIC REEL PACK</span><br>${reels.length} independent 1080×1920 productions · ${Number(run.settings?.duration || 45)}s target each</p></div><div class="reel-pack-header-actions"><button class="secondary-button" id="pack-refresh">Refresh</button><button class="secondary-button pack-start-preview" id="pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live preview' : 'Start live preview'}</button><button class="danger-button" id="pack-stop" ${working ? '' : 'disabled'}>Stop</button><button class="danger-button" id="pack-delete" ${working ? 'disabled' : ''}>Delete</button><button class="secondary-button" id="pack-run-next" ${working || completed >= 8 ? 'disabled' : ''}>Run next</button><button class="primary-button" id="pack-run-review" ${working || completed >= 7 ? 'disabled' : ''}>Run to screening</button><button class="secondary-button" id="pack-screen" ${working || completed < 6 ? 'disabled' : ''}>Screen pack</button><button class="primary-button" id="pack-render-approved" ${working || !approved ? 'disabled' : ''}>Render approved</button><button class="secondary-button" id="pack-youtube-assets" ${working || !rendered ? 'disabled' : ''}>Create YouTube assets</button></div></section><div class="pack-stepper">${PACK_STEPS.map((name, index) => { const step = index + 1; return `<button class="pack-step${completed >= step ? ' is-done' : ''}" data-pack-step="${step}" ${working ? 'disabled' : ''}><span>${completed >= step ? '✓' : step}</span><b>${escapeHtml(name)}</b></button>`; }).join('')}</div><div class="pack-stage-controls"><select id="pack-stage-select" ${working ? 'disabled' : ''}>${PACK_STEPS.map((name, index) => `<option value="${index + 1}">${index + 1}. ${escapeHtml(name)}</option>`).join('')}</select><button class="secondary-button" id="pack-run-stage" ${working ? 'disabled' : ''}>Run selected step</button><button class="danger-button" id="pack-regenerate-stage" ${working ? 'disabled' : ''}>Regenerate from step</button></div><div class="pack-stage-controls"><label class="field"><span>Reels in this pack</span><input id="pack-reel-count" type="number" min="1" max="24" step="1" value="${Number(run.settings?.reel_count || reels.length || 5)}" ${working ? 'disabled' : ''}></label><span class="reel-pack-subtitle">Changing the count rebuilds planning and clears downstream artifacts.</span><button class="secondary-button" id="pack-save-reel-count" ${working ? 'disabled' : ''}>Apply count</button></div><section class="pack-summary"><article><span>Total Reels</span><strong>${reels.length}</strong></article><article><span>Scripts ready</span><strong>${Number(counts.scripted || 0) + ready}</strong></article><article><span>Rejected</span><strong>${Number(counts.rejected || 0)}</strong></article><article><span>Visual evidence</span><strong>${ready}</strong></article><article><span>Approved</span><strong>${approved}</strong></article><article><span>Rendered</span><strong>${rendered}</strong></article></section>${reviewMarkup(run)}${modelMapMarkup(run, working)}<section><div class="pack-section-head"><div><p class="eyebrow">Independent child productions</p><h3>${reels.length} standalone Reels</h3></div><div class="reel-pack-header-actions"><span class="reel-pack-subtitle">${artifacts.preview_url ? 'Each card is a synchronized video player with audio.' : 'Start this to replace validation contact sheets with video.'}</span><button class="primary-button pack-start-preview" ${working || completed < 6 ? 'disabled' : ''}>${artifacts.preview_url ? 'Restart live video + audio' : 'Start live video + audio'}</button></div></div><div class="pack-reels">${reels.map(reel => reelCard(run, reel, working)).join('')}</div></section>${scriptDialogMarkup()}<pre class="pack-log" id="pack-run-log">Loading logs…</pre>${run.error ? `<div class="alert">${escapeHtml(run.error)}</div>` : ''}</div>`;
+    const renderButton = root.querySelector('#pack-render-approved');
+    if (renderButton) {
+      renderButton.textContent = 'Render ready Reels';
+      renderButton.disabled = working || !renderReady;
+    }
+    const nextButton = root.querySelector('#pack-run-next');
+    if (nextButton) nextButton.disabled = working || completed >= 9;
+    if (youtubeZip) {
+      const download = document.createElement('a');
+      download.className = 'primary-button';
+      download.href = artifactUrl(run.id, youtubeZip);
+      download.download = '';
+      download.textContent = 'Download YouTube ZIP';
+      root.querySelector('.reel-pack-header-actions')?.append(download);
+    }
+    const renderSummary = [...root.querySelectorAll('.pack-summary article')].find(card => card.querySelector('span')?.textContent === 'Approved');
+    if (renderSummary) {
+      renderSummary.querySelector('span').textContent = 'Ready to render';
+      renderSummary.querySelector('strong').textContent = String(renderReady);
+    }
+    for (const button of root.querySelectorAll('.pack-reel-render')) {
+      const reel = reels.find(item => item.reel_id === button.dataset.reelId);
+      button.disabled = working || !['visual_ready', 'approved'].includes(reel?.status);
+    }
     root.querySelector('.pack-stage-controls')?.insertAdjacentHTML('afterend', livePreviewMarkup(run, working, completed));
     const live = liveProcessLabel(run);
     if (live) {
@@ -342,6 +378,7 @@
       '#pack-run-review',
       '#pack-screen',
       '#pack-render-approved',
+      '#pack-youtube-assets',
       '#pack-run-stage',
       '#pack-regenerate-stage',
       '#pack-script-dialog-close',
@@ -353,6 +390,7 @@
       '.pack-reel-restore',
       '.pack-reel-approve',
       '.pack-reel-render',
+      '.pack-reel-youtube',
     ].join(','));
     if (!isPackControl) return false;
     event.preventDefault();
@@ -393,11 +431,17 @@
       }
       if (button.id === 'pack-run-next') {
         const current = Number(document.querySelectorAll('.pack-step.is-done').length || 1);
-        await executePack(runId, {from_step: Math.min(8, current + 1), stop_after_step: Math.min(8, current + 1)}); return true;
+        if (current >= 8) {
+          const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/youtube-assets`, {
+            method: 'POST', body: JSON.stringify({task_models: collectPackTaskModels()}),
+          });
+          renderPackWorkspace(response.run); return true;
+        }
+        const next = current >= 6 ? 8 : Math.min(6, current + 1);
+        await executePack(runId, {from_step: next, stop_after_step: next}); return true;
       }
       if (button.id === 'pack-run-review') {
-        const current = Number(document.querySelectorAll('.pack-step.is-done').length || 1);
-        await executePack(runId, {from_step: Math.min(7, current + 1), stop_after_step: 7}); return true;
+        await executePack(runId, {from_step: 7, stop_after_step: 7}); return true;
       }
       if (button.id === 'pack-screen') {
         const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/screen`, {method: 'POST', body: JSON.stringify({auto_repair: true, task_models: collectPackTaskModels()})});
@@ -407,8 +451,21 @@
         const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/render`, {method: 'POST', body: JSON.stringify({task_models: collectPackTaskModels()})});
         renderPackWorkspace(response.run); return true;
       }
+      if (button.id === 'pack-youtube-assets') {
+        const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/youtube-assets`, {
+          method: 'POST',
+          body: JSON.stringify({task_models: collectPackTaskModels()}),
+        });
+        renderPackWorkspace(response.run); return true;
+      }
       if (button.id === 'pack-run-stage') {
         const step = Number(document.getElementById('pack-stage-select')?.value || 1);
+        if (step === 9) {
+          const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/youtube-assets`, {
+            method: 'POST', body: JSON.stringify({task_models: collectPackTaskModels()}),
+          });
+          renderPackWorkspace(response.run); return true;
+        }
         await executePack(runId, {from_step: step, stop_after_step: step}); return true;
       }
       if (button.id === 'pack-regenerate-stage') {
@@ -417,6 +474,12 @@
         const taskModels = collectPackTaskModels();
         const reset = await request(`/api/runs/${encodeURIComponent(runId)}/reset`, {method: 'POST', body: JSON.stringify({step})});
         renderPackWorkspace(reset.run);
+        if (step === 9) {
+          const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/youtube-assets`, {
+            method: 'POST', body: JSON.stringify({task_models: taskModels}),
+          });
+          renderPackWorkspace(response.run); return true;
+        }
         await executePack(runId, {from_step: step, stop_after_step: step, task_models: taskModels});
         return true;
       }
@@ -464,6 +527,13 @@
       }
       if (button.classList.contains('pack-reel-render')) {
         const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/render`, {method: 'POST', body: JSON.stringify({target_reel_id: reelId, task_models: collectPackTaskModels()})});
+        renderPackWorkspace(response.run); return true;
+      }
+      if (button.classList.contains('pack-reel-youtube')) {
+        const response = await request(`/api/runs/${encodeURIComponent(runId)}/reel-pack/youtube-assets`, {
+          method: 'POST',
+          body: JSON.stringify({target_reel_id: reelId, task_models: collectPackTaskModels()}),
+        });
         renderPackWorkspace(response.run); return true;
       }
     } catch (error) {

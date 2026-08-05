@@ -487,12 +487,27 @@ def repair_visual(
 def render_pack(run_path: Path, *, target_reel_id: str | None = None, render_all: bool = False) -> dict[str, Any]:
     pack = load_pack(run_path)
     errors = []
+    eligible_statuses = {"visual_ready", "approved"}
+    requested_target = require_reel_id(target_reel_id) if target_reel_id else None
+    selected = [
+        record for record in pack["reels"]
+        if not requested_target or record["reel_id"] == requested_target
+    ]
+    if requested_target and not selected:
+        raise ValueError(f"Unknown Reel: {requested_target}")
+    if requested_target and selected[0].get("status") not in eligible_statuses:
+        raise ValueError(
+            f"{requested_target} must complete compile & preview before rendering; "
+            f"current status is {selected[0].get('status')}"
+        )
+    attempted = 0
     for record in pack["reels"]:
         parent_id = record["reel_id"]
-        if target_reel_id and parent_id != require_reel_id(target_reel_id):
+        if requested_target and parent_id != requested_target:
             continue
-        if not render_all and record.get("status") != "approved":
+        if record.get("status") not in eligible_statuses:
             continue
+        attempted += 1
         try:
             from mav_render import render_reel_mp4
             final = render_reel_mp4(run_path.name, parent_id)
@@ -504,10 +519,12 @@ def render_pack(run_path: Path, *, target_reel_id: str | None = None, render_all
             record["status"] = "failed"
             record["error"] = str(exc)
             errors.append(f"{parent_id}: {exc}")
+    if not attempted and not errors:
+        raise RuntimeError("No compile-ready Reels are available to render")
     rendered = sum(item.get("status") == "rendered" for item in pack["reels"])
     active_count = sum(item.get("status") != "rejected" for item in pack["reels"])
-    pack["status"] = "complete" if rendered == active_count else "partial" if errors else "approved"
-    pack["current_step"] = max(int(pack.get("current_step", 7)), 8)
+    pack["status"] = "complete" if rendered == active_count else "partial" if errors else "visuals_ready"
+    pack["current_step"] = max(int(pack.get("current_step", 6)), 8)
     save_pack(run_path, pack)
     if errors:
         raise RuntimeError("; ".join(errors))
