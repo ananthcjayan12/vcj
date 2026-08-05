@@ -41,6 +41,29 @@ def _metadata() -> dict:
 
 
 class MavYoutubeReelAssetsTest(unittest.TestCase):
+    def test_builds_valid_short_timeline_from_timed_beats(self) -> None:
+        chapters = mav_youtube_reel_assets._reel_timeline(
+            {
+                "working_title": "Measure Tiny Distances",
+                "audio_duration_seconds": 42,
+                "timed_beats": [
+                    {"id": "hook", "start": 0},
+                    {"id": "prediction_prompt", "start": 6},
+                    {"id": "method_intro", "start": 12},
+                    {"id": "calculation", "start": 25},
+                    {"id": "resolve", "start": 34},
+                ],
+            }
+        )
+
+        self.assertEqual(
+            chapters,
+            [
+                {"timestamp": "00:00", "title": "Measure Tiny Distances"},
+                {"timestamp": "00:12", "title": "The method"},
+                {"timestamp": "00:25", "title": "Calculate the answer"},
+            ],
+        )
     def test_generates_independent_asset_pack_for_rendered_reel(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory) / "test-pack"

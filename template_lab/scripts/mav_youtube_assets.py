@@ -517,7 +517,7 @@ def generate(run_id: str) -> Path:
     if COPY_REFERENCE_PATH.exists():
         system += (
             "\n\nCOPY FORMAT REFERENCE\n"
-            "Use the following as the benchmark for completeness, tone, formatting, placeholders, challenge, "
+            "Use the following as the benchmark for completeness, tone, formatting, challenge, "
             "tags, pinned comment, playlists and upload settings. Adapt every fact to the current transcript; "
             "do not copy lesson-specific claims from the example.\n\n"
             + COPY_REFERENCE_PATH.read_text(encoding="utf-8")

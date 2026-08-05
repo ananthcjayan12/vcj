@@ -1,0 +1,56 @@
+.yt-dashboard { display: grid; gap: 14px; }
+.yt-hero { position: relative; min-height: 176px; padding: 24px; border: 1px solid rgba(239,106,104,.22); border-radius: 15px; overflow: hidden; background: radial-gradient(circle at 88% 10%, rgba(239,106,104,.2), transparent 28%), linear-gradient(135deg, #141b1d, #0d1315 65%); box-shadow: var(--shadow); }
+.yt-hero::after { content: "▶"; position: absolute; right: 28px; top: 18px; color: rgba(239,106,104,.12); font-size: 112px; line-height: 1; }
+.yt-hero-copy { position: relative; z-index: 1; max-width: 680px; }
+.yt-hero h2 { margin: 6px 0 8px; font-size: 24px; letter-spacing: -.035em; }
+.yt-hero p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
+.yt-hero-metrics { position: relative; z-index: 1; margin-top: 20px; display: flex; flex-wrap: wrap; gap: 7px; }
+.yt-hero-metrics span { padding: 7px 9px; border: 1px solid rgba(255,255,255,.09); border-radius: 7px; color: #cbd3d0; background: rgba(0,0,0,.18); font: 700 8px/1 ui-monospace, monospace; text-transform: uppercase; }
+.yt-grid { display: grid; grid-template-columns: minmax(300px,.75fr) minmax(0,1.25fr); gap: 14px; align-items: start; }
+.yt-stack { display: grid; gap: 14px; }
+.yt-panel { border: 1px solid var(--line); border-radius: 13px; background: rgba(15,22,24,.94); overflow: hidden; box-shadow: var(--shadow); }
+.yt-panel-head { min-height: 66px; padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.yt-panel-head h3 { margin: 4px 0 0; font-size: 14px; }
+.yt-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.yt-channel-list { padding: 9px; display: grid; gap: 7px; }
+.yt-channel { width: 100%; padding: 11px; border: 1px solid var(--line-soft); border-radius: 9px; color: var(--muted); background: rgba(255,255,255,.012); display: grid; grid-template-columns: 36px minmax(0,1fr) auto; align-items: center; gap: 10px; text-align: left; }
+.yt-channel:hover { border-color: rgba(239,106,104,.28); }
+.yt-channel.is-selected { border-color: rgba(239,106,104,.42); color: var(--text); background: rgba(239,106,104,.07); }
+.yt-avatar { width: 36px; height: 36px; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#f45d5a,#a92525); display: grid; place-items: center; font: 800 12px/1 ui-monospace, monospace; }
+.yt-channel strong,.yt-channel small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yt-channel strong { font-size: 10px; }.yt-channel small { margin-top: 4px; color: var(--faint); font: 7.5px/1 ui-monospace, monospace; }
+.yt-selected-mark { color: var(--red); font: 800 8px/1 ui-monospace, monospace; }
+.yt-empty { padding: 22px; color: var(--muted); font-size: 10px; line-height: 1.6; text-align: center; }
+.yt-settings { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.yt-field { min-width: 0; }.yt-field.wide { grid-column: 1/-1; }
+.yt-field > span { display: block; margin-bottom: 6px; color: var(--muted); font-size: 8px; }
+.yt-field input,.yt-field select,.yt-field textarea { width: 100%; min-height: 36px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; outline: 0; color: var(--text); background: #0a1012; font-size: 9px; }
+.yt-field textarea { min-height: 58px; padding-top: 8px; resize: vertical; }
+.yt-field input:focus,.yt-field select:focus,.yt-field textarea:focus { border-color: rgba(239,106,104,.5); }
+.yt-options { grid-column: 1/-1; padding: 10px; border: 1px solid var(--line-soft); border-radius: 8px; display: grid; gap: 8px; }
+.yt-check { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 8.5px; line-height: 1.4; }
+.yt-check input { margin-top: 1px; accent-color: var(--red); }
+.yt-publish-footer { padding: 13px 14px; border-top: 1px solid var(--line); display: grid; gap: 9px; }
+.yt-publish-footer .primary-button { border-color: #df4543; color: #fff; background: #df4543; }
+.yt-publish-footer .primary-button:hover { background: #ef5855; }
+.yt-safety { margin: 0; color: var(--faint); font-size: 8px; line-height: 1.5; }
+.yt-library { display: grid; gap: 14px; }
+.yt-library-section { border: 1px solid var(--line); border-radius: 13px; background: rgba(15,22,24,.94); overflow: hidden; }
+.yt-section-heading { min-height: 61px; padding: 13px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.yt-section-heading h3 { margin: 4px 0 0; font-size: 13px; }.yt-section-heading span { color: var(--faint); font: 8px/1 ui-monospace, monospace; }
+.yt-item-list { display: grid; }
+.yt-item { min-height: 70px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: center; gap: 10px; }
+.yt-item:last-child { border-bottom: 0; }.yt-item.is-uploaded { background: rgba(66,184,139,.035); }
+.yt-item input { accent-color: var(--red); }
+.yt-item-copy { min-width: 0; }.yt-item-copy strong { display: block; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.yt-item-copy small { display: block; margin-top: 5px; color: var(--faint); font: 7.5px/1.35 ui-monospace, monospace; }
+.yt-badges { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.yt-badge { padding: 4px 5px; border-radius: 4px; color: var(--faint); background: var(--panel-3); font: 700 6.5px/1 ui-monospace, monospace; text-transform: uppercase; }
+.yt-badge.ready { color: var(--green); background: var(--green-soft); }.yt-badge.missing { color: var(--orange); background: rgba(231,154,99,.1); }.yt-badge.uploaded { color: var(--cyan); background: rgba(89,215,226,.09); }
+.yt-item-side { text-align: right; }.yt-item-side b { display: block; color: var(--muted); font: 700 8px/1 ui-monospace, monospace; }.yt-item-side a { display: block; margin-top: 6px; color: var(--cyan); font-size: 8px; }
+.yt-job-list { display: grid; }.yt-job { padding: 11px 14px; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }.yt-job:last-child { border-bottom: 0; }
+.yt-job strong,.yt-job small { display: block; }.yt-job strong { font-size: 9px; }.yt-job small { margin-top: 5px; color: var(--faint); font-size: 7.5px; line-height: 1.4; }.yt-job time { color: var(--faint); font: 7px/1 ui-monospace, monospace; }
+.yt-job-progress { grid-column: 1/-1; height: 5px; border-radius: 999px; overflow: hidden; background: var(--panel-3); }.yt-job-progress i { display: block; height: 100%; border-radius: inherit; background: var(--red); }
+.yt-error { margin: 0; padding: 10px 14px; border: 1px solid rgba(239,106,104,.3); border-radius: 8px; color: #ffc2c1; background: rgba(239,106,104,.08); font-size: 9px; }
+@media(max-width:1120px){.yt-grid{grid-template-columns:1fr}.yt-stack{grid-template-columns:1fr 1fr}.yt-stack .yt-panel:last-child{grid-column:1/-1}}
+@media(max-width:760px){.yt-stack{grid-template-columns:1fr}.yt-stack .yt-panel:last-child{grid-column:auto}.yt-settings{grid-template-columns:1fr}.yt-field.wide,.yt-options{grid-column:auto}.yt-hero::after{display:none}.yt-panel-head,.yt-section-heading{align-items:flex-start;flex-direction:column}.yt-item{grid-template-columns:22px minmax(0,1fr)}.yt-item-side{grid-column:2;text-align:left}}

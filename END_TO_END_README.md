@@ -226,7 +226,7 @@ python3 -m video_engine.cli set-status \
   --status covered
 ```
 
-Uploading remains manual. The engine has no scheduler, platform credentials, or automatic publishing path.
+Uploading is a separate, explicitly confirmed stage. The local Studio YouTube control room can publish approved long-form lessons and Reels through saved channel profiles; the engine still has no unattended scheduler.
 
 ## 9. Preview the reusable 41-scene library
 

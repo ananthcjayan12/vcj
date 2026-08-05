@@ -22,6 +22,7 @@ from mav_youtube_assets import (  # noqa: E402
     METADATA_SCHEMA,
     _generate_image_with_references,
     _normalize_thumbnail,
+    _timestamp,
     _validate_metadata,
     _write_copy_pack,
 )
@@ -174,6 +175,7 @@ def _reel_context(pack: dict[str, Any], record: dict[str, Any], paragraph: dict[
             "content_product": "youtube-short",
             "reel_id": record["reel_id"],
             "pack_topic": pack.get("topic"),
+            "topic_ref": pack.get("topic_ref"),
             "working_title": record.get("working_title"),
             "hook": record.get("hook"),
             "central_question": record.get("central_question"),
@@ -183,10 +185,54 @@ def _reel_context(pack: dict[str, Any], record: dict[str, Any], paragraph: dict[
             "required_scientific_relationships": record.get("required_scientific_relationships", []),
             "narration": paragraph.get("text") or paragraph.get("narration") or "",
             "target_duration_seconds": record.get("target_duration_seconds"),
+            "timed_reel_structure": [
+                {
+                    "id": beat.get("id"),
+                    "start": beat.get("start"),
+                    "end": beat.get("end"),
+                    "narrative_job": beat.get("narrative_job"),
+                    "spoken_text": beat.get("spoken_text"),
+                }
+                for beat in record.get("timed_beats", [])
+                if isinstance(beat, dict)
+            ],
         },
         indent=2,
         ensure_ascii=False,
     )
+
+
+def _reel_timeline(record: dict[str, Any]) -> list[dict[str, str]]:
+    """Build YouTube-valid Short chapters from authoritative timed beats."""
+    duration = float(record.get("audio_duration_seconds") or record.get("target_duration_seconds") or 0)
+    beats = [beat for beat in record.get("timed_beats", []) if isinstance(beat, dict)]
+    opening = str(record.get("working_title") or record.get("title") or "Reel topic").strip()
+    chapters: list[tuple[int, str]] = [(0, opening[:80])]
+    title_overrides = {
+        "prediction_prompt": "Make your prediction",
+        "method_intro": "The method",
+        "measurement": "Take the measurement",
+        "calculation": "Calculate the answer",
+        "mechanism": "How it works",
+        "reversal": "The surprising result",
+        "resolve": "Key takeaway",
+        "worked_example": "Worked example",
+        "misconception": "Common misconception",
+    }
+    for beat in beats[1:]:
+        start = round(float(beat.get("start") or 0))
+        if start - chapters[-1][0] < 10 or duration - start < 10:
+            continue
+        beat_id = str(beat.get("id") or "").strip()
+        title = title_overrides.get(beat_id) or beat_id.replace("_", " ").strip().title()
+        if not title:
+            continue
+        chapters.append((start, title[:80]))
+        if len(chapters) == 4:
+            break
+    if len(chapters) < 3:
+        return [{"timestamp": "00:00", "title": opening[:80]}]
+    return [{"timestamp": _timestamp(start), "title": title} for start, title in chapters]
 
 
 def _update_publishing_manifest(
@@ -320,6 +366,7 @@ def generate(
             if not metadata:
                 raise RuntimeError("YouTube metadata model returned no response")
             metadata = _validate_metadata(metadata)
+            metadata["chapters"] = _reel_timeline(record)
             generated, mime_type, image_model, reference_images = thumbnail_call(
                 metadata["thumbnail"]["visual_prompt"],
                 metadata["thumbnail"]["overlay_text"],
@@ -333,6 +380,7 @@ def generate(
             report = {
                 "status": "generated",
                 "reel_id": reel_id,
+                "topic_ref": pack.get("topic_ref"),
                 "source_video": f"motion_canvas/renders/{reel_id}.mp4",
                 "youtube_video": str(youtube_video.relative_to(run_path)),
                 "thumbnail_frame_seconds": thumbnail_frame_seconds,

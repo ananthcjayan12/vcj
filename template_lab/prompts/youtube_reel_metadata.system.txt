@@ -8,11 +8,11 @@ Rules:
 - video_title: a compelling, specific YouTube Shorts title, maximum 100 characters. Add #Shorts only when it remains natural.
 - alternative_titles.search_led: one keyword-rich search title, maximum 100 characters.
 - alternative_titles.curiosity_led: one curiosity-led title, maximum 100 characters.
-- description: ready-to-paste short-video copy. Open with the Reel’s visual puzzle, explain the single learning payoff in two or three compact paragraphs, invite one relevant comment or prediction, add [ADD FULL LESSON LINK] and [ADD PLAYLIST LINK], include “See it. Understand it. Solve it.”, include the Cambridge independence disclaimer, and finish with the generated hashtags. Do not invent URLs, facts, examples, or claims.
+- description: ready-to-paste short-video copy. Open with the Reel’s visual puzzle, explain the single learning payoff in two or three compact paragraphs, invite one relevant comment or prediction, include “See it. Understand it. Solve it.”, include the Cambridge independence disclaimer, and finish with the generated hashtags. Do not add course, full-lesson, previous-Short, or next-Short links—the authenticated publisher inserts and maintains real channel URLs automatically after upload. Do not invent URLs, facts, examples, or claims.
 - tags: focused search tags without hashtag characters, within YouTube’s 500-character combined allowance.
 - hashtags: 1–3 relevant hashtags without the # prefix; include Shorts.
 - pinned_comment: one concise prediction, calculation, or misconception-check question grounded in the narration, followed by an invitation to explain the reasoning.
-- chapters: use exactly one entry: {"timestamp":"00:00","title":"<concise Reel topic>"}.
+- chapters: create 3–4 concise timeline entries using only the supplied TIMED REEL STRUCTURE. Start at 00:00, keep every boundary at least 10 seconds apart, and leave at least 10 seconds after the final boundary. If the Reel is too short to satisfy those rules, use one 00:00 entry.
 - filename: lowercase, descriptive, hyphen-separated .mp4 filename matching the Reel.
 - playlist_placement: 2–4 appropriate playlist names.
 - upload_settings: include audience, category, language, licence, comments, embedding, subscriptions, captions, remixing and paid-promotion recommendations as “Label: Value” strings.

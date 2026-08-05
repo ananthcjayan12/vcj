@@ -18,7 +18,7 @@ Use **Regenerate from step** when an earlier artifact must be replaced. It remov
 
 The Physics Production Studio is the manual control room for producing one high-quality IGCSE Physics lesson at a time. It combines the syllabus map, curriculum coverage registry, aggregate past-paper patterns, reusable animation assets, AI-assisted lesson generation, preview, scene repair, and MP4 rendering in one local interface.
 
-The Studio does **not** publish videos or run on a daily schedule. You choose a topic, supervise its production, approve the result, render it, upload it manually, and then update curriculum coverage.
+The Studio does not run unattended daily schedules. After you supervise and approve a production, its local YouTube control room can publish the rendered lesson or selected Reels through an explicitly confirmed, channel-guarded queue.
 
 ---
 
@@ -448,7 +448,22 @@ Watch the rendered MP4 from beginning to end. Browser preview success does not r
 - playback works in a normal media player;
 - final resolution, duration, and file size are suitable for upload.
 
-The Studio intentionally does not upload the result. Publish the approved file manually to YouTube, Instagram, or another platform.
+The Studio does not upload as part of rendering. Open the **YouTube** control room, choose an authorized channel profile, select the approved outputs, review visibility and audience settings, and explicitly confirm the publish job.
+
+## YouTube control room
+
+The YouTube view manages local OAuth channel profiles and two publishing lanes:
+
+- **Long-form** uses each run's final MP4, generated `youtube/metadata.json`, and custom thumbnail.
+- **Reels** uses each generated `youtube-short.mp4` and Reel metadata pack. The generated final one-second frame remains the selectable Shorts cover.
+
+Use **Add channel** to authorize another YouTube or Brand Account. Each channel gets its own local refresh token. Clicking a saved profile changes the selected publishing identity; every real upload verifies that exact channel ID before transferring video bytes.
+
+Publishing defaults to private. The dashboard requires item selection, a settings-review checkbox, and a final confirmation dialog. It refuses incomplete assets and any item that already has `upload-result.json`. Mixed long-form and Reel jobs run sequentially and stop on the first failure. Scheduling is available for one private item at a time.
+
+Course organization is enabled by default. After each upload, the publisher creates or reuses **Cambridge IGCSE Physics (0625) — Complete Course**, inserts long-form lessons before Shorts, keeps transcript-derived chapters in the description, replaces generated link placeholders with the real playlist URL, and refreshes previous/next navigation on the new upload and its neighboring lesson or Short. For a Reel pack, Studio also links the matching uploaded full lesson when both items share the same syllabus topic reference. The playlist title can be changed in Release settings; the playlist-ID field is only for optional additional playlists.
+
+The dashboard is deliberately local-only because it operates on local renders and OAuth files under `.youtube/`. Do not expose the Studio server to the public internet.
 
 ---
 

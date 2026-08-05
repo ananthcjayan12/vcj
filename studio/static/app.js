@@ -531,7 +531,7 @@ function switchViewTo(view) {
   state.view = view;
   $$(".nav-item").forEach(item => item.classList.toggle("is-active", item.dataset.view === view));
   $$(".view").forEach(item => item.classList.toggle("is-active", item.id === `view-${view}`));
-  const titles = { production: ["Motion Canvas lesson engine", "Production workspace"], curriculum: ["Coverage control", "Curriculum map"], runs: ["Production history", "Runs and outputs"] };
+  const titles = { production: ["Motion Canvas lesson engine", "Production workspace"], curriculum: ["Coverage control", "Curriculum map"], runs: ["Production history", "Runs and outputs"], youtube: ["Channel-safe publishing", "YouTube control room"] };
   $("#view-eyebrow").textContent = titles[view][0]; $("#view-title").textContent = titles[view][1];
   history.replaceState(null, "", `#${view}`);
 }
@@ -804,5 +804,5 @@ document.addEventListener("change", event => {
 });
 
 const initialView = location.hash.replace("#", "");
-if (["production", "curriculum", "runs"].includes(initialView)) switchViewTo(initialView);
+if (["production", "curriculum", "runs", "youtube"].includes(initialView)) switchViewTo(initialView);
 boot();

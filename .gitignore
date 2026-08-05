@@ -40,6 +40,10 @@ ENV/
 .env
 .env.*
 !.env.example
+.youtube/
+client_secret*.json
+client_secrets*.json
+youtube-token*.json
 
 # Local tool state
 .playwright-cli/

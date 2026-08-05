@@ -34,8 +34,10 @@ def _bootstrap_reel_pack_extension() -> None:
                 module = sys.modules.get(request_handler_class.__module__)
                 if module is not None:
                     from .reel_pack_extension import install
+                    from .youtube_publish_extension import install as install_youtube
 
                     install(module)
+                    install_youtube(module)
         finally:
             http.server.ThreadingHTTPServer.__init__ = original
         original(instance, server_address, request_handler_class, bind_and_activate)
